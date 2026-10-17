@@ -1,0 +1,11 @@
+{
+  "name": "Fio do Destino",
+  "short_name": "Fio do Destino",
+  "description": "RPG de turnos sobre os deuses antigos.",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0d0b14",
+  "theme_color": "#0d0b14",
+  "icons": [{ "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}
