@@ -14,6 +14,7 @@
   --fundo-reino: linear-gradient(180deg, #1b1530 0%, #0d0b14 100%);
   --safe-b: env(safe-area-inset-bottom, 0px);
   --safe-t: env(safe-area-inset-top, 0px);
+  color-scheme: dark;
 }
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 html, body { margin: 0; height: 100%; background: var(--bg); color: var(--texto); font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; font-size: 16px; overscroll-behavior: none; }
@@ -190,3 +191,7 @@ b { font-weight: 700; }
 @media (max-height: 640px) {
   .sprite { font-size: 3.6rem; } .lado.chefe .sprite { font-size: 4.2rem; } .acoes { min-height: 140px; }
 }
+
+.conf-msg { margin: 6px 36px 16px 0; line-height: 1.5; font-size: 1.05rem; }
+.conf-bts { display: flex; gap: 10px; }
+.conf-bts .btn { flex: 1; }

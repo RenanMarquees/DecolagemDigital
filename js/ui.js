@@ -379,9 +379,24 @@ function atualizarModal() {
   if (!B && P) { const t = app.querySelector('.topo'); if (t) t.outerHTML = statusTopo(); const bd = app.querySelector('.badge'); if (bd && P.pontos <= 0) bd.remove(); }
 }
 
+/* ---------- confirmação dentro do jogo (confirm() do navegador não funciona em todo lugar) ---------- */
+let CONFIRMA = null;
+function confirmar(msg, aoConfirmar) {
+  CONFIRMA = aoConfirmar;
+  MODAL_ATUAL = null;
+  modal.innerHTML = `<div class="janela"><p class="conf-msg">${esc(msg)}</p>
+    <div class="conf-bts"><button class="btn sec" data-a="conf-nao">Cancelar</button><button class="btn grande" data-a="conf-sim">Continuar</button></div></div>`;
+  modal.classList.add('on');
+}
+
 /* ---------- ações (toques) ---------- */
 const ACOES = {
-  novo() { if (carregar() && !confirm('Isso apaga o jogo salvo. Começar um novo?')) return; telaCriar(); },
+  novo() {
+    if (carregar()) confirmar('Isso apaga o jogo salvo. Começar um novo?', telaCriar);
+    else telaCriar();
+  },
+  'conf-sim'() { const f = CONFIRMA; CONFIRMA = null; fecharModal(); if (f) f(); },
+  'conf-nao'() { CONFIRMA = null; fecharModal(); },
   continuar() { P = carregar(); if (P) telaMapa(); },
   titulo() { fecharModal(); telaTitulo(); },
   classe(el) { CRIAR.classe = el.dataset.id; telaCriar(); },
@@ -410,9 +425,12 @@ const ACOES = {
   },
   chefe() {
     const e = INIMIGOS[REINO.chefe];
-    if (P.hp < derivados(P).hpMax * 0.5 && !confirm('Sua vida está baixa. Desafiar mesmo assim?')) return;
-    if (P.derrotados[REINO.chefe]) { iniciarBatalha(REINO.chefe); return; }
-    historia(e.falaAntes, () => iniciarBatalha(REINO.chefe));
+    const iniciar = () => {
+      if (P.derrotados[REINO.chefe]) iniciarBatalha(REINO.chefe);
+      else historia(e.falaAntes, () => iniciarBatalha(REINO.chefe));
+    };
+    if (P.hp < derivados(P).hpMax * 0.5) confirmar('Sua vida está baixa. Desafiar mesmo assim?', iniciar);
+    else iniciar();
   },
   acampar() {
     const d = derivados(P);

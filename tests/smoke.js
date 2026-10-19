@@ -6,7 +6,7 @@ const http = require('http'), fs = require('fs'), path = require('path');
 const raiz = path.join(__dirname, '..');
 const tipos = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml' };
 const srv = http.createServer((q, r) => {
-  const f = path.join(raiz, q.url === '/' ? 'index.html' : q.url.split('?')[0]);
+  const f = q.url === '/' && process.env.PAGINA ? process.env.PAGINA : path.join(raiz, q.url === '/' ? 'index.html' : q.url.split('?')[0]);
   fs.readFile(f, (e, d) => { if (e) { r.writeHead(404); r.end(); } else { r.writeHead(200, { 'content-type': tipos[path.extname(f)] || 'text/plain' }); r.end(d); } });
 });
 (async () => {
@@ -66,6 +66,7 @@ const srv = http.createServer((q, r) => {
   // chefe
   await click('[data-a=reino][data-id=valhala]');
   await click('[data-a=chefe]');
+  if (await page.$('[data-a=conf-sim]')) { await shot('14a-confirma'); await click('[data-a=conf-sim]'); }
   await click('[data-a=hist-prox]');
   await shot('14-chefe');
   await browser.close(); srv.close();
