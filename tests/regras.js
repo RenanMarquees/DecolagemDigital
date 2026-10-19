@@ -579,12 +579,12 @@ teste('as cartas: +N soma, −N tira (mínimo 1), ×2 dobra, bloqueio zera', () 
   igual(r.join(), '5,1,3,6,0,1');
 });
 teste('o baralho só embaralha quando sai ×2 ou bloqueio (aí todas as cartas voltam ao monte)', () => {
-  const r = R(`(() => { SORTE.ativa = true; const b = novoBaralhoMod(['+1', '+2', '-1', 'x2', '0', '0']); const vistas = []; let embaralhou = [];
+  const r = R(`(() => { SORTE.ativa = true; const b = novoBaralhoMod(['+1', '+2', '-1', 'x2', '0', '0']); const vistas = []; const embaralhou = [], monte = [];
     b.compra = ['+1', '+2', '-1', 'x2', '0', '0']; b.descarte = [];
-    for (let i = 0; i < 5; i++) { const c = sacarMod(b); vistas.push(c.id); embaralhou.push(c.embaralhou); }
-    const r = { vistas: vistas.join(), embaralhou: embaralhou.join(), monte: b.compra.length, descarte: b.descarte.length }; SORTE.ativa = false; return r; })()`);
-  igual(r.vistas.split(',').slice(0, 4).join(), '+1,+2,-1,x2'); igual(r.embaralhou, 'false,false,false,true,false');
-  igual(r.monte, 5, 'depois do ×2 as 6 cartas voltaram ao monte e uma já foi virada'); igual(r.descarte, 1);
+    for (let i = 0; i < 4; i++) { const c = sacarMod(b); vistas.push(c.id); embaralhou.push(c.embaralhou); monte.push(b.compra.length + '/' + b.descarte.length); }
+    SORTE.ativa = false; return { vistas: vistas.join(), embaralhou: embaralhou.join(), monte: monte.join() }; })()`);
+  igual(r.vistas, '+1,+2,-1,x2'); igual(r.embaralhou, 'false,false,false,true');
+  igual(r.monte, '5/1,4/2,3/3,6/0', 'depois do ×2 as 6 cartas voltaram ao monte e o descarte ficou vazio');
 });
 teste('cada ataque do herói vira uma carta sozinha: +2 dá 5, ×2 dá 6 e bloqueio perde o ataque (e o empurrão)', () => {
   const r = R(`(() => { SORTE.ativa = true; const out = [];
