@@ -25,7 +25,7 @@ const ROBO = require('./robo');
   await page.evaluate(() => {
     const p = novoJogador('Teste', 'guerreiro');
     p.tutorial.off = true; p.nivel = 20; p.attr.FOR = 300; p.attr.VIT = 300; p.gold = 5000;
-    const d = derivados(p); p.hp = d.hpMax; p.mp = d.mpMax;
+    const d = derivados(p); p.hp = d.hpMax;
     localStorage.setItem(SAVE_KEY, JSON.stringify(p));
   });
   await page.reload();

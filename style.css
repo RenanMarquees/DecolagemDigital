@@ -356,3 +356,6 @@ b { font-weight: 700; }
 }
 .palco > .tut { position: absolute; top: 44px; left: 8px; right: 8px; margin: 0; z-index: 12; max-height: 55%; }
 @media (orientation: landscape) and (max-height: 520px) { .palco > .tut { right: calc(min(330px, 42%) + 8px); top: 40px; max-height: 80%; } }
+.slot { margin-bottom: 8px; }
+.slot-nome { display: block; font-size: .78rem; color: var(--suave); margin: 2px 2px 3px; text-transform: uppercase; letter-spacing: .04em; }
+.slot .linha-item { margin-bottom: 0; }

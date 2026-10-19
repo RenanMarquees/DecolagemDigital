@@ -14,6 +14,9 @@ const ATRIBUTO_DESC = {
   INT: 'A cada 6: +1 de dano do Oráculo e +1 de cura nas cartas',
   VIT: 'A cada 4: +1 de vida máxima',
 };
+/** Personagens que usam um arquivo pronto em modelos/<id>.glb no lugar do modelo feito por código (veja docs/MINIATURAS.md).
+ *  Exemplo: const MODELOS_GLB = ['cerbero', 'hades']; */
+const MODELOS_GLB = [];
 const NIVEL_MAX = 20;
 const PONTOS_POR_NIVEL = 1;
 const VIDA_MAX_JOGO = 30;          // ninguém passa disso: as contas ficam fáceis
@@ -235,9 +238,9 @@ const DIFICULDADES = {
 const DIFICULDADE_PADRAO = 'intermediario';
 /** Dois "botões" gerais de equilíbrio: forca multiplica vida e ataque de TODOS os inimigos; xp multiplica o XP ganho.
  *  (Para deixar o jogo mais fácil ou mais difícil de uma vez, mexa só aqui.) */
-const BALANCO = { forca: 1, xp: 1 };
+const BALANCO = { forca: 0.5, xp: 1 };
 /** A cada nível do cenário acima do "nível-base" do reino, os inimigos ganham este tanto de vida/ataque (e o contrário abaixo). */
-const FORCA_POR_NIVEL = 0.10;
+const FORCA_POR_NIVEL = 0.03;
 const RECOMPENSA_POR_NIVEL = 0.05;
 
 /* ---------- ESTRUTURAS A DESTRUIR (objetivo "destruir") ---------- */

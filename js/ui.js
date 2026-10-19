@@ -525,7 +525,7 @@ function atualizarHud() {
   }
   const rod = document.getElementById('rod');
   if (rod) rod.innerHTML = `Etapa ${T.etapa}/${T.totalEtapas} · ` + (T.livre ? '<b>Sala limpa</b>' : `Rodada ${T.rodada} · ${OCUPADO || T.fase === 'inimigos' ? '<b class="ini">Inimigos agindo</b>' : T.fase === 'escolha' ? '<b>Escolha a carta</b>' : '<b>Seu turno</b>'}`);
-  ajustarMargens(false);
+  ajustarMargens('offset');
   Tutorial.checar('batalha');
 }
 
@@ -919,4 +919,9 @@ if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
   navigator.serviceWorker.register('sw.js').catch(() => { /* offline é opcional */ });
 }
 
+// modelos .glb prontos (opcional, veja docs/MINIATURAS.md): só baixa o leitor de .glb se houver algum na lista
+if (MODELOS_GLB.length) {
+  const carregar = src => new Promise(ok => { const s = document.createElement('script'); s.src = src; s.onload = s.onerror = ok; document.head.appendChild(s); });
+  carregar('js/vendor/GLTFLoader.js').then(() => carregar('js/vendor/SkeletonUtils.js')).then(() => Modelos3D.carregarGlbs(MODELOS_GLB)).catch(() => { /* o modelo de código continua valendo */ });
+}
 telaTitulo();

@@ -55,9 +55,19 @@ const srv = http.createServer((q, r) => {
   await shot('06-batalha');
   const e0 = await page.evaluate(() => Cena3D.estado());
   if (!e0 || e0.quadros < 5 || e0.unidades < 3) throw new Error('o mapa 3D não desenhou: ' + JSON.stringify(e0));
-  if (!(await page.$('.carta-inim'))) throw new Error('as cartas dos inimigos não aparecem na tela');
+  if ((await page.$$('.ini-chip')).length < 2) throw new Error('a faixa de iniciativa não aparece');
+  if ((await page.$$('.cartaH')).length < 8) throw new Error('a mão de cartas do herói não aparece');
   if (!/Limpe a sala/.test(await page.textContent('#obj'))) throw new Error('o objetivo não aparece');
-  if ((await page.$$('.carta-inim .efeitos li')).length < 2) throw new Error('a carta deveria listar os efeitos');
+  if (await page.evaluate(() => document.documentElement.scrollHeight > innerHeight + 2)) throw new Error('a tela de batalha não deveria rolar (tudo cabe sem descer)');
+  // tudo o que importa tem que estar visível sem rolar: botões de ação/cartas dentro da tela
+  const forado = await page.evaluate(() => [...document.querySelectorAll('.btn-mapa, .cartaH, #dock .btn, .ini-faixa')].filter(e => { const r = e.getBoundingClientRect(); return r.bottom > innerHeight + 1 || r.top < 0; }).map(e => e.className));
+  if (forado.length) throw new Error('elementos fora da tela: ' + forado.join(', '));
+  // detalhes (📋): cartas completas dos inimigos
+  await click('[data-a=tat-gaveta] >> nth=0');
+  if ((await page.$$('.gaveta .carta-inim .efeitos li')).length < 2) throw new Error('a carta do inimigo deveria listar os efeitos');
+  await shot('06b-detalhes');
+  await click('.gaveta [data-a=tat-gaveta]');
+  if (await page.$('.gaveta.aberta')) throw new Error('o painel de detalhes não fechou');
 
   // zoom com os botões
   const d0 = (await page.evaluate(() => Cena3D.estado())).dist;
@@ -68,7 +78,7 @@ const srv = http.createServer((q, r) => {
   // pinça com dois dedos (afastar os dedos aproxima a câmera)
   const cdp = await page.context().newCDPSession(page);
   const caixa = await (await page.$('#cena3d')).boundingBox();
-  const cx = caixa.x + caixa.width / 2, cy = caixa.y + caixa.height / 2;
+  const cx = caixa.x + caixa.width / 2, cy = caixa.y + caixa.height * 0.38;   // acima do painel de baixo
   const dedos = (a) => [{ x: cx - a, y: cy, id: 1 }, { x: cx + a, y: cy, id: 2 }];
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: dedos(30) });
   for (const a of [45, 60, 80, 100]) await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: dedos(a) });
@@ -85,13 +95,22 @@ const srv = http.createServer((q, r) => {
   await click('[data-a=tat-centro]'); await page.waitForTimeout(900);
   await shot('07-zoom');
 
+  // escolhe uma carta (toque marca, ▶ Jogar confirma) e joga a rodada
+  await click('.cartaH >> nth=0');
+  if (!(await page.$('.cartaH.sel'))) throw new Error('tocar numa carta deveria marcá-la');
+  await click('[data-a=tat-jogar]');
+  await page.waitForFunction(() => T && T.fase === 'heroi' && !OCUPADO, null, { timeout: 20000 });
+  await shot('07b-turno');
+  if (!(await page.$('[data-a=tat-atacar]')) || !(await page.$('[data-a=tat-fim]'))) throw new Error('os atalhos de ação (atacar/encerrar) deveriam aparecer sobre o mapa');
+
   // toque real num hexágono azul: o herói anda
+  await click('[data-a=tat-centro]'); await page.waitForTimeout(900);
   const alvo = await page.evaluate(() => {
     const campo = tAlcance(T).filter(h => !h.armadilhas && !(h.c === T.heroi.c && h.r === T.heroi.r));
-    const r = document.getElementById('cena3d').getBoundingClientRect();
+    const r = document.getElementById('cena3d').getBoundingClientRect(), dk = document.getElementById('dock').getBoundingClientRect();
     for (const h of campo.sort((a, b) => dist(T.heroi, b) - dist(T.heroi, a))) {
       const t = Cena3D.telaDe(h.c, h.r);
-      if (t && t.x > r.left + 20 && t.x < r.right - 70 && t.y > r.top + 20 && t.y < r.bottom - 20) return { c: h.c, r: h.r, x: t.x, y: t.y };
+      if (t && t.x > r.left + 20 && t.x < r.right - 70 && t.y > r.top + 110 && t.y < dk.top - 20) return { c: h.c, r: h.r, x: t.x, y: t.y };
     }
     return null;
   });
@@ -103,17 +122,17 @@ const srv = http.createServer((q, r) => {
   if (antes === depois) throw new Error('o herói não se moveu ao tocar num hexágono do mapa 3D');
   await shot('08-moveu');
 
-  await click('[data-a=tat-habs]');
-  await shot('09-habilidades');
+  await click('[data-a=tat-itens]');
+  await shot('09-mochila');
   await click('[data-a=tat-voltar]');
   // encerra o turno: os inimigos jogam e a rodada avança
   await click('[data-a=tat-fim]');
-  await page.waitForFunction(() => T && T.rodada >= 2 && !OCUPADO, null, { timeout: 15000 });
+  await page.waitForFunction(() => T && T.rodada >= 2 && T.fase === 'escolha' && !OCUPADO, null, { timeout: 20000 });
   await shot('10-rodada2');
-  if (!(await page.$('.carta-inim'))) throw new Error('as cartas da rodada 2 deveriam aparecer');
+  if ((await page.$$('.cartaH')).length < 8) throw new Error('as cartas da rodada 2 deveriam aparecer (uma foi para o descarte)');
 
   // janelas, loja e salvar/continuar
-  await page.evaluate(() => { P.nivel = 8; P.attr.FOR = 60; P.attr.VIT = 60; const d = derivados(P); P.hp = d.hpMax; P.mp = d.mpMax; salvar(); });
+  await page.evaluate(() => { P.nivel = 8; P.attr.FOR = 60; P.attr.VIT = 60; const d = derivados(P); P.hp = d.hpMax; salvar(); });
   await page.reload();
   await click('[data-a=continuar]');
   await click('[data-a=personagem]'); await shot('11-personagem'); await click('[data-a=fechar]');
@@ -124,5 +143,5 @@ const srv = http.createServer((q, r) => {
   await browser.close(); srv.close();
   if (nivelExpert < 1) throw new Error('o nível do cenário no expert deveria ser pelo menos 1');
   if (erros.length) { console.error('ERROS:', erros); process.exit(1); }
-  console.log('OK: menus, cenário, mapa 3D, toque, pinça, cartas dos inimigos e rodadas funcionam, sem erros de JavaScript. Capturas em', out);
+  console.log('OK: menus, cenário, mapa 3D, toque, pinça, cartas de iniciativa e rodadas funcionam, sem erros de JavaScript. Capturas em', out);
 })().catch(e => { console.error(e); srv.close(); process.exit(1); });

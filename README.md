@@ -4,7 +4,7 @@ RPG de turnos para celular sobre os deuses antigos. Feito em HTML + JavaScript p
 
 **Reinos:** Valhala → Olimpo → Inferno → Duat → Abismo do Caos
 **Classes:** Guerreiro, Caçador, Oráculo
-**Sistemas:** atributos (FOR/DES/INT/VIT), níveis (até 20), inventário, equipamentos (arma/armadura/amuleto), loja, salvamento automático.
+**Sistemas:** atributos (FOR/DES/INT/VIT), níveis (até 20), **5 tipos de item** (cabeça, peito, mãos, pés e mochila), loja, salvamento automático. **Números pequenos:** vida máxima do jogo = 30, dano de 2, 3, 6… sem sorte (nada de crítico/esquiva) e **sem mana**.
 
 **Campanha de 20 cenários:** 4 por reino, em sequência (terminar um destrava o próximo; o último de cada reino abre o reino seguinte). Cada cenário tem um **objetivo**:
 
@@ -15,9 +15,13 @@ RPG de turnos para celular sobre os deuses antigos. Feito em HTML + JavaScript p
 | 🏗️ destruir | destrua as estruturas (torres de gelo, altares, portais, estelas, cristais) |
 | 👑 chefe | derrote o chefe na arena final |
 
-**Combate tático em 3D (estilo Gloomhaven):** o mapa é de hexágonos, visto em 3D (arraste para mover a câmera, **pinça com dois dedos para aproximar/afastar**, gire com dois dedos ou com o botão ↻, 🎯 volta para o herói). No seu turno você **anda** e faz **uma ação** (atacar, habilidade, item ou defender), em qualquer ordem. As miniaturas ficam em bases coloridas (uma cor por tipo de inimigo, igual às cartas na tela), respiram, andam com pulinho e investem ao atacar.
+**Combate tático em 3D (estilo Gloomhaven):** o mapa de hexágonos ocupa a tela toda (arraste para mover a câmera, **pinça com dois dedos para aproximar/afastar**, gire com ↻, 🎯 volta para o herói). Por cima do mapa ficam os atalhos: a **faixa de iniciativa** no topo, os botões de zoom ao lado e, embaixo, a **mão de cartas** e as ações (⚔️ Atacar, 🎒 Mochila, ⏭️ Encerrar). Nada de rolar a tela. Com o **celular deitado**, o painel vai para a direita e o mapa fica à esquerda. O botão 📋 abre os detalhes (cartas completas dos inimigos, armadilhas, histórico).
 
-**Cartas dos inimigos:** a cada rodada cada TIPO de inimigo vira uma carta nova, mostrada na tela antes de você agir: quanto anda (+/−), quanto ataca (+/−), alcance, curar, fortalecer aliados, escudo, empurrar/puxar você. O número no círculo é a **iniciativa** (menor age primeiro). Cada tipo tem o seu baralho (`js/cartas.js`) e os chefes têm baralho próprio, com golpes fortes.
+**Cartas de iniciativa do herói:** você tem uma mão de 10 cartas por classe (`BARALHOS_HEROI` em `js/cartas.js`). Em cada rodada joga **uma**: ela define o seu turno (andar, atacar, alcance, empurrar/puxar, escudo, cura…) e o número dourado é a sua **iniciativa**. Quem tem o menor número age primeiro — inimigos e você se intercalam. A carta jogada vai para o descarte; 💤 **Descansar** (iniciativa 99) cura um pouco e devolve todas as cartas. As habilidades da classe **são as cartas** (sem mana).
+
+**Itens:** usar um item da mochila **não gasta a sua jogada**. Slots: 1 de cabeça, 1 de peito, 1 de pés, 2 de mãos, e a **mochila** começa com 2 lugares e vai a 5 (níveis 5, 10 e 15).
+
+**Cartas dos inimigos:** a cada rodada cada TIPO de inimigo vira uma carta nova, mostrada na tela antes de você agir: quanto anda (+/−), quanto ataca (+/−), alcance, curar, fortalecer aliados, escudo, empurrar/puxar você. O número no círculo é a **iniciativa** (menor age primeiro). Os números mostrados na faixa de iniciativa já são o resultado final (vida e ataque do inimigo + a carta). Cada tipo tem o seu baralho (`js/cartas.js`) e os chefes têm baralho próprio, com golpes fortes.
 
 **Empurrar e puxar:** várias habilidades empurram ou puxam o inimigo (martelo, flecha de Apolo, Fúria de Thor, Drenar Alma...). Parede ou outro monstro para o empurrão; armadilhas disparam em quem for jogado nelas; chefes e estruturas resistem. Alguns inimigos também empurram/puxam você.
 
@@ -35,11 +39,11 @@ RPG de turnos para celular sobre os deuses antigos. Feito em HTML + JavaScript p
 | Olimpo | ⚡ raio | dano e paralisa (o movimento acaba ali) |
 | Inferno | 🔥 fogo | dano |
 | Duat | ☠️ veneno | dano por 3 rodadas |
-| Abismo do Caos | 🌀 vazio | dano e drena 30% da mana |
+| Abismo do Caos | 🌀 vazio | dano e você perde 1 carta da mão |
 
-**Miniaturas 3D esculpidas:** cada herói, inimigo, chefe e estrutura é um modelo 3D feito de formas simples (esferas, cilindros, cones), com contorno de miniatura pintada (`js/modelos3d.js`). Eles encaram o alvo, andam balançando pernas e braços, golpeiam com a arma, piscam em vermelho ao apanhar, caem ao morrer, e têm asas que batem, chamas que tremem e cristais que giram. O baú (com tampa que abre), a porta e as moedas também são 3D. A base colorida de cada miniatura combina com a cor da carta do inimigo.
+**Miniaturas 3D detalhadas:** cada herói, monstro, chefe e estrutura é um modelo 3D esculpido por código (centenas de peças por monstro: chifres, costelas, correntes, asas com penas, cicatrizes, tochas…), com texturas de pele/metal/pelo, contorno de miniatura pintada e animações (andar, golpear, asas, mandíbulas, capas). Os modelos ficam em `js/modelos3d/` (um arquivo por reino). Quer ainda mais detalhe? Dá para trocar qualquer personagem por um arquivo `.glb` gerado em serviços como Meshy ou Tripo — veja `docs/MINIATURAS.md`.
 
-**Tutorial:** os 3 primeiros cenários (Valhala) ensinam o jogo com cartões que aparecem na hora certa e esperam você fazer a ação: câmera e zoom, objetivo, andar, cartas dos inimigos, atacar, encerrar o turno, vida e mana, armadilhas, moedas, portas, loja, inventário, pontos de atributo, habilidades, empurrar/puxar, baú e estruturas. Dá para pular (✕ no cartão) e rever depois pelo link no mapa dos reinos. Os textos ficam em `js/tutorial.js`.
+**Tutorial:** os 3 primeiros cenários (Valhala) ensinam o jogo com cartões que aparecem na hora certa e esperam você fazer a ação: câmera e zoom, objetivo, faixa de iniciativa, escolher a carta, andar, atacar, encerrar o turno, vida e itens livres, armadilhas, moedas, portas, loja, inventário, pontos de atributo, empurrar/puxar, baú e estruturas. Dá para pular (✕ no cartão) e rever depois pelo link no mapa dos reinos. Os textos ficam em `js/tutorial.js`.
 
 ## Como jogar
 
@@ -59,16 +63,17 @@ RPG de turnos para celular sobre os deuses antigos. Feito em HTML + JavaScript p
 | miniaturas, árvores, colunas, lava... | `js/minis.js` |
 | movimento, inimigos andando, empurrar/puxar, moedas, baú, objetivos | `js/tatica.js` |
 | o mapa 3D (câmera, zoom, animações) | `js/cena3d.js` (usa o three.js de `js/vendor/`) |
-| a aparência 3D de cada monstro, herói e estrutura | `js/modelos3d.js` (um bloco por personagem, as cores estão no próprio bloco) |
+| a aparência 3D de cada monstro, herói e estrutura | `js/modelos3d/<reino>.js` (um bloco por personagem; ferramentas em `js/modelos3d.js`) e `docs/MINIATURAS.md` |
+| as cartas do herói (baralho de cada classe) | `js/cartas.js` (`BARALHOS_HEROI`) |
 | textos e passos do tutorial | `js/tutorial.js` (lista `PASSOS`) |
 | telas e botões | `js/ui.js` + `style.css` |
 
 ## Testes
 
-- `node tests/regras.js` — testa o motor sem navegador: cenários, objetivos, cartas, empurrar/puxar, dificuldades, moedas, baú, armadilhas, portas (rápido).
-- `node tests/sim.js 8 todas expert` — um robô joga os 20 cenários e mostra a taxa de vitória por cenário (argumentos: vezes, classe, dificuldade). `BAL_FORCA=1.2 BAL_XP=0.5 node tests/sim.js ...` experimenta o equilíbrio sem mexer no jogo.
+- `node tests/regras.js` — testa o motor sem navegador: cartas de iniciativa, ordem de turnos, itens/slots, cenários, objetivos, empurrar/puxar, dificuldades, moedas, baú, armadilhas, portas (rápido).
+- `node tests/sim.js 8 todas expert` — um robô joga os 20 cenários e mostra a taxa de vitória por cenário (argumentos: vezes, classe, dificuldade). `BAL_FORCA=0.6 BAL_FPN=0.03 RESUMO=1 node tests/sim.js 20 todas` experimenta o equilíbrio sem mexer no jogo (RESUMO=1 mostra uma linha por classe/dificuldade).
 - `node tests/mapas.js --ver` — confere todos os mapas (portas, armadilhas, caminhos) e desenha em texto.
-- `node tests/smoke.js` — abre o jogo num celular virtual: menus, cenário, mapa 3D, toque, pinça de zoom, cartas, rodadas (precisa do Playwright).
+- `node tests/smoke.js` — abre o jogo num celular virtual: menus, cenário, mapa 3D, toque, pinça de zoom, cartas, atalhos sem rolar a tela, rodadas (precisa do Playwright).
 - `node tests/tutorial.js` — um jogador novo segue os cartões do tutorial nos cenários 1, 2 e 3 (inclui loja e inventário).
 - `node tests/boss.js` — um herói superforte joga os 20 cenários pela tela (objetivos, portas, baú, moedas, chefes, final).
 - `python3 tools/gerar-pagina-unica.py saida/index.html` — junta tudo numa página só, para publicar.

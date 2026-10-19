@@ -355,7 +355,7 @@ const Cena3D = (() => {
       const m = grupo.length > 1 ? { x: (ph0.x + perto.x) / 2, z: (ph0.z + perto.z) / 2 } : ph0;
       Object.assign(E.cam, { x: m.x, z: m.z, alvoX: m.x, alvoZ: m.z });
       for (let d = 7; d <= 22 && !(achou = cabeEm(d, grupo)); d += 1);
-      if (!achou) { Object.assign(E.cam, { x: ph0.x, z: ph0.z, alvoX: ph0.x, alvoZ: ph0.z }); cabeEm(21, [ph0]); }
+      if (!achou) { Object.assign(E.cam, { x: ph0.x, z: ph0.z, alvoX: ph0.x, alvoZ: ph0.z }); cabeEm(24, [ph0]); }
     }
     ajustarLimites(); posicionarCamera();
   }
@@ -374,6 +374,7 @@ const Cena3D = (() => {
   function margens(t, b, r, reenquadrar) {
     if (!E) return;
     const antes = E.mg; E.mg = { t, b, r };
+    if (reenquadrar === 'offset') { if (Math.abs(antes.t - t) > 4 || Math.abs(antes.b - b) > 4 || Math.abs(antes.r - r) > 4) aplicarOffset(); return; }   // painel mudou de tamanho: só recentraliza, sem mexer no zoom
     if (reenquadrar && (Math.abs(antes.t - t) > 4 || Math.abs(antes.b - b) > 4 || Math.abs(antes.r - r) > 4 || reenquadrar === true)) enquadrar();
     else if (reenquadrar) aplicarOffset();
   }

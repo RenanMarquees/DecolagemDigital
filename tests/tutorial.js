@@ -1,5 +1,5 @@
 'use strict';
-/* Teste do tutorial: um jogador NOVO segue os cartões dos cenários 1, 2 e 3 (mapa, objetivo, cartas, loja, inventário, baú, estruturas)
+/* Teste do tutorial: um jogador NOVO segue os cartões dos cenários 1, 2 e 3 (mapa, objetivo, iniciativa, cartas, loja, inventário, baú, estruturas)
    e confere que cada passo aparece e se conclui. Uso: node tests/tutorial.js  (precisa de playwright) */
 const { chromium } = require(process.env.PW_PATH || 'playwright');
 const http = require('http'), fs = require('fs'), path = require('path');
@@ -53,7 +53,6 @@ const srv = http.createServer((q, r) => {
 
   /* ---- uma batalha seguindo os cartões; devolve quando o cenário termina ---- */
   async function jogarCenario(id) {
-    let hab = false;
     for (let i = 0; i < 900; i++) {
       if (await page.$('[data-a=bat-fim]')) {
         if (await page.evaluate(() => T.fim === 'derrota')) { await click('[data-a=bat-fim]'); return false; }   // caiu: volta ao reino
@@ -74,18 +73,6 @@ const srv = http.createServer((q, r) => {
       const c = await cartao();
       if (c && c.ok) { await lerCartao(); continue; }
       if (c) await shot(c.id);
-      // no cenário 2 o cartão pede uma habilidade: o teste usa uma de verdade
-      if (c && c.id === 'b2_hab' && !hab) {
-        const feito = await page.evaluate(() => {
-          const h = CLASSES[P.classe].habilidades.map(x => ({ id: x, ...HABILIDADES[x] })).find(x => x.nivel <= P.nivel && P.mp >= x.custo && x.tipo === 'dano' && tAlvos(T, P, { tipo: 'habilidade', id: x.id }).length);
-          if (!h || T.acaoUsada || T.fase !== 'heroi' || OCUPADO) return false;
-          ACOES['tat-habs'](); ACOES['tat-hab']({ dataset: { id: h.id } });
-          const alvo = tAlvos(T, P, { tipo: 'habilidade', id: h.id })[0];
-          ACOES.hex({ dataset: { c: alvo.c, r: alvo.r } });
-          return true;
-        });
-        if (feito) { hab = true; continue; }
-      }
       await page.evaluate(() => robo(2));
     }
     throw new Error('o cenário não terminou');
@@ -129,7 +116,7 @@ const srv = http.createServer((q, r) => {
 
   /* ---- conferência final ---- */
   const feitos = await page.evaluate(() => P.tutorial.feitos);
-  const obrigatorios = ['m_bemvindo', 'r_cen1', 'br1', 'b_mapa', 'b_objetivo', 'b_mover', 'b_cartas', 'b_atacar', 'b_fimturno', 'b_salalimpa', 'b_porta', 'b_ultima', 'b_vitoria1', 'r_loja', 'l_loja', 'l_voltar', 'r_inv', 'r_cen2', 'br2', 'b2_bau', 'b2_vitoria', 'r_cen3', 'br3', 'b3_estrutura', 'r_fim'];
+  const obrigatorios = ['m_bemvindo', 'r_cen1', 'br1', 'b_mapa', 'b_objetivo', 'b_iniciativa', 'b_escolher', 'b_mover', 'b_atacar', 'b_fimturno', 'b_salalimpa', 'b_porta', 'b_ultima', 'b_vitoria1', 'r_loja', 'l_loja', 'l_voltar', 'r_inv', 'r_cen2', 'br2', 'b2_cartas', 'b2_bau', 'b2_vitoria', 'r_cen3', 'br3', 'b3_estrutura', 'r_fim'];
   const faltou = obrigatorios.filter(i => !feitos[i]);
   const todos = await page.evaluate(() => Tutorial.passos());
   const opcionais = todos.filter(i => !obrigatorios.includes(i) && !feitos[i]);
@@ -143,5 +130,5 @@ const srv = http.createServer((q, r) => {
   console.log(`passos vistos: ${Object.keys(feitos).filter(k => !k.startsWith('ev_')).length}/${todos.length}` + (opcionais.length ? ` (não apareceram, dependem da situação: ${opcionais.join(', ')})` : ''));
   if (faltou.length) throw new Error('passos que deveriam ter sido concluídos: ' + faltou.join(', '));
   if (erros.length) { console.error('ERROS:', erros); process.exit(1); }
-  console.log('OK: o tutorial guia os cenários 1, 2 e 3 (mapa, objetivo, cartas, loja, inventário, baú e estruturas), sem erros de JavaScript.');
+  console.log('OK: o tutorial guia os cenários 1, 2 e 3 (mapa, objetivo, iniciativa, cartas, loja, inventário, baú e estruturas), sem erros de JavaScript.');
 })().catch(e => { console.error(e); srv.close(); process.exit(1); });

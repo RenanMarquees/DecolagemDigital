@@ -3,14 +3,16 @@
    mochila, moedas, baú e objetivos) numa dificuldade, várias vezes, para vermos se a curva de dificuldade faz sentido.
    Uso: node tests/sim.js [vezes] [classe|todas] [dificuldade]
    Ex.: node tests/sim.js 10 guerreiro expert      (sem classe/dificuldade: testa todas)
-   Experimentos sem mexer no jogo:  BAL_FORCA=1.2 BAL_XP=0.8 node tests/sim.js ... */
+   Experimentos sem mexer no jogo:  BAL_FORCA=1.2 BAL_XP=0.8 BAL_FPN=0.06 RESUMO=1 node tests/sim.js ... */
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 
 const ctx = vm.createContext({ Math, console });
 for (const f of ['data.js', 'cartas.js', 'cenarios.js', 'logic.js', 'mapas.js', 'tatica.js']) {
-  vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'js', f), 'utf8'), ctx, { filename: f });
+  let src = fs.readFileSync(path.join(__dirname, '..', 'js', f), 'utf8');
+  if (f === 'data.js' && process.env.BAL_FPN) src = src.replace(/const FORCA_POR_NIVEL = [\d.]+/, `const FORCA_POR_NIVEL = ${+process.env.BAL_FPN}`);   // experimento
+  vm.runInContext(src, ctx, { filename: f });
 }
 const FORTE = !!process.env.FORTE;   // FORTE=1: começa com o herói superforte do tests/boss.js
 
@@ -267,6 +269,11 @@ for (const dif of difs) {
         const a = (agg[r.id] ||= { obj: r.obj, n: 0, nivelIni: 0, nivelFim: 0, derrotas: 0, rod: 0, vitorias: 0, primeira: 0 });
         a.n++; a.nivelIni += r.nivelIni; a.nivelFim += r.nivelFim; a.derrotas += r.derrotas; a.rod += r.rodadas; a.vitorias += r.venceu ? 1 : 0; a.primeira += r.derrotas === 0 && r.venceu ? 1 : 0;
       }
+    }
+    if (process.env.RESUMO) {      // só uma linha por classe/dificuldade: % de vitória de primeira por faixa de cenários
+      const faixa = (a, b) => { let x = 0, y = 0; for (let i = a; i <= b; i++) if (agg[i]) { x += agg[i].primeira; y += agg[i].n; } return y ? Math.round(100 * x / y) + '%' : '--'; };
+      console.log(`${dif.padEnd(13)} ${classe.padEnd(9)} 1-4:${faixa(1, 4).padStart(4)} 5-8:${faixa(5, 8).padStart(4)} 9-12:${faixa(9, 12).padStart(4)} 13-16:${faixa(13, 16).padStart(4)} 17-20:${faixa(17, 20).padStart(4)}  zerou ${zerou}/${N}`);
+      continue;
     }
     console.log(`\n=== ${classe} · ${dif} (${N} jogos, zerou ${zerou}/${N}) ===`);
     console.log('cen  objetivo   nv_ini→fim  1ª tentativa  derrotas  rodadas');
