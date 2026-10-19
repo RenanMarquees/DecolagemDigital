@@ -60,7 +60,7 @@ const ROBO = require('./robo');
         falas += await passarHistoria();
         return { etapas, falas };
       }
-      await click('[data-a=tat-seguir]');
+      try { await page.click('[data-a=tat-seguir]', { timeout: 5000 }); } catch (e) { throw new Error(`cenário ${cen.id} etapa ${etapas}: sem botão de seguir/concluir ${JSON.stringify(await page.evaluate(() => ({ fim: T && T.fim, ultima: T && T.ultimaEtapa, obj: T && T.objetivo, ok: T && T.objetivoCumprido, bau: T && T.bau, centro: document.getElementById('centro').innerText.slice(0, 200) })))}`); }
       for (let k = 0; k < 6 && !(await page.$('.hist-texto')); k++) { await click('[data-a=tat-porta]'); await page.waitForTimeout(150); }
       await click('[data-a=hist-prox]');
       falas += await passarHistoria();
