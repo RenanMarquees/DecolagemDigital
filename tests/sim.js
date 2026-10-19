@@ -36,10 +36,17 @@ const robo = `(function () {
   }
 
   /* ---- escolha da carta da rodada ---- */
+  /** Entre as cartas já usadas, a que menos faz falta (para o descanso longo perder). */
+  function cartaMenosUtil(T, p) {
+    const d = derivados(p);
+    return [...T.descarte].sort((a, b) => ((a.atq || 0) * 2 + (a.mov || 0) + (a.cura || 0) * 2 + (a.escudo || 0)) - ((b.atq || 0) * 2 + (b.mov || 0) + (b.cura || 0) * 2 + (b.escudo || 0)))[0];
+  }
+  /** Devolve [idDaCarta, idDaCartaPerdida?]. Usa o descanso rápido quando a mão está acabando e o longo quando está ferido. */
   function escolherCarta(T, p) {
     const d = derivados(p), quem = alvosDoRobo(T), frac = p.hp / d.hpMax;
-    if (!T.mao.length) return 'descanso';
-    if ((T.mao.length <= 2 && frac < 0.7) || (T.mao.length <= 3 && frac < 0.35)) return 'descanso';
+    if (T.mao.length <= 1 && T.descarte.length >= 3 && !T.rapidoUsado) tDescansoRapido(T, p);    // a mão acabando: volta com as cartas (perde 1 sorteada)
+    if (!T.mao.length) return T.descarte.length >= 2 ? ['descanso', cartaMenosUtil(T, p).id] : ['descanso', null];
+    if (T.descarte.length >= 2 && ((T.mao.length <= 2 && frac < 0.7) || (T.mao.length <= 3 && frac < 0.35))) return ['descanso', cartaMenosUtil(T, p).id];
     const perto = menorDist(T.heroi, quem), vizinhosN = quem.filter(e => dist(e, T.heroi) <= 2).length;
     const bau = querBau(T, p);
     let melhor = null;
@@ -57,7 +64,7 @@ const robo = `(function () {
       sc -= c.ini * 0.01;
       if (!melhor || sc > melhor.sc) melhor = { c, sc };
     }
-    return melhor.c.id;
+    return [melhor.c.id];
   }
 
   /* ---- itens: usa poções quando está ferido (não gasta a jogada) ---- */
@@ -114,7 +121,8 @@ const robo = `(function () {
   }
 
   function turnoRobo(T, p) {
-    if (T.fase === 'escolha') tEscolherCarta(T, p, escolherCarta(T, p));
+    if (T.limpa) return turnoLimpa(T, p);
+    if (T.fase === 'escolha') { const [id, perder] = escolherCarta(T, p); tEscolherCarta(T, p, id, perder); }
     while (T.fase === 'inimigos' && !T.fim) tProximoInimigo(T, p);        // inimigos com iniciativa menor agem antes
     if (T.fim || T.fase !== 'heroi') return;
     usarItens(T, p);
@@ -138,17 +146,39 @@ const robo = `(function () {
     while (T.fase === 'inimigos' && !T.fim) tProximoInimigo(T, p);
   }
 
-  /** Sala limpa: pega as moedas do chão (e o baú, se ainda estiver fechado) sem pisar em armadilhas. */
-  function saquearTudo(T, p) {
-    for (let g = 0; g < 30; g++) {
-      const alvos = [...T.moedas.keys()].map(k => { const [c, r] = k.split(',').map(Number); return { c, r }; });
-      if (T.bau && !T.bau.aberto) alvos.push({ c: T.bau.c, r: T.bau.r });
-      const alc = tAlcance(T);
-      const viaveis = alvos.filter(a => alc.some(h => h.c === a.c && h.r === a.r && !h.armadilhas));
-      if (!viaveis.length) break;
-      viaveis.sort((a, b) => dist(T.heroi, a) - dist(T.heroi, b));
-      tMover(T, p, viaveis[0].c, viaveis[0].r);
+  /** Sala limpa: ainda é por turnos. Pega as moedas (e o baú) sem pisar em armadilhas e depois vai à porta (ou à entrada, na última sala). */
+  function alvosLimpa(T) {
+    const l = [...T.moedas.keys()].map(k => { const [c, r] = k.split(',').map(Number); return { c, r }; }).filter(a => !temArmadilha(T, a.c, a.r));
+    if (T.bau && !T.bau.aberto) l.push({ c: T.bau.c, r: T.bau.r });
+    return l.length ? l : [T.ultimaEtapa ? T.saida : T.porta];
+  }
+  function turnoLimpa(T, p) {
+    if (T.fase === 'escolha') {
+      if (!T.mao.length || (T.mao.length <= 1 && T.descarte.length >= 3 && !T.rapidoUsado)) { if (T.descarte.length >= 2) tDescansoRapido(T, p); }
+      if (T.fase === 'escolha') {
+        if (!T.mao.length) tEscolherCarta(T, p, 'descanso', cartaMenosUtil(T, p) && cartaMenosUtil(T, p).id);
+        else tEscolherCarta(T, p, [...T.mao].sort((a, b) => (b.mov || 0) - (a.mov || 0))[0].id);
+      }
     }
+    while (T.fase === 'inimigos' && !T.fim) tProximoInimigo(T, p);
+    let guard = 0;
+    while (T.fase === 'heroi' && !T.fim && guard++ < 20) {
+      if (T.bau && !T.bau.aberto && T.heroi.c === T.bau.c && T.heroi.r === T.bau.r) break;
+      const alvos = alvosLimpa(T), cp = campo(T, alvos), atual = cp.get(chave(T.heroi.c, T.heroi.r)) ?? 99;
+      let melhor = null;
+      for (const evita of [true, false]) {
+        for (const h of tAlcance(T)) {
+          if (evita && h.armadilhas > 0) continue;
+          const d = cp.get(chave(h.c, h.r)) ?? 99;
+          if (d < atual && (!melhor || d < melhor.d || (d === melhor.d && h.custo < melhor.h.custo))) melhor = { h, d };
+        }
+        if (melhor) break;
+      }
+      if (!melhor || !tMover(T, p, melhor.h.c, melhor.h.r)) break;
+    }
+    if (T.fim || T.fase !== 'heroi') return;
+    tEncerrarTurno(T, p);
+    while (T.fase === 'inimigos' && !T.fim) tProximoInimigo(T, p);
   }
 
   /** Um cenário inteiro: salas, portas e o objetivo final. */
@@ -156,14 +186,13 @@ const robo = `(function () {
     const exp = criarExpedicao(cenario, p, difId);
     let T = criarTatica(exp, p), rodadas = 0;
     for (;;) {
-      let guard = 0;
-      while (!T.fim && guard++ < 200) turnoRobo(T, p);
+      let guard = 0, premiou = false;
+      while (!T.fim && guard++ < 400) {
+        turnoRobo(T, p);
+        if (T.limpa && !premiou) { premiou = true; aplicarVitoriaT(T, p); }     // objetivo cumprido: XP e drops entram agora
+      }
       rodadas += T.rodada;
-      if (T.fim !== 'vitoria') { penalidadeDerrota(p); return { resultado: 'derrota', rodadas }; }
-      aplicarVitoriaT(T, p);
-      if (T.ultimaEtapa) { tSaquear(T); saquearTudo(T, p); concluirCenario(T, p); return { resultado: 'vitoria', rodadas }; }
-      tAbrirPorta(T); saquearTudo(T, p);
-      tMover(T, p, T.porta.c, T.porta.r);
+      if (T.fim === 'vitoria') { concluirCenario(T, p); return { resultado: 'vitoria', rodadas }; }
       if (T.fim !== 'porta') { penalidadeDerrota(p); return { resultado: 'derrota', rodadas }; }
       T = tProximaEtapa(T, p);
     }

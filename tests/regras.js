@@ -186,27 +186,27 @@ teste('loja: vende consumíveis do reino e 1 item de cada tipo de slot; comprar 
 
 console.log('\nObjetivos');
 teste('matar todos: termina quando o último inimigo cai', () => {
-  const r = R(`(() => { const { T } = cen(1, { etapa: 1, vivos: true }); const antes = String(T.fim); matarTodos(T); return [antes, T.fim, T.objetivoCumprido]; })()`);
-  igual(r.join(), 'null,vitoria,true');
+  const r = R(`(() => { const { T } = cen(1, { etapa: 1, vivos: true }); const antes = String(T.fim); matarTodos(T); return [antes, T.limpa, T.objetivoCumprido, T.fim]; })()`);
+  igual(r.join(), 'null,true,true,');   // a sala fica limpa, mas o jogo continua: ainda falta chegar à saída
 });
 teste('baú: o objetivo é abrir o baú, mesmo com inimigos vivos', () => {
   const r = R(`(() => { const { p, T } = cen(2, { etapa: 1 }); const k = T.objetivo;
     T.heroi = { c: T.bau.c, r: T.bau.r }; // parado em cima do baú
-    tEncerrarTurno(T, p); return { k, fim: T.fim, aberto: T.bau.aberto, vivos: T.inim.some(e => e.vivo) }; })()`);
-  igual(r.k, 'bau'); igual(r.fim, 'vitoria'); igual(r.aberto, true);
+    tEncerrarTurno(T, p); return { k, limpa: T.limpa, aberto: T.bau.aberto, vivos: T.inim.some(e => e.vivo) }; })()`);
+  igual(r.k, 'bau'); igual(r.limpa, true); igual(r.aberto, true);
 });
 teste('baú: matar todos NÃO cumpre o objetivo', () => {
   igual(R(`(() => { const { T } = cen(2, { etapa: 1, vivos: true }); matarTodos(T); return T.fim; })()`), null);
 });
 teste('chefe: basta derrotar o chefe; os capangas recuam', () => {
   const r = R(`(() => { const { T } = cen(4, { etapa: 2, vivos: true }); const antes = T.fim;
-    const boss = T.inim.find(e => e.chefe); boss.hp = 0; verificarMortes(T); return { antes, fim: T.fim, restantes: T.inim.filter(e => e.vivo).length, objetivo: T.objetivo }; })()`);
-  igual(r.antes, null); igual(r.fim, 'vitoria'); igual(r.restantes, 0); igual(r.objetivo, 'chefe');
+    const boss = T.inim.find(e => e.chefe); boss.hp = 0; verificarMortes(T); return { antes, fim: T.limpa, restantes: T.inim.filter(e => e.vivo).length, objetivo: T.objetivo }; })()`);
+  igual(r.antes, null); igual(r.fim, true); igual(r.restantes, 0); igual(r.objetivo, 'chefe');
 });
 teste('destruir: há 3 estruturas que não atacam nem andam, e destruí-las cumpre o objetivo', () => {
   const r = R(`(() => { const { T } = cen(3, { etapa: 1, vivos: true }); const est = T.inim.filter(e => e.estrutura);
-    const imoveis = est.every(e => e.atk === 0 && e.mov === 0); est.forEach(e => { e.hp = 0; }); verificarMortes(T); return { n: est.length, imoveis, fim: T.fim }; })()`);
-  igual(r.n, 3); verdade(r.imoveis, 'estruturas imóveis'); igual(r.fim, 'vitoria');
+    const imoveis = est.every(e => e.atk === 0 && e.mov === 0); est.forEach(e => { e.hp = 0; }); verificarMortes(T); return { n: est.length, imoveis, fim: T.limpa }; })()`);
+  igual(r.n, 3); verdade(r.imoveis, 'estruturas imóveis'); igual(r.fim, true);
 });
 teste('destruir: estruturas não jogam cartas e podem ser atacadas', () => {
   const r = R(`(() => { const { p, T } = cen(3, { etapa: 1, vivos: true }); const est = T.inim.find(e => e.estrutura); pe(est, 1, 10); est.hp = est.hpMax = 500; est.def = 0;
@@ -215,7 +215,7 @@ teste('destruir: estruturas não jogam cartas e podem ser atacadas', () => {
   verdade(r.sinCarta, 'estrutura não deve ter carta'); verdade(r.dano > 0, 'deveria sofrer dano');
 });
 teste('numa etapa que não é a última, limpar a sala abre a porta (não conclui o cenário)', () => {
-  igual(R(`(() => { const { T } = cen(1, { etapa: 0, vivos: true }); matarTodos(T); return [T.fim, T.ultimaEtapa, T.objetivo]; })()`).join(), 'vitoria,false,limpar');
+  igual(R(`(() => { const { T } = cen(1, { etapa: 0, vivos: true }); matarTodos(T); return [T.limpa, T.ultimaEtapa, T.objetivo]; })()`).join(), 'true,false,limpar');
 });
 teste('concluir o cenário marca como feito e sorteia ouro, XP ou item', () => {
   const r = R(`(() => { const tipos = new Set(); let marcou = true;
@@ -243,11 +243,12 @@ teste('há 1 baú só, na última etapa; só abre se o herói terminar o turno p
     return { baus: out.join(), antes, depois: T.bau.aberto, ouro: q.gold - ouro0, itens: T.bau.recompensa.itens.length }; })()`);
   igual(r.baus, 'false,true'); igual(r.antes, false); igual(r.depois, true); verdade(r.ouro > 0 && r.itens >= 1, 'o baú dá ouro e item');
 });
-teste('com a sala livre, parar no baú abre na hora; "saquear" deixa pegar o que sobrou', () => {
-  const r = R(`(() => { const { p, T } = cen(1, { etapa: 1, vivos: true }); const e = T.inim[0]; pe(e, 5, 7); e.moedas = 4; matarTodos(T); const antes = T.fim; tSaquear(T);
-    T.heroi = { c: 4, r: 7 }; const g0 = T.exp.moedasColetadas; tMover(T, p, 5, 7); const ganhou = T.exp.moedasColetadas - g0;
-    const v = vizinhos(T.g, T.bau.c, T.bau.r)[0]; T.heroi = { ...v }; tMover(T, p, T.bau.c, T.bau.r); return { antes, livre: T.livre, ganhou, bau: T.bau.aberto }; })()`);
-  igual(r.antes, 'vitoria'); igual(r.livre, true); verdade(r.ganhou >= 4, 'saqueou a moeda'); igual(r.bau, true);
+teste('sala limpa: o jogo continua por turnos; as moedas só valem se você parar nelas e o baú abre ao terminar o turno nele', () => {
+  const r = R(`(() => { const { p, T } = cen(1, { etapa: 1, vivos: true }); const e = T.inim[0]; pe(e, 2, 10); e.moedas = 4; matarTodos(T);
+    const limpa = T.limpa, fim = T.fim, livre = T.livre; const g0 = T.exp.moedasColetadas; tMover(T, p, 2, 10); const juntou = T.exp.moedasColetadas - g0;
+    T.heroi = { ...vizinhos(T.g, T.bau.c, T.bau.r)[0] }; T.movRest = 3; tMover(T, p, T.bau.c, T.bau.r); const antes = T.bau.aberto; tEncerrarTurno(T, p);
+    return { limpa, fim, livre, juntou, antes, bau: T.bau.aberto }; })()`);
+  igual(r.limpa, true); igual(r.fim, null); igual(r.livre, false); igual(r.juntou, 4, 'pegou as 4 moedas'); igual(r.antes, false, 'só parar não abre'); igual(r.bau, true);
 });
 
 console.log('\nCartas do herói (habilidades + iniciativa)');
@@ -352,28 +353,69 @@ teste('o movimento da carta + botas; gelo tira 1; cartas sem "anda" não andam',
     return out; })()`);
   igual(r.join(), '4,5,3,0');
 });
-teste('descansar: iniciativa 99, não anda nem age, recupera vida e todas as cartas', () => {
+teste('descanso longo: iniciativa 99, não anda nem age, cura 3, e a carta usada ESCOLHIDA se perde (as outras voltam)', () => {
   const r = R(`(() => { const { p, T } = cen(1, { semTurno: true }); const d = derivados(p);
     for (let i = 0; i < 3; i++) { tEscolherCarta(T, p, T.mao[0].id); T.fase = 'escolha'; T.cartaHeroi = null; }
-    const antes = T.mao.length; p.hp = 2; tEscolherCarta(T, p, 'descanso');
-    return [antes, T.mao.length, T.descarte.length, p.hp > 2, T.cartaHeroi.ini, T.movRest, T.acaoUsada]; })()`);
-  igual(r.join(), '7,10,0,true,99,0,true');
+    const antes = T.mao.length; const escolhida = T.descarte[1]; p.hp = 2; tEscolherCarta(T, p, 'descanso', escolhida.id);
+    return [antes, T.mao.length, T.descarte.length, T.perdidas.length, T.perdidas[0].id === escolhida.id, T.mao.some(c => c.id === escolhida.id), p.hp, T.cartaHeroi.ini, T.movRest, T.acaoUsada]; })()`);
+  igual(r.join(), '7,9,0,1,true,false,5,99,0,true');
+});
+teste('descanso longo exige 2 cartas usadas e que você diga qual se perde', () => {
+  const r = R(`(() => { const { p, T } = cen(1, { semTurno: true }); const a = tEscolherCarta(T, p, 'descanso', 'x');      // nada usado ainda
+    tEscolherCarta(T, p, T.mao[0].id); T.fase = 'escolha'; T.cartaHeroi = null; const b = tEscolherCarta(T, p, 'descanso', T.descarte[0].id);   // só 1 usada
+    tEscolherCarta(T, p, T.mao[0].id); T.fase = 'escolha'; T.cartaHeroi = null; const c = tEscolherCarta(T, p, 'descanso');                    // 2 usadas, sem dizer qual
+    const d = tEscolherCarta(T, p, 'descanso', T.descarte[0].id); return [a, b, c, d]; })()`);
+  igual(r.join(), 'false,false,false,true');
+});
+teste('descanso rápido: uma carta usada SORTEADA se perde, as outras voltam à mão e você ainda joga na mesma rodada (1 por rodada)', () => {
+  const r = R(`(() => { const { p, T } = cen(1, { semTurno: true }); const hp0 = p.hp = 5;
+    for (let i = 0; i < 4; i++) { tEscolherCarta(T, p, T.mao[0].id); T.fase = 'escolha'; T.cartaHeroi = null; }
+    const mao0 = T.mao.length, usadas = T.descarte.length; const ids = T.descarte.map(c => c.id);
+    const perdida = tDescansoRapido(T, p); const ok2 = tDescansoRapido(T, p);
+    const depois = [T.mao.length, T.descarte.length, T.perdidas.length, ids.includes(perdida.id), T.fase, p.hp === hp0, ok2];
+    const joga = tEscolherCarta(T, p, T.mao[0].id); return [mao0, usadas, ...depois, joga, T.fase]; })()`);
+  igual(r.join(), '6,4,9,0,1,true,escolha,true,,true,heroi');
+});
+teste('descanso rápido precisa de 2 cartas usadas; na próxima rodada pode de novo', () => {
+  const r = R(`(() => { const { p, T } = cen(1, { semTurno: true }); const a = tDescansoRapido(T, p);
+    for (let i = 0; i < 3; i++) { tEscolherCarta(T, p, T.mao[0].id); T.fase = 'escolha'; T.cartaHeroi = null; }
+    const b = tDescansoRapido(T, p); T.rapidoUsado = false; const c = tDescansoRapido(T, p); return [a, !!b, !!c, T.perdidas.length]; })()`);
+  igual(r.join(), ',true,false,1');
+});
+teste('sem cartas na mão e com menos de 2 no descarte o herói desmaia (derrota)', () => {
+  const r = R(`(() => { const { p, T } = cen(1, { semTurno: true }); T.descarte.push(T.mao.splice(0, 1)[0]); T.perdidas.push(...T.mao.splice(0)); T.fase = 'escolha'; conferirExaustao(T); return [T.fim, T.log[T.log.length - 1].msg.includes('exaustão')]; })()`);
+  igual(r.join(), 'derrota,true');
+});
+teste('as cartas perdidas ficam perdidas na próxima etapa também (o baralho do herói vale pelo cenário todo)', () => {
+  const r = R(`(() => { const { p, T, exp } = cen(1, { semTurno: true }); for (let i = 0; i < 2; i++) { tEscolherCarta(T, p, T.mao[0].id); T.fase = 'escolha'; T.cartaHeroi = null; }
+    tDescansoRapido(T, p); const T2 = criarTatica(exp, p); return [T2.perdidas.length, T2.mao.length + T2.descarte.length + T2.perdidas.length]; })()`);
+  igual(r.join(), '1,10');
 });
 teste('com a mão vazia só dá para descansar; a mão e o descarte seguem para a etapa seguinte', () => {
-  const r = R(`(() => { const { p, T, exp } = cen(1, { semTurno: true }); T.descarte.push(...T.mao.splice(0)); const ruim = tEscolherCarta(T, p, T.descarte[0].id); const bom = tEscolherCarta(T, p, 'descanso');
+  const r = R(`(() => { const { p, T, exp } = cen(1, { semTurno: true }); T.descarte.push(...T.mao.splice(0)); const ruim = tEscolherCarta(T, p, T.descarte[0].id); const bom = tEscolherCarta(T, p, 'descanso', T.descarte[0].id);
     const { p: q, T: U, exp: e2 } = cen(1, { semTurno: true }); tEscolherCarta(U, q, U.mao[3].id); const U2 = criarTatica(e2, q);
     return [maoVazia({ mao: [] }), ruim, bom, U2.mao.length, U2.descarte.length, U2.fase]; })()`);
   igual(r.join(), 'true,false,true,9,1,escolha');
 });
-teste('na sala limpa não há cartas: o herói anda livre e usa itens à vontade', () => {
-  const r = R(`(() => { const { p, T } = cen(1, { semTurno: true, etapa: 1 }); matarTodos(T); tSaquear(T); p.hp = 3; return [T.livre, T.fase, T.movRest > 10, tUsarItem(T, p, 0), cartaAtual(T).mov || 0]; })()`);
-  igual(r.join(), 'true,heroi,true,true,0');
+teste('sala limpa: não há modo livre; você segue usando cartas (a rodada passa sem inimigos)', () => {
+  const r = R(`(() => { const { p, T } = cen(1, { semTurno: true, etapa: 1 }); turnoDeTeste(T, p); matarTodos(T); p.hp = 3;
+    const out = [T.livre, T.limpa, T.fase, cartaAtual(T).mov, tUsarItem(T, p, 0)]; tEncerrarTurno(T, p); let g = 0; while (T.fase === 'inimigos' && !T.fim && g++ < 5) tProximoInimigo(T, p);
+    return [...out, T.fase, T.rodada]; })()`);
+  igual(r.join(), 'false,true,heroi,3,true,escolha,2');
+});
+teste('as cartas dos monstros ficam OCULTAS até você escolher a sua (e viram uma de cada tipo depois)', () => {
+  const r = R(`(() => { const { p, T } = cen(1, { semTurno: true, vivos: true }); const antes = Object.keys(T.cartas).length;
+    T.mao.unshift({ id: 'x', nome: 'x', ini: 30, mov: 1 }); tEscolherCarta(T, p, 'x'); const tipos = new Set(combatentes(T).map(e => e.tipo));
+    const depois = Object.keys(T.cartas).length; T.inim.forEach(e => { e.parado = true; }); tEncerrarTurno(T, p); let g = 0; while (T.fase === 'inimigos' && g++ < 20) tProximoInimigo(T, p);
+    return [antes, depois === tipos.size, T.fase, Object.keys(T.cartas).length]; })()`);
+  igual(r.join(), '0,true,escolha,0');
 });
 teste('as rodadas seguintes voltam a pedir carta e os inimigos revelam cartas novas', () => {
   const r = R(`(() => { const { p, T } = cen(1, { vivos: true }); T.inim.forEach(e => { e.c = 11 - e.uid; e.r = 0; e.atk = 1; });
     const r1 = T.rodada; tEncerrarTurno(T, p); let g = 0; while (T.fase === 'inimigos' && !T.fim && g++ < 20) tProximoInimigo(T, p);
-    return [r1, T.rodada, T.fase, T.cartaHeroi, T.fila.length, Object.keys(T.cartas).length > 0]; })()`);
-  igual(r[0], 1); igual(r[1], 2); igual(r[2], 'escolha'); igual(r[3], null, 'a carta da rodada anterior sai de cena'); igual(r[4], 0); verdade(r[5]);
+    const ocultas = Object.keys(T.cartas).length === 0; const fase = T.fase, carta = T.cartaHeroi, fila = T.fila.length, rod = T.rodada; turnoDeTeste(T, p);
+    return [r1, rod, fase, carta, fila, ocultas, Object.keys(T.cartas).length > 0]; })()`);
+  igual(r[0], 1); igual(r[1], 2); igual(r[2], 'escolha'); igual(r[3], null, 'a carta da rodada anterior sai de cena'); igual(r[4], 0); verdade(r[5], 'cartas ocultas até escolher'); verdade(r[6], 'reveladas depois');
 });
 
 console.log('\nCartas dos inimigos (números fixos)');
@@ -545,21 +587,35 @@ teste('o caminho evita armadilhas quando existe outro igualmente curto', () => {
 });
 
 console.log('\nPortas');
-teste('a porta fechada bloqueia o caminho e a visão; abre quando a sala é limpa', () => {
+teste('a porta fechada bloqueia o caminho; limpar a sala NÃO abre nada: você precisa chegar até ela com as cartas', () => {
   const r = R(`(() => { const { p, T } = cen(1, { etapa: 0, vivos: true }); const { c, r } = T.porta;
     const antes = { chao: celula(T.g, c, r), alcanca: tAlcance({ ...T, movRest: 99 }).some(h => h.c === c && h.r === r) };
-    matarTodos(T); const fim = T.fim; tAbrirPorta(T); return { antes, fim, depois: celula(T.g, c, r), livre: T.livre }; })()`);
-  igual(r.antes.chao, 'D'); igual(r.antes.alcanca, false); igual(r.fim, 'vitoria'); igual(r.depois, '.'); igual(r.livre, true);
+    matarTodos(T); return { antes, fim: T.fim, limpa: T.limpa, depois: celula(T.g, c, r), aberta: T.porta.aberta, livre: T.livre }; })()`);
+  igual(r.antes.chao, 'D'); igual(r.antes.alcanca, false); igual(r.fim, null); igual(r.limpa, true); igual(r.depois, '.'); igual(r.aberta, false, 'a porta só abre quando você chega nela'); igual(r.livre, false);
 });
-teste('com a porta aberta, andar até ela leva à próxima etapa (mais inimigos e um pouco de vida de volta)', () => {
+teste('chegar na porta (com a sala limpa) abre e leva à próxima etapa (mais inimigos e um pouco de vida de volta)', () => {
   const r = R(`(() => { const { p, T } = cen(1, { etapa: 0, vivos: true }); const d = derivados(p); const n1 = combatentes(T).length;
-    p.hp = Math.round(d.hpMax * 0.4); const hp0 = p.hp; matarTodos(T); tAbrirPorta(T); tMover(T, p, T.porta.c, T.porta.r); const fim = T.fim;
+    p.hp = Math.round(d.hpMax * 0.4); const hp0 = p.hp; matarTodos(T); T.movRest = 99; tMover(T, p, T.porta.c, T.porta.r); const fim = T.fim, aberta = T.porta.aberta;
     const N = tProximaEtapa(T, p); const rec = Math.max(1, Math.round(d.hpMax * DIFICULDADES.intermediario.porta));
-    return { fim, n1, n2: combatentes(N).length, etapa: N.etapa, ganhou: p.hp - hp0, esperado: rec }; })()`);
-  igual(r.fim, 'porta'); verdade(r.n2 > r.n1, `${r.n1} → ${r.n2}`); igual(r.etapa, 2); igual(r.ganhou, r.esperado, 'vida recuperada');
+    return { fim, aberta, n1, n2: combatentes(N).length, etapa: N.etapa, ganhou: p.hp - hp0, esperado: rec }; })()`);
+  igual(r.fim, 'porta'); igual(r.aberta, true); verdade(r.n2 > r.n1, `${r.n1} → ${r.n2}`); igual(r.etapa, 2); igual(r.ganhou, r.esperado, 'vida recuperada');
 });
-teste('na sala livre não há turno dos inimigos', () => {
-  igual(R(`(() => { const { p, T } = cen(1, { etapa: 0, vivos: true }); matarTodos(T); tAbrirPorta(T); return tEncerrarTurno(T, p); })()`), false);
+teste('a porta só vale depois da sala limpa (com inimigos vivos ela é parede)', () => {
+  const r = R(`(() => { const { p, T } = cen(1, { etapa: 0, vivos: true }); T.movRest = 99; return [tMover(T, p, T.porta.c, T.porta.r), T.fim]; })()`);
+  igual(r.join(), 'false,');
+});
+teste('última sala: cumprir o objetivo NÃO termina o cenário; só voltar à entrada com as cartas (moedas e baú que ficarem se perdem)', () => {
+  const r = R(`(() => { const { p, T, exp } = cen(1, { etapa: 1, vivos: true }); const e = T.inim[0]; pe(e, 5, 5); e.moedas = 3; matarTodos(T);
+    const limpa = T.limpa, fim0 = T.fim, noChao = [...T.moedas.values()].reduce((a, m) => a + m.valor, 0), bau = !T.bau.aberto;
+    T.heroi = { c: T.saida.c + 1, r: T.saida.r }; if (celula(T.g, T.heroi.c, T.heroi.r) !== '.') T.heroi = { ...vizinhos(T.g, T.saida.c, T.saida.r).find(h => celula(T.g, h.c, h.r) === '.') };
+    T.movRest = 3; tMover(T, p, T.saida.c, T.saida.r); const rec = concluirCenario(T, p);
+    return { limpa, fim0, fim: T.fim, noChao, bau, juntou: exp.moedasColetadas, ouro: rec.moedas.ouro }; })()`);
+  igual(r.limpa, true); igual(r.fim0, null); igual(r.fim, 'vitoria'); verdade(r.noChao >= 3, 'moedas no chão'); verdade(r.bau); igual(r.juntou, 0, 'as moedas do chão não foram pegas'); igual(r.ouro, 0, 'e não viram ouro');
+});
+teste('na sala limpa os turnos seguem sem inimigos: a rodada passa e pede uma nova carta', () => {
+  const r = R(`(() => { const { p, T } = cen(1, { etapa: 0, vivos: true }); matarTodos(T); const a = tEncerrarTurno(T, p); let g = 0; while (T.fase === 'inimigos' && !T.fim && g++ < 5) tProximoInimigo(T, p);
+    return [a, T.fase, T.rodada]; })()`);
+  igual(r.join(), 'true,escolha,2');
 });
 teste('só dá para fugir pela entrada, e nunca na arena do chefe', () => {
   const r = R(`(() => { const a = cen(1); a.T.heroi = { ...a.T.saida }; const livre = tFugir(a.T);

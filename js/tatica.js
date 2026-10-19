@@ -222,7 +222,7 @@ function criarTatica(exp, p) {
   const T = {
     g, nomeSala: sala.nome, idSala: etapa.mapa, parede: sala.parede, liquido: sala.liquido, reinoId: reino.id,
     exp, etapa: exp.idx + 1, totalEtapas: exp.etapas.length, ultimaEtapa: !temProxima,
-    objetivo: temProxima ? 'limpar' : exp.cenario.objetivo,
+    objetivo: temProxima ? 'limpar' : exp.cenario.objetivo, limpa: false, rapidoUsado: false,
     chefeId: ehChefe ? reino.chefe : null,
     tipoArm: reino.armadilha || null, armadilhas, porta, livre: false,
     moedas: new Map(), bau: null, objetivoCumprido: false,
@@ -233,7 +233,8 @@ function criarTatica(exp, p) {
   };
   // as cartas do herói acompanham o cenário inteiro (a mão e o descarte passam de uma etapa para a outra)
   if (!exp.cartasHeroi) exp.cartasHeroi = { mao: maoDoHeroi(p.classe), descarte: [] };
-  T.mao = exp.cartasHeroi.mao; T.descarte = exp.cartasHeroi.descarte;
+  if (!exp.cartasHeroi.perdidas) exp.cartasHeroi.perdidas = [];
+  T.mao = exp.cartasHeroi.mao; T.descarte = exp.cartasHeroi.descarte; T.perdidas = exp.cartasHeroi.perdidas;
 
   // estruturas a destruir (só na última etapa)
   if (!temProxima && exp.cenario.objetivo === 'destruir') {
@@ -253,17 +254,16 @@ function criarTatica(exp, p) {
   const chefe = inim.find(e => e.chefe);
   logar(T, chefe ? `${chefe.icone} ${chefe.nome} bloqueia o caminho!` : `${inim.filter(e => !e.estrutura).map(e => e.icone).join(' ')} cercam você!`, 'info');
   if (armadilhas.size) { const def = ARMADILHAS[reino.armadilha]; logar(T, `${def.icone} Cuidado: ${armadilhas.size} armadilhas no chão (${def.nome.toLowerCase()}). ${def.desc}`, 'aviso'); }
-  revelarCartas(T);
-  return T;
+  conferirExaustao(T);
+  return T;                      // as cartas dos monstros só viram DEPOIS que você escolhe a sua (veja tEscolherCarta)
 }
 
 function logar(T, msg, cls = '') { T.log.push({ msg, cls }); }
 
 /* ---------- Cartas dos inimigos ---------- */
 /** Vira a carta do topo do baralho de cada tipo de inimigo vivo. Todos do mesmo tipo fazem a mesma coisa. */
-function revelarCartas(T) {
-  T.cartas = {};
-  for (const e of T.inim) { e.bonusAtq = 0; e.escudo = 0; } // fortalecer e escudo duram só a rodada
+function revelarCartas(T, soFaltantes = false) {
+  if (!soFaltantes) T.cartas = {};   // soFaltantes: mantém cartas já viradas (os testes de regras escolhem cartas de propósito)
   for (const e of T.inim) {
     if (!e.vivo || e.estrutura || T.cartas[e.tipo]) continue;
     let b = T.baralhos[e.tipo];
@@ -322,6 +322,8 @@ function soltarMoeda(T, e) {
   T.moedas.set(k, { valor: (atual ? atual.valor : 0) + e.moedas });   // `valor` = quantas moedas (cada uma vale 2 de ouro até o cenário 10 e 3 depois, no fim do cenário)
 }
 /** Quanto ouro vale cada moeda no cenário: 2 até o cenário 10, 3 do 11 em diante. */
+/** Vida que o descanso longo devolve. */
+const DESCANSO_CURA = 3;
 const valorDaMoeda = cenarioId => (cenarioId <= 10 ? 2 : 3);
 
 function sortearEquipamento(reino, p) {
@@ -362,7 +364,7 @@ function abrirBau(T, p) {
 /* ---------- Fim da etapa e objetivos ---------- */
 /** Confere se o objetivo foi cumprido. Se sim, os inimigos que sobraram recuam (sem dar recompensa). */
 function checarFim(T) {
-  if (T.fim) return;
+  if (T.fim || T.limpa) return;
   const resto = combatentes(T), estruturas = T.inim.filter(e => e.vivo && e.estrutura);
   let cumprido;
   if (!T.ultimaEtapa) cumprido = resto.length === 0;                        // sala limpa: a porta vai abrir
@@ -373,7 +375,9 @@ function checarFim(T) {
   if (!cumprido) return;
   for (const e of T.inim) if (e.vivo) { e.vivo = false; e.recuou = true; }
   T.objetivoCumprido = true;
-  T.fim = 'vitoria';
+  T.limpa = true;                 // a sala está limpa, mas o jogo continua: você ainda usa as cartas para andar até a saída
+  if (!T.ultimaEtapa && T.porta) { T.porta.acessivel = true; T.g.cel[T.porta.r][T.porta.c] = '.'; }   // a porta só abre quando você chega nela
+  logar(T, T.ultimaEtapa ? '✅ Objetivo cumprido! Pegue o que ainda quiser e volte à entrada 🚪 para concluir. O que ficar para trás se perde!' : '✅ Sala limpa! Pegue as moedas e o baú e ande até a porta 🚪. O que ficar para trás se perde!', 'info');
 }
 
 function verificarMortes(T) {
@@ -430,10 +434,15 @@ function tMover(T, p, c, r) {
   for (const passo of caminhoAte(alvo)) {
     T.heroi = { c: passo.c, r: passo.r };
     T.movRest -= 1;
-    if (T.porta && T.porta.aberta && passo.c === T.porta.c && passo.r === T.porta.r) { T.fim = 'porta'; return true; }
     const res = dispararArmadilha(T, p, 'heroi', passo.c, passo.r);
     if (T.fim) return true;       // morreu na armadilha
     if (res && res.parou) break;  // paralisado: o movimento acaba aqui
+  }
+  if (T.limpa && T.porta && T.porta.acessivel && T.heroi.c === T.porta.c && T.heroi.r === T.porta.r) {      // chegou na porta: ela se abre
+    T.porta.aberta = true; T.fim = 'porta'; return true;
+  }
+  if (T.limpa && T.ultimaEtapa && T.heroi.c === T.saida.c && T.heroi.r === T.saida.r) {                       // voltou à entrada: o cenário termina
+    T.fim = 'vitoria'; logar(T, '🏆 Você deixa a arena. Cenário concluído!', 'info'); return true;
   }
   lootarAqui(T, p);               // parou aqui: pega as moedas que estiverem no chão
   return true;
@@ -533,6 +542,7 @@ function tUsarItem(T, p, i) {
 
 /** Fugir só é possível em cima da saída 🚪 (onde você começou). Não vale na arena do chefe. */
 function tFugir(T) {
+  if (T.limpa) return false;      // objetivo cumprido: o caminho é a porta/saída, não fugir
   if ((T.fase !== 'heroi' && T.fase !== 'escolha') || T.fim) return false;
   if (T.chefeId) { logar(T, 'Não há como fugir de um deus!', 'erro'); return false; }
   if (T.heroi.c !== T.saida.c || T.heroi.r !== T.saida.r) { logar(T, 'Chegue até a saída 🚪 para fugir.', 'erro'); return false; }
@@ -643,10 +653,14 @@ function ordemDaRodada(T, iniPrevia = null) {   // iniPrevia: mostra onde o her�
 }
 
 /** O herói escolhe a carta da rodada (índice/ id da carta na mão, ou 'descanso'). Monta a fila e começa a rodada. */
-function tEscolherCarta(T, p, id) {
+function tEscolherCarta(T, p, id, perder) {
   if (T.fase !== 'escolha' || T.fim || T.livre) return false;
   let carta;
-  if (id === 'descanso') carta = { ...CARTA_DESCANSO, id: 'descanso' };
+  if (id === 'descanso') {          // descanso LONGO: iniciativa 99, cura 3 e você escolhe qual carta usada se perde
+    if (T.descarte.length < 2) { logar(T, 'Para descansar você precisa de pelo menos 2 cartas usadas.', 'erro'); return false; }
+    if (!T.descarte.some(c => c.id === perder)) { logar(T, 'Escolha qual carta usada vai se perder.', 'erro'); return false; }
+    carta = { ...CARTA_DESCANSO, id: 'descanso', perder };
+  }
   else {
     const i = T.mao.findIndex(c => c.id === id);
     if (i < 0) { logar(T, 'Essa carta não está na sua mão.', 'erro'); return false; }
@@ -656,6 +670,7 @@ function tEscolherCarta(T, p, id) {
   T.cartaHeroi = carta;
   T.escudoHeroi = (carta.escudo || 0) + (carta.descanso ? 0 : derivados(p).esc);
   logar(T, carta.descanso ? '💤 Você decide descansar (iniciativa 99).' : `🃏 Você joga "${carta.nome}" (iniciativa ${carta.ini}).`, 'info');
+  revelarCartas(T, true);         // agora os monstros viram as cartas deles (você escolheu primeiro, às cegas)
   T.fila = ordemDaRodada(T).map(x => (x.tipo === 'heroi' ? 'heroi' : x.uid));
   continuarRodada(T, p);
   return true;
@@ -676,10 +691,13 @@ function iniciarTurnoHeroi(T, p) {
   T.movRest = movEfetivo(c.mov, d.mov, T.efeitos);
   if (c.descanso) {
     const hp0 = p.hp;
-    p.hp = Math.min(d.hpMax, p.hp + Math.max(2, Math.round(d.hpMax * 0.3)));
-    T.mao.push(...T.descarte.splice(0));                  // pega todas as cartas de volta
+    p.hp = Math.min(d.hpMax, p.hp + DESCANSO_CURA);
+    const i = T.descarte.findIndex(x => x.id === c.perder);
+    const perdida = i >= 0 ? T.descarte.splice(i, 1)[0] : null;
+    if (perdida) T.perdidas.push(perdida);                // a carta escolhida se perde (até o fim do cenário)
+    T.mao.push(...T.descarte.splice(0));                  // as outras cartas usadas voltam para a mão
     T.movRest = 0; T.acaoUsada = true;
-    logar(T, `💤 Você descansa: +${p.hp - hp0} vida e todas as cartas voltam para a mão.`, 'cura');
+    logar(T, `💤 Você descansa: +${p.hp - hp0} vida. ${perdida ? `A carta "${perdida.nome}" se perdeu;` : ''} as outras cartas voltam para a mão.`, 'cura');
     T.fx.push({ alvo: 'heroi', v: p.hp - hp0, cura: true });
     return;
   }
@@ -687,6 +705,19 @@ function iniciarTurnoHeroi(T, p) {
     const v = Math.min(d.hpMax - p.hp, c.cura + d.cura);
     if (v > 0) { p.hp += v; logar(T, `✚ A carta cura ${v} de vida.`, 'cura'); T.fx.push({ alvo: 'heroi', v, cura: true }); }
   }
+}
+
+/** Descanso RÁPIDO (antes de escolher a carta): uma carta usada, sorteada, se perde; as outras voltam para a mão e você joga na mesma rodada. */
+function tDescansoRapido(T, p) {
+  if (T.fase !== 'escolha' || T.fim || T.livre) return null;
+  if (T.rapidoUsado) { logar(T, 'Você já fez um descanso rápido nesta rodada.', 'erro'); return null; }
+  if (T.descarte.length < 2) { logar(T, 'Para descansar você precisa de pelo menos 2 cartas usadas.', 'erro'); return null; }
+  const perdida = T.descarte.splice(Math.floor(Math.random() * T.descarte.length), 1)[0];
+  T.perdidas.push(perdida);
+  T.mao.push(...T.descarte.splice(0));
+  T.rapidoUsado = true;
+  logar(T, `⚡ Descanso rápido: a carta "${perdida.nome}" se perdeu. As outras voltaram para a sua mão.`, 'aviso');
+  return perdida;
 }
 
 /** A mão acabou? Então o herói só pode descansar. */
@@ -815,7 +846,16 @@ function finalizarRodada(T, p) {
   T.fase = 'escolha';           // nova rodada: primeiro você escolhe a sua carta de iniciativa
   T.cartaHeroi = null; T.escudoHeroi = 0; T.fila = []; T.heroiJogou = false; T.bonusItem = { atq: 0 };
   T.movRest = 0; T.acaoUsada = false;
-  revelarCartas(T);             // novas cartas dos inimigos: aparecem na tela antes de você escolher a sua
+  T.cartas = {}; T.rapidoUsado = false;     // as cartas dos monstros ficam ocultas até você escolher a sua
+  for (const e of T.inim) { e.bonusAtq = 0; e.escudo = 0; }   // fortalecer e escudo duram só a rodada
+  conferirExaustao(T);
+}
+/** Sem cartas na mão e com menos de 2 no descarte: não dá mais para jogar nem descansar. O herói desmaia. */
+function conferirExaustao(T) {
+  if (T.fim || T.fase !== 'escolha') return;
+  if (T.mao.length === 0 && T.descarte.length < 2) {
+    T.fim = 'derrota'; logar(T, '😵 Você ficou sem cartas e desmaia de exaustão!', 'erro');
+  }
 }
 
 /** Faz UM inimigo agir. Quando o último termina, começa a próxima rodada. */
