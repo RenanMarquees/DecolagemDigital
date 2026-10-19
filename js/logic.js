@@ -16,6 +16,8 @@ function novoJogador(nome, classe) {
     equip: { arma: `${classe}_0`, armadura: 'armadura_0', amuleto: null },
     hp: 0, mp: 0,
     derrotados: {}, fragmentos: [], vistos: {}, kills: 0, finalizado: false,
+    cenarios: {},                       // cenários concluídos: { 1: true, 2: true... }
+    dificuldade: DIFICULDADE_PADRAO,
   };
   const d = derivados(p);
   p.hp = d.hpMax; p.mp = d.mpMax;
@@ -137,7 +139,7 @@ function usarConsumivel(p, id) {
 
 /* ---------- Loja ---------- */
 function estoqueLoja(p, reino) {
-  const t = reino.tier;
+  const t = Math.min(reino.tier, 4);   // o Abismo do Caos (nível 5) vende o melhor equipamento comum (nível 4)
   const ids = [...reino.consumiveis, `${p.classe}_${t}`, `armadura_${t}`];
   for (const a of ATRIBUTOS) ids.push(`amuleto_${a}_${t}`);
   return ids.filter(id => ITENS[id]);
@@ -158,10 +160,22 @@ function vender(p, id) {
 }
 
 /* ---------- Progresso ---------- */
+/** Um cenário abre quando o anterior foi concluído (o primeiro já nasce aberto). */
+function cenarioDesbloqueado(p, c) { return c.id === 1 || !!p.cenarios[c.id - 1]; }
+/** Um reino abre quando o último cenário do reino anterior foi concluído. */
 function reinoDesbloqueado(p, i) {
   if (i === 0) return true;
-  if (REINOS[i].final) return p.fragmentos.length >= 4;
-  return !!p.derrotados[REINOS[i - 1].chefe];
+  const anterior = cenariosDoReino(REINOS[i - 1].id);
+  return !!p.cenarios[anterior[anterior.length - 1].id];
+}
+/** Saves antigos não tinham cenários nem dificuldade: completa o que faltar (e conta os chefes já vencidos). */
+function migrarSave(p) {
+  p.cenarios = p.cenarios || {};
+  p.dificuldade = DIFICULDADES[p.dificuldade] ? p.dificuldade : DIFICULDADE_PADRAO;
+  REINOS.forEach((r, i) => {
+    if (p.derrotados && p.derrotados[r.chefe]) for (let k = 0; k <= i; k++) for (const c of cenariosDoReino(REINOS[k].id)) p.cenarios[c.id] = true;
+  });
+  return p;
 }
 
 function descansar(p, reino) {

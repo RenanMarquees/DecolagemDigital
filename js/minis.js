@@ -235,6 +235,34 @@ const MINIS = {
     <ellipse cx="-9" cy="2" rx="3.3" ry="2.3" fill="#fff"/><circle cx="-9" cy="2" r="1.3" fill="#8a2be2" stroke="none"/>
     <ellipse cx="9" cy="2" rx="3.3" ry="2.3" fill="#fff"/><circle cx="9" cy="2" r="1.3" fill="#8a2be2" stroke="none"/>
     <circle cx="-4" cy="-18" r="1" fill="#fff" stroke="none"/><circle cx="8" cy="-14" r=".8" fill="#fff" stroke="none"/><circle cx="-12" cy="-8" r=".8" fill="#fff" stroke="none"/>`,
+
+  /* ---------- Estruturas a destruir (objetivo "destruir") ---------- */
+  torre_gelo: () => `
+    <path d="M-12 12 L-9 -6 L-4 -2 L0 -24 L5 -4 L9 -8 L12 12 Z" fill="#a9dcf7"/>
+    <path d="M0 -24 L2 -4 L-2 -2 Z M-9 -6 L-6 8 L-3 -1Z" fill="#e8f8ff" stroke="none"/>
+    <path d="M-12 12 L12 12 L14 15 L-14 15 Z" fill="#6b7a90"/>
+    <path d="M-5 4 L-2 -8 M4 6 L6 -4" stroke="#fff" stroke-width="1.2" stroke-opacity=".8"/>`,
+  altar: () => `
+    <rect x="-13" y="6" width="26" height="8" rx="1.5" fill="#d8d2c2"/>
+    <rect x="-9" y="-6" width="18" height="12" fill="#ece6d6"/>
+    <path d="M-11 -6 L11 -6 L8 -11 L-8 -11 Z" fill="#c9ad55"/>
+    <path d="M0 -12 L3 -20 L0 -17 L-3 -20 Z" fill="#ffe14d"/><path d="M-3 -17 L0 -26 L3 -17 L0 -14 Z" fill="#ffe14d"/>
+    <path d="M-6 -2 H6 M0 -4 V4" stroke="#8a6a1a" stroke-width="1.6"/>`,
+  portal_fogo: () => `
+    <ellipse cx="0" cy="12" rx="15" ry="5" fill="#2a1612"/>
+    <path d="M-12 12 L-12 -6 Q-12 -22 0 -22 Q12 -22 12 -6 L12 12 L7 12 L7 -4 Q7 -15 0 -15 Q-7 -15 -7 -4 L-7 12 Z" fill="#3a2a30"/>
+    <path d="M-7 12 L-7 -4 Q-7 -15 0 -15 Q7 -15 7 -4 L7 12 Z" fill="#ff7a45"/>
+    <path d="M0 10 Q-5 4 -2 -2 Q0 2 3 0 Q6 6 0 10Z" fill="#ffd34d" stroke="none"/>
+    <path d="M-12 -6 L-16 -14 M12 -6 L16 -14" stroke="#ff7a45" stroke-width="2"/>`,
+  estela: () => `
+    <path d="M-9 14 L-9 -10 Q0 -24 9 -10 L9 14 Z" fill="#b8985a"/>
+    <path d="M-12 14 L12 14 L12 17 L-12 17 Z" fill="#8a7040"/>
+    <path d="M-4 -8 H4 M-4 -2 H4 M0 -12 V8 M-5 5 L0 1 L5 5" stroke="#3a2a10" stroke-width="1.6" fill="none"/>
+    <circle cx="0" cy="-15" r="3.2" fill="#e8b84a"/><circle cx="0" cy="-15" r="1.2" fill="#7a1010" stroke="none"/>`,
+  cristal_caos: () => `
+    <path d="M-12 14 L-8 -6 L-3 14Z" fill="#7a4bd0"/><path d="M-5 14 L2 -24 L10 14Z" fill="#9a6bf0"/><path d="M7 14 L12 -10 L16 14Z" fill="#7a4bd0"/>
+    <path d="M2 -24 L5 -4 L1 -2Z" fill="#e0c8ff" stroke="none"/>
+    <circle cx="2" cy="-6" r="2.4" fill="#fff" stroke="none"/><circle cx="-8" cy="-10" r="1.2" fill="#fff" stroke="none"/>`,
 };
 
 /** Miniatura (para dentro de um <g>). id = id do inimigo ou da classe do herói. */
@@ -347,4 +375,24 @@ function portaSvg(reinoId, aberta) {
     <path d="M-5 -16 V14 M0 -17 V14 M5 -16 V14" stroke="#00000055" stroke-width="1"/>
     <path d="M-10 -2 H10 M-10 8 H10" stroke="#00000066" stroke-width="2"/>
     <circle cx="0" cy="3" r="3.6" fill="#e8b84a"/><rect x="-1" y="3" width="2" height="5" fill="#8a6a1a" stroke="none"/></g>`;
+}
+
+
+/* ---------- Baú e moeda ---------- */
+function bauSvg(aberto) {
+  if (aberto) {
+    return `<g ${TRACO}><path d="M-14 -2 L-14 12 L14 12 L14 -2 Z" fill="#8a5a2b"/><path d="M-14 -2 L14 -2 L14 2 L-14 2Z" fill="#c9a227"/>
+      <path d="M-14 -2 L-11 -16 L11 -16 L14 -2" fill="#6b3d1a"/>
+      <ellipse cx="0" cy="-4" rx="11" ry="3.5" fill="#ffe14d" stroke="none"/><circle cx="-5" cy="-6" r="2.2" fill="#fff6a8" stroke="none"/><circle cx="4" cy="-7" r="2.6" fill="#ffd34d" stroke="none"/>
+      <path d="M-12 12 H12" stroke="#4a2a10" stroke-width="2"/></g>`;
+  }
+  return `<g ${TRACO}><path d="M-14 -4 L-14 12 L14 12 L14 -4 Z" fill="#8a5a2b"/>
+    <path d="M-14 -4 Q-14 -16 0 -16 Q14 -16 14 -4 Z" fill="#a8733a"/>
+    <path d="M-14 -4 L14 -4" stroke="#c9a227" stroke-width="3"/><path d="M-6 -16 V12 M6 -16 V12" stroke="#c9a227" stroke-width="2.2"/>
+    <rect x="-3.5" y="-6" width="7" height="8" rx="1.5" fill="#ffd34d"/><circle cx="0" cy="-2" r="1.2" fill="#4a2a10" stroke="none"/></g>`;
+}
+function moedaSvg() {
+  return `<g ${TRACO}><circle cx="0" cy="0" r="11" fill="#c9a227"/><circle cx="0" cy="0" r="8" fill="#ffd34d"/>
+    <path d="M-2 -5 L2 -5 M0 -6 V6 M-3 -2 Q0 -4 3 -2 Q-3 2 3 3 Q0 5 -3 3" fill="none" stroke="#8a6a1a" stroke-width="1.4"/>
+    <path d="M-6 -6 Q-8 0 -6 5" fill="none" stroke="#fff6a8" stroke-width="1.6" stroke-opacity=".8"/></g>`;
 }

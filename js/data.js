@@ -43,20 +43,20 @@ const CLASSES = {
 /* ---------- HABILIDADES ----------
    tipo: dano | cura | dreno | buff   —   custo em mana (MP) */
 const HABILIDADES = {
-  golpe_poderoso:    { nome: 'Golpe Poderoso',       icone: '💥', alcance: 1, custo: 6,  nivel: 1,  tipo: 'dano', stat: 'FOR', mult: 2.0, desc: 'Um golpe pesado.' },
+  golpe_poderoso:    { nome: 'Golpe Poderoso',       icone: '💥', empurrar: 1, alcance: 1, custo: 6,  nivel: 1,  tipo: 'dano', stat: 'FOR', mult: 2.0, desc: 'Golpe pesado que empurra o inimigo 1 hexágono.' },
   grito_guerra:      { nome: 'Grito de Guerra',      icone: '📣', alcance: 0, custo: 6,  nivel: 3,  tipo: 'buff', mult: 1.5, turnos: 4, desc: '+50% de dano por 4 turnos.' },
-  furia_tor:         { nome: 'Fúria de Thor',        icone: '⚡', alcance: 3, custo: 11, nivel: 5,  tipo: 'dano', stat: 'FOR', mult: 3.2, desc: 'O trovão atinge um inimigo a até 3 hexágonos.' },
-  martelo_titas:     { nome: 'Martelo dos Titãs',    icone: '🔨', alcance: 0, area: 'ao-redor', custo: 20, nivel: 9,  tipo: 'dano', stat: 'FOR', mult: 4.8, desc: 'Golpeia todos os inimigos ao seu redor.' },
+  furia_tor:         { nome: 'Fúria de Thor',        icone: '⚡', puxar: 2, alcance: 3, custo: 11, nivel: 5,  tipo: 'dano', stat: 'FOR', mult: 3.2, desc: 'O trovão atinge um inimigo a até 3 hexágonos e o PUXA 2 hexágonos até você.' },
+  martelo_titas:     { nome: 'Martelo dos Titãs',    icone: '🔨', empurrar: 1, alcance: 0, area: 'ao-redor', custo: 20, nivel: 9,  tipo: 'dano', stat: 'FOR', mult: 4.8, desc: 'Golpeia todos os inimigos ao seu redor e os empurra 1 hexágono.' },
 
-  tiro_certeiro:     { nome: 'Tiro Certeiro',        icone: '🎯', alcance: 4, custo: 5,  nivel: 1,  tipo: 'dano', stat: 'DES', mult: 1.9, critBonus: 0.25, desc: 'Mais chance de crítico.' },
+  tiro_certeiro:     { nome: 'Tiro Certeiro',        icone: '🎯', empurrar: 1, alcance: 4, custo: 5,  nivel: 1,  tipo: 'dano', stat: 'DES', mult: 1.9, critBonus: 0.25, desc: 'Mais chance de crítico. Empurra o alvo 1 hexágono.' },
   flecha_dupla:      { nome: 'Flecha Dupla',         icone: '🏹', alcance: 3, custo: 9,  nivel: 3,  tipo: 'dano', stat: 'DES', mult: 1.3, golpes: 2, desc: 'Duas flechas seguidas.' },
-  chuva_artemis:     { nome: 'Chuva de Ártemis',     icone: '🌧️', alcance: 3, area: 'alvo+vizinhos', custo: 15, nivel: 5,  tipo: 'dano', stat: 'DES', mult: 3.3, desc: 'Atinge o alvo e os inimigos ao lado dele.' },
-  flecha_apolo:      { nome: 'Flecha de Apolo',      icone: '☀️', alcance: 5, custo: 20, nivel: 9,  tipo: 'dano', stat: 'DES', mult: 4.8, critBonus: 0.4, desc: 'Luz solar em forma de flecha.' },
+  chuva_artemis:     { nome: 'Chuva de Ártemis',     icone: '🌧️', empurrar: 1, alcance: 3, area: 'alvo+vizinhos', custo: 15, nivel: 5,  tipo: 'dano', stat: 'DES', mult: 3.3, desc: 'Atinge o alvo e quem está ao lado dele, empurrando todos 1 hexágono.' },
+  flecha_apolo:      { nome: 'Flecha de Apolo',      icone: '☀️', empurrar: 2, alcance: 5, custo: 20, nivel: 9,  tipo: 'dano', stat: 'DES', mult: 4.8, critBonus: 0.4, desc: 'Luz solar em forma de flecha. Empurra o alvo 2 hexágonos.' },
 
-  raio_zeus:         { nome: 'Raio de Zeus',         icone: '⚡', alcance: 4, custo: 6,  nivel: 1,  tipo: 'dano', stat: 'INT', mult: 2.1, desc: 'Um raio divino.' },
+  raio_zeus:         { nome: 'Raio de Zeus',         icone: '⚡', empurrar: 1, alcance: 4, custo: 6,  nivel: 1,  tipo: 'dano', stat: 'INT', mult: 2.1, desc: 'Um raio divino que empurra o alvo 1 hexágono.' },
   bencao_apolo:      { nome: 'Bênção de Apolo',      icone: '☀️', alcance: 0, custo: 12, nivel: 3,  tipo: 'cura', stat: 'INT', mult: 3.5, desc: 'Cura suas feridas.' },
-  drenar_alma:       { nome: 'Drenar Alma',          icone: '💀', alcance: 3, custo: 13, nivel: 5,  tipo: 'dreno', stat: 'INT', mult: 2.4, desc: 'Fere o inimigo e recupera metade do dano.' },
-  julgamento_deuses: { nome: 'Julgamento dos Deuses', icone: '⚖️', alcance: 4, area: 'alvo+vizinhos', custo: 24, nivel: 9, tipo: 'dano', stat: 'INT', mult: 5.0, desc: 'Atinge o alvo e os inimigos ao lado dele.' },
+  drenar_alma:       { nome: 'Drenar Alma',          icone: '💀', puxar: 2, alcance: 3, custo: 13, nivel: 5,  tipo: 'dreno', stat: 'INT', mult: 2.4, desc: 'Fere o inimigo, recupera metade do dano e PUXA o alvo 2 hexágonos até você.' },
+  julgamento_deuses: { nome: 'Julgamento dos Deuses', icone: '⚖️', empurrar: 2, alcance: 4, area: 'alvo+vizinhos', custo: 24, nivel: 9, tipo: 'dano', stat: 'INT', mult: 5.0, desc: 'Atinge o alvo e quem está ao lado dele, empurrando todos 2 hexágonos.' },
 };
 
 /* ---------- ITENS ---------- */
@@ -197,7 +197,7 @@ const INIMIGOS = {
 
   // --- Final ---
   caos: {
-    nome: 'Caos Primordial', icone: '🌌', mov: 4, alc: 5, chefe: true, hp: 1650, atk: 100, def: 30, xp: 0, gold: 0,
+    nome: 'Caos Primordial', icone: '🌌', mov: 4, alc: 5, chefe: true, hp: 1300, atk: 100, def: 30, xp: 0, gold: 0,
     especial: { nome: 'Colapso do Cosmos', mult: 2.2, cada: 3 },
     drops: [],
     falaAntes: [
@@ -228,42 +228,72 @@ const ARMADILHAS = {
 const CHEFE_FATOR_ARM = 0.5;   // chefes sofrem metade do efeito das armadilhas
 const RECUPERA_PORTA = 0.15;   // ao atravessar uma porta, você recupera esta parte da vida e da mana
 
+/* ---------- DIFICULDADES ----------
+   nivel      soma ao nível do cenário (que é metade do seu nível, arredondado para cima)
+   stat       multiplica vida e ataque dos inimigos
+   recompensa multiplica o XP e as moedas
+   armadilha  multiplica o efeito das armadilhas
+   porta      parte da vida e da mana que você recupera ao atravessar uma porta */
+const DIFICULDADES = {
+  facil:         { nome: 'Fácil',         icone: '🌱', nivel: -1, stat: 0.85, recompensa: 0.8, armadilha: 0.7, porta: 0.25 },
+  intermediario: { nome: 'Intermediário', icone: '⚔️', nivel: 0,  stat: 1.0,  recompensa: 1.0, armadilha: 1.0, porta: 0.15 },
+  dificil:       { nome: 'Difícil',       icone: '🔥', nivel: 1,  stat: 1.1,  recompensa: 1.2, armadilha: 1.3, porta: 0.10 },
+  expert:        { nome: 'Expert',        icone: '💀', nivel: 2,  stat: 1.15,  recompensa: 1.5, armadilha: 1.6, porta: 0.05 },
+};
+const DIFICULDADE_PADRAO = 'intermediario';
+/** Dois "botões" gerais de equilíbrio: forca multiplica vida e ataque de TODOS os inimigos; xp multiplica o XP ganho.
+ *  (Para deixar o jogo mais fácil ou mais difícil de uma vez, mexa só aqui.) */
+const BALANCO = { forca: 1.35, xp: 0.6 };
+/** A cada nível do cenário acima do "nível-base" do reino, os inimigos ganham este tanto de vida/ataque (e o contrário abaixo). */
+const FORCA_POR_NIVEL = 0.10;
+const RECOMPENSA_POR_NIVEL = 0.05;
+
+/* ---------- ESTRUTURAS A DESTRUIR (objetivo "destruir") ---------- */
+const ESTRUTURAS = {
+  valhala: { nome: 'Torre de gelo',          mini: 'torre_gelo',   hp: 70,  def: 6 },
+  olimpo:  { nome: 'Altar de Zeus',          mini: 'altar',        hp: 120, def: 9 },
+  inferno: { nome: 'Portal demoníaco',       mini: 'portal_fogo',  hp: 190, def: 12 },
+  duat:    { nome: 'Estela amaldiçoada',     mini: 'estela',       hp: 260, def: 16 },
+  caos:    { nome: 'Cristal do Caos',        mini: 'cristal_caos', hp: 340, def: 20 },
+};
+
 /* ---------- REINOS ---------- */
 const REINOS = [
   {
-    id: 'valhala', armadilha: 'gelo', salas: ['v_salao', 'v_floresta'], arena: 'v_covil', nome: 'Valhala', icone: '🛡️', tier: 1, nivelRec: '1–4',
+    id: 'valhala', nivelBase: 2, armadilha: 'gelo', salas: ['v_salao', 'v_floresta'], arena: 'v_covil', nome: 'Valhala', icone: '🛡️', tier: 1, nivelRec: '1–4',
     intro: 'O grande salão dos guerreiros mortos está coberto de neve e silêncio. Os einherjar, antes honrados, vagam como draugr. No fundo do salão, algo uiva.',
     inimigos: ['draugr', 'lobo_gelo', 'valquiria', 'troll_gelo'], chefe: 'fenrir',
     mercador: { nome: 'Brokkr, o Ferreiro Anão', icone: '🧔', fala: 'Aço é aço, em qualquer reino! O que vai ser?' },
     consumiveis: ['pocao', 'pocao_mana', 'hidromel'], descanso: 15,
   },
   {
-    id: 'olimpo', armadilha: 'raio', salas: ['o_jardins', 'o_escadaria'], arena: 'o_arena', nome: 'Olimpo', icone: '🏛️', tier: 2, nivelRec: '5–8',
+    id: 'olimpo', nivelBase: 4, armadilha: 'raio', salas: ['o_jardins', 'o_escadaria'], arena: 'o_arena', nome: 'Olimpo', icone: '🏛️', tier: 2, nivelRec: '5–8',
     intro: 'Colunas de mármore flutuam entre as nuvens. As harpias dominam os jardins dos deuses e o trovão de Zeus ecoa, sem dono, pelos corredores vazios.',
     inimigos: ['harpia', 'satiro', 'ciclope', 'minotauro'], chefe: 'ares',
     mercador: { nome: 'Hefesto, o Ferreiro Divino', icone: '🔥', fala: 'Forjado no Etna! Escolha com sabedoria, mortal.' },
     consumiveis: ['pocao_mana', 'hidromel', 'ambrosia'], descanso: 30,
   },
   {
-    id: 'inferno', armadilha: 'fogo', salas: ['i_flegetonte', 'i_dite'], arena: 'i_trono', nome: 'Inferno', icone: '🔥', tier: 3, nivelRec: '9–12',
+    id: 'inferno', nivelBase: 6, armadilha: 'fogo', salas: ['i_flegetonte', 'i_dite'], arena: 'i_trono', nome: 'Inferno', icone: '🔥', tier: 3, nivelRec: '9–12',
     intro: 'Rios de fogo cortam um mundo sem céu. As almas condenadas gritam em coro e demônios patrulham as muralhas de Dite. Cada passo queima.',
     inimigos: ['alma_penada', 'diabrete', 'cerbero', 'demonio'], chefe: 'hades',
     mercador: { nome: 'Caronte, o Barqueiro', icone: '🛶', fala: 'Só aceito ouro. Ouro, e nunca perguntas.' },
     consumiveis: ['pocao_mana', 'ambrosia', 'nectar'], descanso: 60,
   },
   {
-    id: 'duat', armadilha: 'veneno', salas: ['d_osiris', 'd_dunas'], arena: 'd_piramide', nome: 'Duat', icone: '🏜️', tier: 4, nivelRec: '13–17',
+    id: 'duat', nivelBase: 8, armadilha: 'veneno', salas: ['d_osiris', 'd_dunas'], arena: 'd_piramide', nome: 'Duat', icone: '🏜️', tier: 4, nivelRec: '13–17',
     intro: 'O mundo dos mortos egípcio é um deserto infinito sob um sol negro. Pirâmides sussurram o nome de Set, e a Balança de Maat pende torta.',
     inimigos: ['escaravelho', 'mumia', 'chacal', 'serpente'], chefe: 'set',
     mercador: { nome: 'Khenti, o Embalsamador', icone: '🏺', fala: 'Tudo se conserva no Duat... menos a esperança.' },
     consumiveis: ['ambrosia', 'agua_nilo', 'nectar'], descanso: 100,
   },
   {
-    id: 'caos', armadilha: 'vazio', salas: [], arena: 'c_abismo', nome: 'Abismo do Caos', icone: '🌌', tier: 5, nivelRec: '17+', final: true,
+    id: 'caos', nivelBase: 9, armadilha: 'vazio', salas: ['c_ruinas', 'c_fenda'], arena: 'c_abismo', nome: 'Abismo do Caos', icone: '🌌', tier: 5, nivelRec: '17+', final: true,
     intro: 'Não há chão aqui. Os Fragmentos do Destino flutuam ao seu redor, formando uma escada de luz até a escuridão primordial.',
     inimigos: ['escaravelho', 'mumia', 'chacal', 'serpente'], // ecos do Duat que acompanham o Caos
     chefe: 'caos',
-    descanso: 0,
+    mercador: { nome: 'Thot, o Escriba Perdido', icone: '📜', fala: 'Tudo o que existe está escrito, exceto o que vem a seguir. Compre depressa.' },
+    consumiveis: ['ambrosia', 'agua_nilo', 'nectar'], descanso: 120,
   },
 ];
 

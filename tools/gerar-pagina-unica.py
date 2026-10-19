@@ -9,7 +9,8 @@ raiz = Path(__file__).resolve().parent.parent
 saida = Path(sys.argv[1] if len(sys.argv) > 1 else 'pagina-unica.html')
 
 css = (raiz / 'style.css').read_text()
-scripts = ''.join((raiz / 'js' / f).read_text() + '\n' for f in ['data.js', 'logic.js', 'mapas.js', 'minis.js', 'tatica.js', 'ui.js'])
+ordem = ['data.js', 'cartas.js', 'cenarios.js', 'logic.js', 'mapas.js', 'minis.js', 'tatica.js', 'vendor/three.min.js', 'cena3d.js', 'ui.js']
+scripts = ''.join((raiz / 'js' / f).read_text() + '\n' for f in ordem)
 assert '</script' not in scripts
 # O service worker não funciona dentro da página publicada: removemos só esse trecho
 scripts = re.sub(r"if \('serviceWorker' in navigator.*?\n\}\n", '', scripts, flags=re.S)

@@ -1,6 +1,7 @@
 'use strict';
 /* ============================================================
-   TELAS E TOQUES — desenha o jogo na página usando as regras de logic.js
+   TELAS E TOQUES — desenha o jogo na página usando as regras de logic.js e tatica.js.
+   O mapa de batalha em 3D é desenhado por cena3d.js; aqui ficam os botões, painéis e textos.
    ============================================================ */
 
 const SAVE_KEY = 'fio_do_destino_v1';
@@ -8,15 +9,19 @@ const app = document.getElementById('app');
 const modal = document.getElementById('modal');
 
 let P = null;          // jogador
-let T = null;          // batalha tática atual
+let T = null;          // etapa de batalha atual
 let MODO = null;       // ação à espera de alvo: {tipo:'atacar'} ou {tipo:'hab', id}
 let OCUPADO = false;   // true enquanto os inimigos jogam
-let RES = null;        // resultado da última vitória
+let RES = null;        // resultado da última etapa vencida
 let REINO = null;      // reino aberto (objeto de REINOS)
+let CEN = null;        // cenário aberto na tela de preparação
 let HIST = null;       // história em andamento
 let SUB = 'main';      // submenu da batalha: main | habs | itens
 let LOJA_ABA = 'comprar';
 let TOAST_T = null;
+let ARM_AVISO = null;  // hexágono perigoso já avisado (o 2º toque confirma)
+let ATOR_TIPO = null;  // tipo de inimigo que está agindo agora (destaca a carta dele)
+const dormir = ms => new Promise(r => setTimeout(r, window.TESTE_RAPIDO ? 1 : ms));   // TESTE_RAPIDO: só os testes automáticos ligam
 
 /* ---------- utilidades ---------- */
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -29,7 +34,7 @@ function carregar() {
     const s = localStorage.getItem(SAVE_KEY);
     if (!s) return null;
     const p = JSON.parse(s);
-    return p && p.classe && CLASSES[p.classe] ? p : null;
+    return p && p.classe && CLASSES[p.classe] ? migrarSave(p) : null;
   } catch (e) { return null; }
 }
 
@@ -63,6 +68,12 @@ function statusTopo() {
   </header>`;
 }
 
+/** Os 4 botões de dificuldade (usados no mapa dos reinos e na preparação do cenário). */
+function chipsDificuldade() {
+  return `<div class="dificuldades">${Object.entries(DIFICULDADES).map(([id, d]) =>
+    `<button class="chip-dif ${P.dificuldade === id ? 'on' : ''}" data-a="dif" data-id="${id}">${d.icone}<span>${d.nome}</span></button>`).join('')}</div>`;
+}
+
 /* ---------- história ---------- */
 function historia(paginas, depois) {
   if (!paginas.length) { depois(); return; }
@@ -70,6 +81,7 @@ function historia(paginas, depois) {
   telaHistoria();
 }
 function telaHistoria() {
+  Cena3D.destruir();
   const pg = HIST.paginas[HIST.i];
   const ultimo = HIST.i === HIST.paginas.length - 1;
   const nome = P ? P.nome : '';
@@ -83,6 +95,7 @@ function telaHistoria() {
 
 /* ---------- título e criação ---------- */
 function telaTitulo() {
+  Cena3D.destruir();
   REINO = null; T = null;
   const tem = !!carregar();
   app.innerHTML = `<div class="tela titulo">
@@ -121,21 +134,25 @@ function telaCriar() {
 
 /* ---------- mapa de reinos ---------- */
 function telaMapa() {
-  REINO = null; T = null;
+  Cena3D.destruir();
+  REINO = null; T = null; CEN = null;
   salvar();
   app.innerHTML = `<div class="tela mapa">
     ${statusTopo()}
     <div class="corpo">
       <h2>Reinos dos Deuses</h2>
       <div class="fragmentos">${[0, 1, 2, 3].map(i => `<span class="${P.fragmentos[i] ? 'on' : ''}" title="${esc(P.fragmentos[i] || 'Fragmento ainda oculto')}">${P.fragmentos[i] ? '🔶' : '◇'}</span>`).join('')}<small>Fragmentos do Destino</small></div>
+      <div class="rotulo-dif">Dificuldade</div>
+      ${chipsDificuldade()}
       ${REINOS.map((r, i) => {
         const livre = reinoDesbloqueado(P, i);
-        const feito = !!P.derrotados[r.chefe];
-        const dica = r.final ? 'Reúna os 4 Fragmentos do Destino' : i > 0 ? `Derrote ${INIMIGOS[REINOS[i - 1].chefe].nome.split(',')[0]} para abrir` : '';
+        const lista = cenariosDoReino(r.id);
+        const feitos = lista.filter(c => P.cenarios[c.id]).length;
+        const dica = i > 0 ? `Conclua "${cenariosDoReino(REINOS[i - 1].id).slice(-1)[0].nome}" para abrir` : '';
         return `<button class="card-reino reino-${r.id}" data-a="reino" data-id="${r.id}" ${livre ? '' : 'disabled'}>
           <span class="ico-g">${livre ? r.icone : '🔒'}</span>
-          <span class="txt"><b>${r.nome}</b><small>${livre ? `Nível recomendado: ${r.nivelRec}` : dica}</small></span>
-          <span class="selo">${feito ? '✅' : ''}</span>
+          <span class="txt"><b>${r.nome}</b><small>${livre ? `Cenários ${lista[0].id}–${lista[lista.length - 1].id} · concluídos ${feitos}/${lista.length}` : dica}</small></span>
+          <span class="selo">${feitos === lista.length ? '✅' : ''}</span>
         </button>`;
       }).join('')}
     </div>
@@ -151,22 +168,30 @@ function rodapeNav() {
   </nav>`;
 }
 
-/* ---------- reino ---------- */
-function telaReino(primeira = false) {
+/* ---------- reino: lista de cenários ---------- */
+function telaReino() {
+  Cena3D.destruir();
   const r = REINO;
+  T = null; CEN = null;
   salvar();
-  const chefe = INIMIGOS[r.chefe];
-  const feito = !!P.derrotados[r.chefe];
   app.innerHTML = `<div class="tela reino reino-${r.id}">
     ${statusTopo()}
     <div class="corpo">
       <div class="banner"><span>${r.icone}</span><h2>${r.nome}</h2></div>
       <p class="intro">${esc(r.intro)}</p>
+      <div class="lista-cen">
+        ${cenariosDoReino(r.id).map(c => {
+          const liberado = cenarioDesbloqueado(P, c), feito = !!P.cenarios[c.id], o = OBJETIVOS[c.objetivo];
+          return `<button class="card-cen ${feito ? 'feito' : ''}" data-a="cenario" data-id="${c.id}" ${liberado ? '' : 'disabled'}>
+            <span class="num">${liberado ? c.id : '🔒'}</span>
+            <span class="txt"><b>${esc(c.nome)}</b><small>${o.icone} ${o.nome} · ${c.etapas.length} etapas</small></span>
+            <span class="selo">${feito ? '✅' : liberado ? '▶' : ''}</span>
+          </button>`;
+        }).join('')}
+      </div>
       <div class="acoes-reino">
-        ${r.final ? '' : '<button class="btn grande" data-a="explorar">🧭 Explorar</button>'}
-        <button class="btn grande ${feito ? 'sec' : 'chefe'}" data-a="chefe">${chefe.icone} ${feito ? 'Revanche: ' : 'Desafiar '}${esc(chefe.nome.split(',')[0])}</button>
         ${r.mercador ? `<button class="btn" data-a="loja">🛒 ${esc(r.mercador.nome.split(',')[0])}</button>` : ''}
-        ${r.final ? '' : `<button class="btn" data-a="acampar">🏕️ Acampar (🪙 ${r.descanso})</button>`}
+        <button class="btn" data-a="acampar">🏕️ Acampar (🪙 ${r.descanso})</button>
         <button class="btn link" data-a="mapa">← Mapa dos reinos</button>
       </div>
     </div>
@@ -174,8 +199,45 @@ function telaReino(primeira = false) {
   </div>`;
 }
 
+/* ---------- preparação do cenário ---------- */
+function telaBriefing() {
+  Cena3D.destruir();
+  const c = CEN, r = REINO, o = OBJETIVOS[c.objetivo];
+  const res = resumoCenario(c, P, P.dificuldade);
+  const d = derivados(P);
+  const chefe = c.objetivo === 'chefe' ? INIMIGOS[r.chefe] : null;
+  app.innerHTML = `<div class="tela reino reino-${r.id}">
+    ${statusTopo()}
+    <div class="corpo">
+      <div class="cen-topo"><span class="num-g">${c.id}</span><div><small>Cenário ${c.id} de ${CENARIOS.length} · ${r.nome}</small><h2>${esc(c.nome)}</h2></div></div>
+      <p class="intro">${esc(c.texto)}</p>
+      <div class="caixa-obj"><span class="ico-g">${o.icone}</span><div><b>Objetivo: ${o.nome}</b><small>${esc(o.dica)}</small></div></div>
+      <div class="detalhes-cen">
+        <span>🚪 ${c.etapas.length} etapas</span>
+        <span>🧰 1 baú</span>
+        <span>${ARMADILHAS[r.armadilha].icone} ${ARMADILHAS[r.armadilha].nome.replace('Armadilha ', 'armadilhas ').replace('armadilhas de', 'armadilhas de').replace('armadilhas venenosa', 'armadilhas venenosas')}</span>
+        ${chefe ? `<span>${chefe.icone} ${esc(chefe.nome.split(',')[0])}</span>` : ''}
+      </div>
+      <div class="rotulo-dif">Dificuldade</div>
+      ${chipsDificuldade()}
+      <div class="resumo-dif">
+        <span>Nível do cenário <b>${res.nivel}</b></span>
+        <span>Força dos inimigos <b>${Math.round(res.stat * 100)}%</b></span>
+        <span>Recompensas <b>×${res.rec.toFixed(2)}</b></span>
+        <span>Você <b>Nv ${P.nivel}</b> · ❤️ ${P.hp}/${d.hpMax}</span>
+      </div>
+      <p class="dica">O nível do cenário sobe a cada 2 níveis seus, e os inimigos ficam mais fortes junto.</p>
+      <div class="acoes-reino">
+        <button class="btn grande" data-a="iniciar">⚔️ Começar o cenário</button>
+        <button class="btn link" data-a="voltar-reino">← Voltar</button>
+      </div>
+    </div>
+  </div>`;
+}
+
 /* ---------- loja ---------- */
 function telaLoja() {
+  Cena3D.destruir();
   const r = REINO;
   const lista = LOJA_ABA === 'comprar'
     ? estoqueLoja(P, r).filter(id => { const it = ITENS[id]; return !it.classe || it.classe === P.classe; })
@@ -208,126 +270,34 @@ function telaLoja() {
   </div>`;
 }
 
-/* ---------- batalha tática (mapa de hexágonos) ---------- */
-const HEX = 27;                 // tamanho de um hexágono (em unidades do SVG)
-const RAIZ3 = Math.sqrt(3);
-const NS = 'http://www.w3.org/2000/svg';
-const dormir = ms => new Promise(r => setTimeout(r, ms));
-let POLI = {};                  // "c,r" -> polígono do hexágono
-let ARM_AVISO = null;           // hexágono perigoso já avisado (o 2º toque confirma)
-const ZOOMS = [0.75, 1, 0.6];   // o botão 🔍 passa de um para o próximo
-let ZOOM = ZOOMS[0];            // começa com uma visão aberta, para ver os inimigos
-
-function hexCentro(c, r) {
-  return { x: RAIZ3 * HEX * (c + 0.5 * (r & 1)) + (RAIZ3 * HEX) / 2, y: 1.5 * HEX * r + HEX };
-}
-const HEX_PONTOS = [0, 1, 2, 3, 4, 5].map(i => {
-  const a = ((60 * i - 30) * Math.PI) / 180;
-  return `${(HEX * Math.cos(a)).toFixed(1)},${(HEX * Math.sin(a)).toFixed(1)}`;
-}).join(' ');
-
-function iniciarBatalha(chefeId) {
-  T = criarTatica(REINO, criarExpedicao(REINO, chefeId), P);
-  RES = null; ARM_AVISO = null; SUB = 'main'; MODO = null; OCUPADO = false;
+/* ---------- batalha tática em 3D ---------- */
+function iniciarBatalha() {
+  const exp = criarExpedicao(CEN, P, P.dificuldade);
+  T = criarTatica(exp, P);
+  RES = null; SUB = 'main'; MODO = null; OCUPADO = false; ARM_AVISO = null; ATOR_TIPO = null;
   telaTatica();
 }
 
 function telaTatica() {
-  const g = T.g;
-  const larg = RAIZ3 * HEX * (g.cols + 0.5);
-  const alt = 1.5 * HEX * (g.rows - 1) + 2 * HEX;
-  let chao = '', objetos = '';
-  for (let r = 0; r < g.rows; r++) {
-    for (let c = 0; c < g.cols; c++) {
-      const ch = g.cel[r][c];
-      if (ch === ' ') continue;
-      const { x, y } = hexCentro(c, r);
-      const pos = `transform="translate(${x.toFixed(1)} ${y.toFixed(1)})"`;
-      const h = (Math.imul(c + 1, 73856093) ^ Math.imul(r + 1, 19349663)) >>> 0;
-      if (ch === '#') {
-        chao += `<polygon class="hex-base v${h % 3}" points="${HEX_PONTOS}" ${pos}/>`;
-        objetos += `<g class="prop" ${pos}>${PROPS[T.parede]()}</g>`;
-      } else if (ch === 'D') {
-        chao += `<polygon class="hex porta-hex v${h % 3}" data-a="hex" data-c="${c}" data-r="${r}" points="${HEX_PONTOS}" ${pos}/>`;
-        objetos += `<g class="porta fechada" id="porta" ${pos}>${portaSvg(T.reinoId, false)}</g>`;
-      } else if (ch === '~') {
-        chao += `<polygon class="hex-liq liq-${T.liquido}" points="${HEX_PONTOS}" ${pos}/><g ${pos} class="liq-det">${LIQUIDOS[T.liquido]()}</g>`;
-      } else {
-        chao += `<polygon class="hex v${h % 3}" data-a="hex" data-c="${c}" data-r="${r}" points="${HEX_PONTOS}" ${pos}/>`;
-        const det = decorChao(T.reinoId, c, r);
-        if (det) chao += `<g class="decor" ${pos}>${det}</g>`;
-      }
-    }
-  }
-  const sx = hexCentro(T.saida.c, T.saida.r);
   app.innerHTML = `<div class="tela tatica reino-${T.reinoId}">
     <div class="tat-topo"><span class="tat-nome">📍 <b>${esc(T.nomeSala)}</b></span><span id="rod"></span></div>
+    <div id="obj" class="obj"></div>
     <div class="tabuleiro">
-      <div class="rolagem" id="rolagem">
-        <svg id="tab" viewBox="0 0 ${larg.toFixed(1)} ${alt.toFixed(1)}" style="width:${Math.round(larg * ZOOM)}px" role="img" aria-label="Mapa: ${esc(T.nomeSala)}">
-          <defs><radialGradient id="gcaos"><stop offset="0" stop-color="#2a0e55"/><stop offset=".7" stop-color="#4b1d96"/><stop offset="1" stop-color="#0d0618"/></radialGradient></defs>
-          <g id="c-chao">${chao}</g>
-          <g id="c-arm"></g>
-          <text class="saida-ico" x="${(sx.x + HEX * 0.5).toFixed(1)}" y="${(sx.y - HEX * 0.35).toFixed(1)}">🚪</text>
-          <g id="c-obj">${objetos}</g>
-          <g id="c-unid"></g><g id="c-fx"></g>
-        </svg>
-      </div>
+      <div class="cena3d" id="cena3d"></div>
       <div class="mapa-botoes">
-        <button class="btn-mapa" data-a="tat-zoom" aria-label="Alternar zoom">🔍</button>
+        <button class="btn-mapa" data-a="tat-zoom-mais" aria-label="Aproximar">＋</button>
+        <button class="btn-mapa" data-a="tat-zoom-menos" aria-label="Afastar">－</button>
+        <button class="btn-mapa" data-a="tat-girar" aria-label="Girar o mapa">↻</button>
         <button class="btn-mapa" data-a="tat-centro" aria-label="Centralizar no herói">🎯</button>
       </div>
     </div>
     <div id="hud"></div>
   </div>`;
-  POLI = {};
-  app.querySelectorAll('.hex').forEach(p => { POLI[chave(+p.dataset.c, +p.dataset.r)] = p; });
+  Cena3D.montar(document.getElementById('cena3d'), T, { onHex: (c, r) => ACOES.hex({ dataset: { c, r } }) });
   atualizarTudo();
-  // enquadra no meio entre o herói e os inimigos, para ver os dois lados
-  const vs = vivos(T);
-  const mc = vs.reduce((a, e) => a + e.c, 0) / vs.length, mr = vs.reduce((a, e) => a + e.r, 0) / vs.length;
-  centralizar({ c: (T.heroi.c + mc) / 2, r: (T.heroi.r + mr) / 2 }, false);
-}
-
-/** Rola o mapa até o hexágono ficar no meio da tela. */
-function centralizar(pos, suave = true) {
-  const sc = document.getElementById('rolagem');
-  if (!sc) return;
-  const { x, y } = hexCentro(pos.c, pos.r);
-  sc.scrollTo({ left: x * ZOOM - sc.clientWidth / 2, top: y * ZOOM - sc.clientHeight / 2, behavior: suave ? 'smooth' : 'auto' });
-}
-
-/** Só rola se o hexágono estiver perto da borda da área visível. */
-function garantirVisivel(pos) {
-  const sc = document.getElementById('rolagem');
-  if (!sc) return;
-  const { x, y } = hexCentro(pos.c, pos.r);
-  const px = x * ZOOM, py = y * ZOOM, m = 70;
-  if (px < sc.scrollLeft + m || px > sc.scrollLeft + sc.clientWidth - m || py < sc.scrollTop + m || py > sc.scrollTop + sc.clientHeight - m) centralizar(pos);
 }
 
 function atualizarTudo() { atualizarTabuleiro(); atualizarHud(); }
-
-const HPW = 28; // largura da barra de vida sob cada miniatura
-function noUnidade(id, cls, miniId) {
-  const g = document.createElementNS(NS, 'g');
-  g.id = id; g.setAttribute('class', 'unid ' + cls);
-  g.innerHTML = `<ellipse class="base" cx="0" cy="12" rx="16" ry="6"/>
-    <g class="fig">${miniatura(miniId)}</g>
-    <rect class="hp-bg" x="${-HPW / 2}" y="19" width="${HPW}" height="4.5" rx="2"/>
-    <rect class="hp-fg" x="${-HPW / 2}" y="19" width="${HPW}" height="4.5" rx="2"/>`;
-  document.getElementById('c-unid').appendChild(g);
-  return g;
-}
-
-function posicionar(g, pos, hp, hpMax) {
-  const { x, y } = hexCentro(pos.c, pos.r);
-  const antes = g._x;
-  g.style.transform = `translate(${x}px, ${y}px)`;
-  if (antes !== undefined && Math.abs(x - antes) > 1) g.querySelector('.fig').classList.toggle('volta', x < antes); // vira para onde anda
-  g._x = x;
-  g.querySelector('.hp-fg').setAttribute('width', (HPW * Math.max(0, hp) / hpMax).toFixed(1));
-}
 
 /** Alvos possíveis do modo atual (para destacar em vermelho). */
 function alvosDoModo() {
@@ -336,7 +306,7 @@ function alvosDoModo() {
 }
 
 function atualizarTabuleiro() {
-  if (!T || !document.getElementById('c-unid')) return;
+  if (!T) return;
   const alc = new Set(), alvos = new Set(), perigo = new Set();
   if (T.fase === 'heroi' && !T.fim && !OCUPADO) {
     if (MODO) alvosDoModo().forEach(e => alvos.add(chave(e.c, e.r)));
@@ -346,68 +316,58 @@ function atualizarTabuleiro() {
       if (!T.acaoUsada) tAlvos(T, P, { tipo: 'atacar' }).forEach(e => alvos.add(chave(e.c, e.r)));
     }
   }
-  for (const [k, p] of Object.entries(POLI)) {
-    p.classList.toggle('alcancavel', alc.has(k));
-    p.classList.toggle('alvo', alvos.has(k));
-    p.classList.toggle('perigo', perigo.has(k));
-  }
-  // armadilhas no chão: criam as novas e apagam as que dispararam
-  const camArm = document.getElementById('c-arm');
-  if (camArm) {
-    const vivas = new Set(T.armadilhas.keys());
-    camArm.querySelectorAll('.arm').forEach(n => { if (n.dataset.k && !vivas.has(n.dataset.k)) { n.classList.add('some'); n.dataset.k = ''; setTimeout(() => n.remove(), 450); } });
-    for (const k of vivas) {
-      if (camArm.querySelector(`[data-k="${k}"]`)) continue;
-      const [c, r] = k.split(',').map(Number), { x, y } = hexCentro(c, r), tipo = T.armadilhas.get(k).tipo;
-      const g = document.createElementNS(NS, 'g');
-      g.setAttribute('class', 'arm arm-' + tipo); g.dataset.k = k;
-      g.setAttribute('transform', `translate(${x.toFixed(1)} ${y.toFixed(1)})`);
-      g.innerHTML = ARM_SVG[tipo]();
-      camArm.appendChild(g);
-    }
-  }
-  // porta: trancada ou aberta
-  const pg = document.getElementById('porta');
-  if (pg && T.porta) {
-    const ab = T.porta.aberta;
-    if (pg.dataset.ab !== String(ab)) { pg.dataset.ab = String(ab); pg.innerHTML = portaSvg(T.reinoId, ab); pg.classList.toggle('aberta', ab); pg.classList.toggle('fechada', !ab); }
-    const ph = POLI[chave(T.porta.c, T.porta.r)];
-    if (ph) ph.classList.toggle('porta-aberta', ab);
-  }
-  // herói
-  let gh = document.getElementById('u-heroi');
-  if (!gh) gh = noUnidade('u-heroi', 'heroi', P.classe);
-  const d = derivados(P);
-  posicionar(gh, T.heroi, P.hp, d.hpMax);
-  gh.classList.toggle('buff', !!T.buff);
-  gh.classList.toggle('defende', T.defendendo);
-  // inimigos
-  for (const e of T.inim) {
-    const id = 'u-' + e.uid;
-    let g = document.getElementById(id);
-    if (!e.vivo) { if (g) { g.classList.add('morto'); g.id = ''; setTimeout(() => g.remove(), 450); } continue; }
-    if (!g) g = noUnidade(id, 'inim' + (e.chefe ? ' chefe' : ''), e.id);
-    posicionar(g, e, e.hp, e.hpMax);
-  }
+  Cena3D.sincronizar(T, P, { alc, alvos, perigo });
 }
 
 function mostrarFxT() {
   if (!T || !T.fx.length) return;
-  const camada = document.getElementById('c-fx');
-  for (const f of T.fx) {
-    const alvo = f.alvo === 'heroi' ? T.heroi : T.inim.find(e => e.uid === f.alvo);
-    if (!alvo || !camada) continue;
-    const { x, y } = hexCentro(alvo.c, alvo.r);
-    const t = document.createElementNS(NS, 'text');
-    t.setAttribute('x', x); t.setAttribute('y', y - HEX * 0.3);
-    t.setAttribute('class', 'flutua-s' + (f.cura ? ' cura' : '') + (f.crit ? ' crit' : '') + (f.forte ? ' forte' : '') + (f.esquiva ? ' esq' : ''));
-    t.textContent = f.esquiva ? 'Esquivou!' : f.texto || ((f.cura ? '+' : '-') + f.v);
-    camada.appendChild(t);
-    setTimeout(() => t.remove(), 1000);
-    const g = document.getElementById(f.alvo === 'heroi' ? 'u-heroi' : 'u-' + f.alvo);
-    if (g && !f.cura && !f.esquiva) { g.classList.add('golpeado'); setTimeout(() => g.classList.remove('golpeado'), 350); }
-  }
+  Cena3D.fx(T.fx);
   T.fx = [];
+}
+const centralizar = pos => Cena3D.centralizar(pos.c, pos.r);
+const garantirVisivel = pos => Cena3D.garantirVisivel(pos.c, pos.r);
+
+/** Texto do objetivo da etapa, com o andamento. */
+function objetivoHtml() {
+  const comb = combatentes(T).length, estr = T.inim.filter(e => e.vivo && e.estrutura).length;
+  const total = T.inim.filter(e => e.estrutura).length;
+  const moedas = [...T.moedas.values()].reduce((a, m) => a + m.valor, 0);
+  let txt;
+  if (T.objetivoCumprido && T.ultimaEtapa) txt = '✅ <b>Objetivo cumprido!</b> Saqueie o que sobrou e conclua o cenário.';
+  else if (!T.ultimaEtapa) txt = T.livre ? '🚪 <b>Sala limpa:</b> vá até a porta.' : `🚪 <b>Limpe a sala</b> para abrir a porta · inimigos: ${comb}`;
+  else if (T.objetivo === 'matar_todos') txt = `☠️ <b>Derrote todos os inimigos</b> · restam ${comb}`;
+  else if (T.objetivo === 'bau') txt = T.bau && T.bau.aberto ? '🧰 <b>Baú aberto!</b>' : '🧰 <b>Abra o baú:</b> termine o turno parado em cima dele';
+  else if (T.objetivo === 'destruir') txt = `🏗️ <b>Destrua as estruturas</b> · ${total - estr}/${total}`;
+  else { const b = T.inim.find(e => e.chefe); txt = `👑 <b>Derrote ${esc(b ? b.nome.split(',')[0] : 'o chefe')}</b>${b && b.vivo ? ` · ❤️ ${Math.round(pct(b.hp, b.hpMax))}%` : ''}`; }
+  const extras = [moedas ? `🪙 no chão: ${moedas}` : '', T.bau && !T.bau.aberto && T.objetivo !== 'bau' ? '🧰 baú no mapa' : ''].filter(Boolean).join(' · ');
+  return `${txt}${extras ? `<small>${extras}</small>` : ''}`;
+}
+
+/** Cartas dos inimigos: uma por TIPO, mostrando o que ele vai fazer nesta rodada. */
+function cartasHtml() {
+  const tipos = [];
+  for (const e of combatentes(T)) if (!tipos.includes(e.tipo)) tipos.push(e.tipo);
+  const cartas = tipos.map(tipo => {
+    const grupo = combatentes(T).filter(e => e.tipo === tipo), ref = grupo[0], c = T.cartas[tipo];
+    if (!c) return '';
+    const movEf = c.mov === undefined ? 0 : Math.max(1, ref.mov + c.mov), alcEf = Math.max(1, ref.alc + (c.alc || 0));
+    const atqEf = c.atq === undefined ? null : Math.round(ref.atk * Math.max(0.3, 1 + 0.15 * c.atq));
+    const numeros = [c.mov !== undefined ? `👣 ${movEf}` : '', atqEf !== null ? `⚔️ ${atqEf}` : '', atqEf !== null ? `🎯 ${alcEf}` : ''].filter(Boolean).join('  ');
+    return `<div class="carta-inim ${ref.chefe ? 'chefe' : ''} ${ATOR_TIPO === tipo ? 'agindo' : ''}" style="--cor:${Cena3D.corDoTipo(tipo)}">
+      <div class="carta-topo"><span class="ini" title="Iniciativa: quem tem número menor age primeiro">${c.ini}</span>${miniIcone(ref.id, 28)}<b>${esc(ref.nome.split(',')[0])}</b>${grupo.length > 1 ? `<em>×${grupo.length}</em>` : ''}</div>
+      <div class="carta-nome">🃏 ${esc(c.nome)}</div>
+      <ul class="efeitos">${descreverCarta(c).map(d => `<li>${d.icone} ${d.texto}</li>`).join('')}</ul>
+      ${numeros ? `<div class="carta-num">${numeros}</div>` : ''}
+      <div class="vidas">${grupo.map(e => `<div class="barra hp inimigo mini"><i style="width:${pct(e.hp, e.hpMax)}%"></i><span>${e.hp}/${e.hpMax}${e.efeitos.map(ef => (ef.tipo === 'gelo' ? '❄️' : '☠️')).join('')}</span></div>`).join('')}</div>
+    </div>`;
+  }).join('');
+  const estr = T.inim.filter(e => e.vivo && e.estrutura);
+  const estrHtml = estr.length ? `<div class="carta-inim estrutura" style="--cor:#8a8a99">
+      <div class="carta-topo">${miniIcone(estr[0].id, 28)}<b>${esc(estr[0].nome)}</b><em>×${estr.length}</em></div>
+      <div class="carta-nome">🏗️ Estrutura: não ataca nem anda</div>
+      <div class="vidas">${estr.map(e => `<div class="barra hp inimigo mini"><i style="width:${pct(e.hp, e.hpMax)}%"></i><span>${e.hp}/${e.hpMax}</span></div>`).join('')}</div>
+    </div>` : '';
+  return cartas + estrHtml;
 }
 
 function hudHtml() {
@@ -418,22 +378,19 @@ function hudHtml() {
     T.defendendo ? '<span class="tag">🛡️ defendendo</span>' : '',
     ...T.efeitos.map(ef => `<span class="tag efeito">${ef.tipo === 'gelo' ? '❄️ gelo' : '☠️ veneno'} (${ef.turnos})</span>`),
   ].join('');
-  const inimigos = T.inim.filter(e => e.vivo).map(e => `<div class="chip-inim ${e.chefe ? 'chefe' : ''}">
-      <div class="chip-topo">${miniIcone(e.id, 26)}<b>${esc(e.nome.split(',')[0])}</b></div>
-      <div class="barra hp inimigo mini"><i style="width:${pct(e.hp, e.hpMax)}%"></i><span>${e.hp}/${e.hpMax}</span></div>
-      <small>👣${movEfetivo(e.mov, e.efeitos)} 🎯${e.alc} ⚔️${e.atk} ${e.efeitos.map(ef => (ef.tipo === 'gelo' ? '❄️' : '☠️')).join('')}</small></div>`).join('');
+  const cartas = T.livre ? '' : cartasHtml();
   const defArm = T.tipoArm && T.armadilhas.size ? ARMADILHAS[T.tipoArm] : null;
   const log = T.log.slice(-3).map(l => `<p class="l-${l.cls}">${esc(l.msg)}</p>`).join('');
   return `<div class="hud-heroi">
-      <div class="hud-linha">${miniIcone(P.classe, 30)}<b>${esc(P.nome)} · Nv ${P.nivel}</b>${etiquetas}</div>
+      <div class="hud-linha">${miniIcone(P.classe, 30)}<b>${esc(P.nome)} · Nv ${P.nivel}</b>${etiquetas}<span class="cen-tag">${DIFICULDADES[T.exp.difId].icone} Nv do cenário ${T.exp.nivelCen}</span></div>
       ${barra('hp', P.hp, d.hpMax, '❤️ ')}${barra('mp', P.mp, d.mpMax, '💧 ')}
       <div class="hud-linha pontos-turno">${T.livre
-        ? '<span class="on">🚪 Sala limpa: vá até a porta</span>'
+        ? `<span class="on">${T.ultimaEtapa ? '🪙 Saqueie e conclua o cenário' : '🚪 Sala limpa: vá até a porta'}</span><span class="on">🪙 ${P.gold}</span>`
         : `<span class="${T.movRest > 0 ? 'on' : ''}">👣 Mover ${T.movRest}/${movEfetivo(d.mov, T.efeitos)}</span>
-        <span class="${T.acaoUsada ? '' : 'on'}">${T.acaoUsada ? '⚔️ Ação usada' : '⚔️ Ação livre'}</span>`}
+        <span class="${T.acaoUsada ? '' : 'on'}">${T.acaoUsada ? '⚔️ Ação usada' : '⚔️ Ação livre'}</span><span class="on">🪙 ${P.gold}</span>`}
       </div>
     </div>
-    ${T.livre ? '' : `<div class="inims">${inimigos}</div>`}
+    ${cartas ? `<div class="cartas-titulo">🃏 Cartas dos inimigos nesta rodada</div><div class="cartas">${cartas}</div>` : ''}
     ${defArm ? `<div class="dica-arm" style="--cor:${defArm.cor}">${defArm.icone} <b>${defArm.nome}</b> · ${defArm.desc} <small>(${T.armadilhas.size} no mapa)</small></div>` : ''}
     <div class="log" id="log">${log}</div>
     <div class="acoes" id="acoes">${acoesHtml(meuTurno)}</div>`;
@@ -443,6 +400,8 @@ function atualizarHud() {
   const hud = document.getElementById('hud');
   if (!hud || !T) return;
   hud.innerHTML = hudHtml();
+  const obj = document.getElementById('obj');
+  if (obj) obj.innerHTML = objetivoHtml();
   const rod = document.getElementById('rod');
   if (rod) rod.innerHTML = `Etapa ${T.etapa}/${T.totalEtapas} · ` + (T.livre ? '<b>Sala limpa</b>' : `Rodada ${T.rodada} · ${OCUPADO || T.fase === 'inimigos' ? '<b class="ini">Inimigos agindo…</b>' : '<b>Seu turno</b>'}`);
 }
@@ -478,8 +437,8 @@ function acoesHtml(meuTurno) {
   if (T.livre) {
     return `<div class="grade-acoes">
       <button class="btn" data-a="tat-itens">🎒 Itens</button>
-      <button class="btn fim-turno" data-a="tat-porta">🚪 Ir até a porta</button>
-      <button class="btn sec span2" data-a="tat-fugir" ${naSaida ? '' : 'disabled'}>↩️ Sair da expedição <small>(só na entrada)</small></button>
+      ${T.ultimaEtapa ? '<button class="btn fim-turno" data-a="bat-fim">✅ Concluir cenário</button>' : '<button class="btn fim-turno" data-a="tat-porta">🚪 Ir até a porta</button>'}
+      <button class="btn sec span2" data-a="tat-fugir" ${naSaida ? '' : 'disabled'}>↩️ Sair do cenário <small>(só na entrada)</small></button>
     </div>`;
   }
   return `<div class="grade-acoes">
@@ -497,13 +456,17 @@ function painelVitoria() {
   const itens = r.itens.map(id => `<span class="drop" style="color:${RARIDADE_COR[ITENS[id].raridade]}">${ITENS[id].icone} ${esc(ITENS[id].nome)}</span>`).join('');
   const subidas = r.subidas.map(s => `<p class="nivelup">⭐ Nível ${s.nivel}! +${PONTOS_POR_NIVEL} pontos de atributo${s.novas.length ? ' · Nova habilidade: ' + s.novas.map(id => HABILIDADES[id].nome).join(', ') : ''}</p>`).join('');
   const ultima = T.ultimaEtapa;
-  return `<div class="fim"><h3>${ultima ? '🏆 Vitória!' : `✅ Sala limpa! Etapa ${T.etapa}/${T.totalEtapas}`}</h3>
-    <p>+${r.xp} XP · +${r.gold} 🪙</p>${itens ? `<p class="drops">${itens}</p>` : ''}${subidas}
-    ${ultima ? '<button class="btn grande" data-a="bat-fim">Continuar</button>'
-             : '<button class="btn grande" data-a="tat-seguir">🚪 Abrir a porta</button>'}</div>`;
+  const sobras = [r.moedasNoChao ? `🪙 ${r.moedasNoChao} moedas no chão` : '', r.bauFechado ? '🧰 o baú ainda está fechado' : ''].filter(Boolean).join(' · ');
+  const botoes = ultima
+    ? `${sobras ? '<button class="btn" data-a="tat-saquear">🪙 Saquear o que ficou</button>' : ''}<button class="btn grande" data-a="bat-fim">✅ Concluir cenário</button>`
+    : '<button class="btn grande" data-a="tat-seguir">🚪 Abrir a porta</button>';
+  return `<div class="fim"><h3>${ultima ? '🏆 Objetivo cumprido!' : `✅ Sala limpa! Etapa ${T.etapa}/${T.totalEtapas}`}</h3>
+    <p>+${r.xp} XP</p>${itens ? `<p class="drops">${itens}</p>` : ''}${subidas}
+    ${sobras ? `<p class="sobras">${sobras}${ultima ? '' : ' (pare em cima para pegar)'}</p>` : ''}
+    ${botoes}</div>`;
 }
 
-/* Depois de qualquer ação: salva, mostra números flutuantes e confere se a luta acabou. */
+/* Depois de qualquer ação: salva, mostra números flutuantes e confere se a etapa acabou. */
 function depoisDaAcao(ok) {
   if (!ok && T.log.length) {
     const ult = T.log[T.log.length - 1];
@@ -521,7 +484,7 @@ function depoisDaAcao(ok) {
 /** Sem movimento e sem ação, não sobra nada a fazer: encerra o turno sozinho. */
 function conferirAutoFim() {
   const t = T;
-  if (t && t.fase === 'heroi' && !t.fim && !OCUPADO && t.acaoUsada && t.movRest === 0) {
+  if (t && t.fase === 'heroi' && !t.fim && !t.livre && !OCUPADO && t.acaoUsada && t.movRest === 0) {
     setTimeout(() => { if (T === t && t.fase === 'heroi' && !t.fim && !OCUPADO) encerrarTurno(); }, 600);
   }
 }
@@ -543,6 +506,7 @@ function irPara(c, r) {
   if (T.fim === 'porta') { entrarPorta(); return true; }
   garantirVisivel(T.heroi);
   if (T.fim) { depoisDaAcao(true); return true; }
+  if (!T.livre && T.bau && !T.bau.aberto && T.bau.c === T.heroi.c && T.bau.r === T.heroi.r) toast('🧰 Termine o turno aqui para abrir o baú.');
   conferirAutoFim();
   return true;
 }
@@ -555,60 +519,78 @@ function entrarPorta() {
   T = null; MODO = null; OCUPADO = false;
   const rec = prox.recuperou;
   const folego = rec.hp || rec.mp ? ` Você recupera o fôlego (${[rec.hp ? `+${rec.hp} vida` : '', rec.mp ? `+${rec.mp} mana` : ''].filter(Boolean).join(', ')}).` : '';
-  const texto = prox.chefeId
-    ? `A porta se abre para a arena final: ${prox.nomeSala}. ${INIMIGOS[prox.chefeId].nome} aguarda!${folego}`
-    : `Você atravessa a porta. Etapa ${prox.etapa} de ${prox.totalEtapas}: ${prox.nomeSala}. ${prox.inim.length} inimigos!${folego}`;
-  historia([{ icone: '🚪', texto }], () => { T = prox; RES = null; SUB = 'main'; ARM_AVISO = null; telaTatica(); });
+  const paginas = [];
+  if (prox.chefeId) {
+    const b = INIMIGOS[prox.chefeId];
+    paginas.push({ icone: '🚪', texto: `A porta se abre para a arena final: ${prox.nomeSala}.${folego}` });
+    if (!P.derrotados[prox.chefeId]) for (const f of b.falaAntes) paginas.push(f);
+    else paginas.push({ icone: b.icone, texto: `${b.nome} aguarda de novo!` });
+  } else {
+    paginas.push({ icone: '🚪', texto: `Você atravessa a porta. Etapa ${prox.etapa} de ${prox.totalEtapas}: ${prox.nomeSala}. ${combatentes(prox).length} inimigos!${folego}` });
+  }
+  historia(paginas, () => { T = prox; RES = null; SUB = 'main'; ARM_AVISO = null; ATOR_TIPO = null; telaTatica(); });
 }
 
 function executar(acao, uid) {
   let ok = false;
+  const alvo = uid !== undefined ? T.inim.find(e => e.uid === uid) : null;
   if (acao.tipo === 'atacar') ok = tAtacar(T, P, uid);
   else if (acao.tipo === 'hab') ok = tHabilidade(T, P, acao.id, uid);
   else if (acao.tipo === 'item') ok = tUsarItem(T, P, acao.id);
   else if (acao.tipo === 'defender') ok = tDefender(T, P);
+  if (ok && alvo && (acao.tipo === 'atacar' || acao.tipo === 'hab')) Cena3D.investir('heroi', alvo.c, alvo.r);
   MODO = null; SUB = 'main';
   depoisDaAcao(ok);
 }
 
 async function encerrarTurno() {
   const t = T;
-  if (!t || OCUPADO || !tEncerrarTurno(t)) return;
+  if (!t || OCUPADO || !tEncerrarTurno(t, P)) return;
   MODO = null; SUB = 'main'; OCUPADO = true;
   atualizarTudo();
+  if (t.fim) { OCUPADO = false; depoisDaAcao(true); return; }   // abriu o baú e cumpriu o objetivo
+  mostrarFxT();
   while (T === t && t.fase === 'inimigos' && !t.fim) {
-    await dormir(350);
+    await dormir(380);
     if (T !== t) return;
     const ator = tProximoInimigo(t, P);
-    atualizarTabuleiro();      // o inimigo desliza até o novo lugar
+    ATOR_TIPO = ator ? ator.tipo : null;
+    atualizarTabuleiro();       // o inimigo desliza até o novo lugar
     if (ator) garantirVisivel(ator);
-    await dormir(320);
-    if (T !== t) return;
-    mostrarFxT(); atualizarHud();
     await dormir(380);
+    if (T !== t) return;
+    if (ator && t.fx.some(f => f.de === ator.uid)) Cena3D.investir(ator.uid, t.heroi.c, t.heroi.r);
+    mostrarFxT(); atualizarHud();
+    await dormir(420);
   }
   if (T !== t) return;
+  ATOR_TIPO = null;
   OCUPADO = false;
   depoisDaAcao(true);
 }
 
+/** Fim do cenário: recompensa aleatória, história do chefe (na 1ª vez), relíquia e, no cenário 20, o final do jogo. */
 function fimBatalha() {
-  const t = T;
+  const t = T, res = RES;
   T = null; MODO = null;
   if (t.fim === 'derrota') { penalidadeDerrota(P); salvar(); telaReino(); toast('Você acordou no acampamento.'); return; }
-  if (t.fim !== 'vitoria') { telaReino(); return; }
-  const e = t.chefeId ? INIMIGOS[t.chefeId] : null;
-  if (e && RES.primeira) {
-    const ultimo = t.chefeId === 'caos';
-    const paginas = e.falaDepois.concat(RES.itens.includes(e.reliquia) ? [{ icone: ITENS[e.reliquia].icone, texto: `Você recebeu a relíquia lendária: ${ITENS[e.reliquia].nome}!` }] : []);
-    historia(paginas, () => {
-      if (ultimo) { P.finalizado = true; salvar(); historia(HISTORIA_FINAL, telaTitulo); }
-      else if (P.fragmentos.length >= 4) historia([{ icone: '🌌', texto: 'O Abismo do Caos está aberto. Volte ao mapa dos reinos quando estiver pronto para o confronto final.' }], telaReino);
-      else telaReino();
-    });
-    return;
+  if (!(t.objetivoCumprido && t.ultimaEtapa)) { telaReino(); return; }   // saiu sem cumprir o objetivo
+  const rec = concluirCenario(t, P);
+  salvar();
+  const c = t.exp.cenario;
+  const paginas = [];
+  const chefe = t.chefeId ? INIMIGOS[t.chefeId] : null;
+  if (chefe && res && res.primeira) {
+    for (const f of chefe.falaDepois) paginas.push(f);
+    if (res.itens.includes(chefe.reliquia)) paginas.push({ icone: ITENS[chefe.reliquia].icone, texto: `Você recebeu a relíquia lendária: ${ITENS[chefe.reliquia].nome}!` });
   }
-  telaReino();
+  const premio = rec.tipo === 'gold' ? `+${rec.gold} moedas de ouro` : rec.tipo === 'xp' ? `+${rec.xp} de XP${rec.subidas.length ? ` (você chegou ao nível ${rec.subidas[rec.subidas.length - 1].nivel}!)` : ''}` : `o item ${ITENS[rec.id].nome} ${ITENS[rec.id].icone}`;
+  paginas.push({ icone: '🏆', texto: `Cenário concluído: ${c.nome}! Recompensa: ${premio}.${rec.primeira ? '' : ' (cenário já concluído antes)'}` });
+  historia(paginas, () => {
+    if (c.id === CENARIOS.length) { P.finalizado = true; salvar(); historia(HISTORIA_FINAL, telaTitulo); }
+    else if (chefe && res && res.primeira && P.fragmentos.length >= 4) historia([{ icone: '🌌', texto: 'O Abismo do Caos está aberto. Volte ao mapa dos reinos quando estiver pronto para o confronto final.' }], telaReino);
+    else telaReino();
+  });
 }
 
 /* ---------- personagem e inventário (janelas) ---------- */
@@ -708,15 +690,14 @@ const ACOES = {
     } else telaReino();
   },
   'voltar-reino'() { telaReino(); },
-  explorar() { iniciarBatalha(null); },
-  chefe() {
-    const e = INIMIGOS[REINO.chefe];
-    const iniciar = () => {
-      if (P.derrotados[REINO.chefe]) iniciarBatalha(REINO.chefe);
-      else historia(e.falaAntes, () => iniciarBatalha(REINO.chefe));
-    };
-    if (P.hp < derivados(P).hpMax * 0.5) confirmar('Sua vida está baixa. Desafiar mesmo assim?', iniciar);
-    else iniciar();
+  cenario(el) { CEN = cenarioPorId(+el.dataset.id); REINO = reinoPorId(CEN.reino); telaBriefing(); },
+  dif(el) {
+    P.dificuldade = el.dataset.id; salvar();
+    if (CEN) telaBriefing(); else telaMapa();
+  },
+  iniciar() {
+    if (P.hp < derivados(P).hpMax * 0.5) confirmar('Sua vida está baixa. Começar o cenário mesmo assim?', iniciarBatalha);
+    else iniciarBatalha();
   },
   acampar() {
     const d = derivados(P);
@@ -744,7 +725,9 @@ const ACOES = {
     if (MODO) { MODO = null; atualizarTudo(); return; }
     if (irPara(c, r)) return;
     if (T.porta && !T.porta.aberta && c === T.porta.c && r === T.porta.r) { toast('🚪 A porta está trancada. Derrote todos os inimigos da sala!'); return; }
-    if (temArmadilha(T, c, r)) { const def = ARMADILHAS[T.tipoArm]; toast(`${def.icone} ${def.nome}: ${def.desc}`); }
+    if (temArmadilha(T, c, r)) { const def = ARMADILHAS[T.tipoArm]; toast(`${def.icone} ${def.nome}: ${def.desc}`); return; }
+    if (T.bau && T.bau.c === c && T.bau.r === r) toast(T.bau.aberto ? '🧰 O baú já foi aberto.' : '🧰 Baú do tesouro: termine o turno parado em cima dele.');
+    else if (T.moedas.has(chave(c, r))) toast(`🪙 ${T.moedas.get(chave(c, r)).valor} moedas: pare em cima para saquear.`);
   },
   'tat-seguir'() {
     if (!T || T.fim !== 'vitoria' || T.ultimaEtapa) return;
@@ -753,6 +736,13 @@ const ACOES = {
     atualizarTudo();
     centralizar(T.porta);
     toast('🚪 A porta se abriu! Vá até ela.');
+  },
+  'tat-saquear'() {
+    if (!T || T.fim !== 'vitoria' || !T.ultimaEtapa) return;
+    tSaquear(T);
+    ARM_AVISO = null;
+    atualizarTudo();
+    toast('🪙 Pare em cima das moedas (e do baú) para pegar.');
   },
   'tat-porta'() { if (T && T.livre && T.porta) { if (!irPara(T.porta.c, T.porta.r)) toast('Não dá para chegar até a porta daqui.'); } },
   'tat-atacar'() {
@@ -774,21 +764,17 @@ const ACOES = {
   'tat-item'(el) { if (T && !OCUPADO) executar({ tipo: 'item', id: el.dataset.id }); },
   'tat-defender'() { if (T && !OCUPADO) executar({ tipo: 'defender' }); },
   'tat-fugir'() { if (T && !OCUPADO) depoisDaAcao(tFugir(T)); },
-  'tat-fim'() { encerrarTurno(); },
-  'tat-zoom'() {
-    if (!T) return;
-    ZOOM = ZOOMS[(ZOOMS.indexOf(ZOOM) + 1) % ZOOMS.length];
-    const svg = document.getElementById('tab');
-    svg.style.width = Math.round(parseFloat(svg.getAttribute('viewBox').split(' ')[2]) * ZOOM) + 'px';
-    centralizar(T.heroi, false);
-  },
+  'tat-fim'() { return encerrarTurno(); },
+  'tat-zoom-mais'() { Cena3D.zoom(1.25); },
+  'tat-zoom-menos'() { Cena3D.zoom(1 / 1.25); },
+  'tat-girar'() { Cena3D.girar(60); },
   'tat-centro'() { if (T) centralizar(T.heroi); },
   'bat-fim'() { fimBatalha(); },
 
   // janelas
   personagem() { modalPersonagem(); },
   inventario() { modalInventario(); },
-  fechar() { MODAL_ATUAL = null; fecharModal(); if (!T && REINO) telaReino(); else if (!T && P && !HIST) telaMapa(); },
+  fechar() { MODAL_ATUAL = null; fecharModal(); if (!T && CEN) telaBriefing(); else if (!T && REINO) telaReino(); else if (!T && P && !HIST) telaMapa(); },
   ponto(el) { if (distribuirPonto(P, el.dataset.id)) { salvar(); atualizarModal(); } },
   equipar(el) { const r = equipar(P, el.dataset.id); if (r.ok) { salvar(); atualizarModal(); } else toast(r.msg); },
   desequipar(el) { desequipar(P, el.dataset.id); salvar(); atualizarModal(); },

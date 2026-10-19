@@ -1,7 +1,7 @@
 'use strict';
 // Cache simples para jogar offline. Tenta a rede primeiro; se falhar, usa o cache.
-const CACHE = 'fio-do-destino-v3';
-const ARQUIVOS = ['./', 'index.html', 'style.css', 'js/data.js', 'js/logic.js', 'js/mapas.js', 'js/minis.js', 'js/tatica.js', 'js/ui.js', 'manifest.json', 'icon.svg'];
+const CACHE = 'fio-do-destino-v5';
+const ARQUIVOS = ['./', 'index.html', 'style.css', 'js/data.js', 'js/cartas.js', 'js/cenarios.js', 'js/logic.js', 'js/mapas.js', 'js/minis.js', 'js/tatica.js', 'js/vendor/three.min.js', 'js/cena3d.js', 'js/ui.js', 'manifest.json', 'icon.svg'];
 
 self.addEventListener('install', e => e.waitUntil(caches.open(CACHE).then(c => c.addAll(ARQUIVOS)).then(() => self.skipWaiting())));
 self.addEventListener('activate', e => e.waitUntil(
