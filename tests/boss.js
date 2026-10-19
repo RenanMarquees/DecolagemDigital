@@ -30,6 +30,7 @@ const ROBO = require('./robo');
   });
   await page.reload();
   await page.evaluate(ROBO);
+  await page.evaluate(() => { BALANCO.forca = 0.15; });   // o teste confere o fluxo da campanha, não a dificuldade: inimigos fracos para o robô nunca cair
   const click = s => page.click(s);
   const estado = () => page.evaluate(() => JSON.parse(localStorage.getItem(SAVE_KEY)));
   const passarHistoria = async () => { let n = 0; while (await page.$('[data-a=hist-prox]')) { n++; await click('[data-a=hist-prox]'); } return n; };
