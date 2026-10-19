@@ -64,7 +64,8 @@ const srv = http.createServer((q, r) => {
   if (forado.length) throw new Error('elementos fora da tela: ' + forado.join(', '));
   // detalhes (📋): cartas completas dos inimigos
   await click('[data-a=tat-gaveta] >> nth=0');
-  if ((await page.$$('.gaveta .carta-inim .efeitos li')).length < 2) throw new Error('a carta do inimigo deveria listar os efeitos');
+  if (!(await page.$('.gaveta .carta-inim.oculta')) || (await page.$$('.gaveta .carta-inim .efeitos li')).length) throw new Error('as cartas dos inimigos deveriam estar OCULTAS antes de escolher a sua');
+  if (!(await page.$('.ini-chip.oculta'))) throw new Error('a faixa de iniciativa deveria mostrar "?" nos monstros');
   await shot('06b-detalhes');
   await click('.gaveta [data-a=tat-gaveta]');
   if (await page.$('.gaveta.aberta')) throw new Error('o painel de detalhes não fechou');
@@ -101,6 +102,9 @@ const srv = http.createServer((q, r) => {
   await click('[data-a=tat-jogar]');
   await page.waitForFunction(() => T && T.fase === 'heroi' && !OCUPADO, null, { timeout: 20000 });
   await shot('07b-turno');
+  await click('[data-a=tat-gaveta] >> nth=0');
+  if ((await page.$$('.gaveta .carta-inim .efeitos li')).length < 2) throw new Error('depois de escolher, a carta do inimigo deveria ser revelada com os efeitos');
+  await click('.gaveta [data-a=tat-gaveta]');
   if (!(await page.$('[data-a=tat-atacar]')) || !(await page.$('[data-a=tat-fim]'))) throw new Error('os atalhos de ação (atacar/encerrar) deveriam aparecer sobre o mapa');
 
   // toque real num hexágono azul: o herói anda

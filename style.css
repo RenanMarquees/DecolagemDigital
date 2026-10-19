@@ -393,3 +393,12 @@ b { font-weight: 700; }
 .marcos li span { flex: 1; } .marcos li.feito { opacity: .55; }
 .mod-pq { min-width: 30px; text-align: center; border: 2px solid #e8d9a8; border-radius: 7px; font-size: .85rem; padding: 0 4px; }
 .mod-pq.x2 { border-color: #ffd166; color: #ffe08a; }
+
+/* ---------- cartas ocultas, descansos e sala limpa ---------- */
+.ini-chip.oculta { border-style: dashed; } .ini-chip.oculta .n { background: #555; }
+.carta-inim.oculta { opacity: .85; border-style: dashed; } .carta-inim.oculta small { color: var(--suave); }
+.cartaH:disabled { opacity: .4; }
+.cartaH.desc .efs span { font-size: .68rem; }
+.fim.perda { max-width: 380px; } .perda-lista { flex-wrap: wrap; justify-content: center; overflow-x: visible; max-height: 46vh; overflow-y: auto; }
+.perda-lista .cartaH { flex: 0 0 104px; }
+.regra-limpa { font-size: .84rem; line-height: 1.4; color: var(--texto); background: #ffd16618; border: 1px solid var(--ouro); border-radius: 10px; padding: 6px 10px; }

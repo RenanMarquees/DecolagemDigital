@@ -53,25 +53,17 @@ const srv = http.createServer((q, r) => {
 
   /* ---- uma batalha seguindo os cartões; devolve quando o cenário termina ---- */
   async function jogarCenario(id) {
-    for (let i = 0; i < 900; i++) {
+    for (let i = 0; i < 2500; i++) {
       if (await page.$('[data-a=bat-fim]')) {
         if (await page.evaluate(() => T.fim === 'derrota')) { await click('[data-a=bat-fim]'); return false; }   // caiu: volta ao reino
         await lerCartao();                                   // "objetivo cumprido"
-        if (await page.$('[data-a=tat-saquear]')) { await click('[data-a=tat-saquear]'); await page.waitForTimeout(30); }
         await click('[data-a=bat-fim]'); await passarHistoria();
         return true;
       }
-      if (await page.$('[data-a=tat-seguir]')) {
-        const c = await lerCartao();
-        if (id === 1 && !(c && c.id === 'b_salalimpa') && !visto.has('b_salalimpa')) await esperarCartao('b_salalimpa');
-        await click('[data-a=tat-seguir]');
-        await lerCartao();                                   // "rumo à porta"
-        for (let k = 0; k < 8 && !(await page.$('.hist-texto')); k++) { await click('[data-a=tat-porta]'); await page.waitForTimeout(120); }
-        await click('[data-a=hist-prox]'); await passarHistoria();
-        continue;
-      }
+      if (await page.$('.hist-texto')) { await click('[data-a=hist-prox]'); await passarHistoria(); continue; }   // chegou na porta: próxima sala
       const c = await cartao();
       if (c && c.ok) { await lerCartao(); continue; }
+      if (await page.$('[data-a=tat-limpa-ok]')) { await click('[data-a=tat-limpa-ok]'); continue; }
       if (c) await shot(c.id);
       await page.evaluate(() => robo(2));
     }
@@ -117,7 +109,7 @@ const srv = http.createServer((q, r) => {
 
   /* ---- conferência final ---- */
   const feitos = await page.evaluate(() => P.tutorial.feitos);
-  const obrigatorios = ['m_bemvindo', 'r_cen1', 'br1', 'b_mapa', 'b_objetivo', 'b_iniciativa', 'b_escolher', 'b_mover', 'b_atacar', 'b_modcarta', 'b_fimturno', 'b_salalimpa', 'b_porta', 'b_ultima', 'b_vitoria1', 'r_loja', 'l_loja', 'l_voltar', 'r_inv', 'r_baralho', 'r_cen2', 'br2', 'b2_cartas', 'b2_bau', 'b2_vitoria', 'r_cen3', 'br3', 'b3_estrutura', 'r_fim'];
+  const obrigatorios = ['m_bemvindo', 'r_cen1', 'br1', 'b_mapa', 'b_objetivo', 'b_iniciativa', 'b_escolher', 'b_mover', 'b_atacar', 'b_modcarta', 'b_fimturno', 'b_salalimpa', 'b_porta', 'b_ultima', 'b_vitoria1', 'r_loja', 'l_loja', 'l_voltar', 'r_inv', 'r_baralho', 'r_cen2', 'br2', 'b2_cartas', 'b2_bau', 'b2_volta', 'b2_vitoria', 'r_cen3', 'br3', 'b3_estrutura', 'r_fim'];
   const faltou = obrigatorios.filter(i => !feitos[i]);
   const todos = await page.evaluate(() => Tutorial.passos());
   const opcionais = todos.filter(i => !obrigatorios.includes(i) && !feitos[i]);

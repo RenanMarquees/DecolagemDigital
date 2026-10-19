@@ -50,18 +50,17 @@ const ROBO = require('./robo');
       const info = await page.evaluate(() => ({ etapa: T.etapa, total: T.totalEtapas, chefe: T.inim.some(e => e.chefe), obj: T.objetivo, ultima: T.ultimaEtapa }));
       if (info.chefe !== (info.etapa === info.total && cen.objetivo === 'chefe')) throw new Error(`cenário ${cen.id}: o chefe deveria aparecer só na última etapa ${JSON.stringify(info)}`);
       const r = await page.evaluate(() => robo());
-      if (r !== 'vitoria') {
+      if (r !== 'vitoria' && r !== 'porta') {
         const diag = await page.evaluate(() => T && ({ rodada: T.rodada, hp: P.hp, heroi: T.heroi, inim: T.inim.filter(e => e.vivo).map(e => [e.nome, e.hp, e.c, e.r]), log: T.log.slice(-8).map(l => l.msg) }));
         throw new Error(`cenário ${cen.id} etapa ${etapas}: terminou com "${r}" ${JSON.stringify(diag)}`);
       }
-      if (await page.$('[data-a=bat-fim]')) {
-        if (await page.$('[data-a=tat-saquear]')) { await click('[data-a=tat-saquear]'); await page.evaluate(() => { const m = [...T.moedas.values()][0]; if (m) { ACOES.hex({ dataset: { c: m.c, r: m.r } }); } }); }
+      if (r === 'vitoria') {                                  // voltou à entrada: cenário concluído
+        await page.waitForSelector('[data-a=bat-fim]');
         await click('[data-a=bat-fim]');
         falas += await passarHistoria();
         return { etapas, falas };
       }
-      try { await page.click('[data-a=tat-seguir]', { timeout: 5000 }); } catch (e) { throw new Error(`cenário ${cen.id} etapa ${etapas}: sem botão de seguir/concluir ${JSON.stringify(await page.evaluate(() => ({ fim: T && T.fim, ultima: T && T.ultimaEtapa, obj: T && T.objetivo, ok: T && T.objetivoCumprido, bau: T && T.bau, centro: document.getElementById('centro').innerText.slice(0, 200) })))}`); }
-      for (let k = 0; k < 6 && !(await page.$('.hist-texto')); k++) { await click('[data-a=tat-porta]'); await page.waitForTimeout(150); }
+      await page.waitForSelector('.hist-texto', { timeout: 5000 });   // chegou na porta: ela abriu e a próxima sala começa
       await click('[data-a=hist-prox]');
       falas += await passarHistoria();
     }
