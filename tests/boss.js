@@ -40,6 +40,7 @@ const ROBO = require('./robo');
     await click(`[data-a=reino][data-id=${cen.reino}]`);
     await passarHistoria();
     await click(`[data-a=cenario][data-id="${cen.id}"]`);
+    await page.evaluate(() => { P.hp = derivados(P).hpMax; });   // o teste não passa pelo acampamento: começa cada cenário com a vida cheia
     await click('[data-a=iniciar]');
     if (await page.$('[data-a=conf-sim]')) await click('[data-a=conf-sim]');
     let etapas = 0, falas = 0;
