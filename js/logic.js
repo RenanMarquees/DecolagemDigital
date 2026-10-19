@@ -18,6 +18,7 @@ function novoJogador(nome, classe) {
     derrotados: {}, fragmentos: [], vistos: {}, kills: 0, finalizado: false,
     cenarios: {},                       // cenários concluídos: { 1: true, 2: true... }
     dificuldade: DIFICULDADE_PADRAO,
+    tutorial: { off: false, feitos: {} },   // passos do tutorial já vistos (js/tutorial.js)
   };
   const d = derivados(p);
   p.hp = d.hpMax; p.mp = d.mpMax;
@@ -172,6 +173,7 @@ function reinoDesbloqueado(p, i) {
 function migrarSave(p) {
   p.cenarios = p.cenarios || {};
   p.dificuldade = DIFICULDADES[p.dificuldade] ? p.dificuldade : DIFICULDADE_PADRAO;
+  if (!p.tutorial) p.tutorial = { off: !!p.cenarios[1], feitos: {} };   // quem já passou do cenário 1 não precisa do tutorial
   REINOS.forEach((r, i) => {
     if (p.derrotados && p.derrotados[r.chefe]) for (let k = 0; k <= i; k++) for (const c of cenariosDoReino(REINOS[k].id)) p.cenarios[c.id] = true;
   });

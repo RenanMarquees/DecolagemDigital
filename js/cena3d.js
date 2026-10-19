@@ -180,6 +180,44 @@ const Cena3D = (() => {
     },
   };
 
+  /* ---------- Porta, baú e moeda em 3D ---------- */
+  const COR_PORTA = { valhala: [0x5d6b82, 0x8794ab, 0x7fd4ff], olimpo: [0xc9ad55, 0xecdc95, 0xfff6c8], inferno: [0x33232a, 0x5a3a42, 0xff7a45], duat: [0xa58545, 0xcfb06d, 0xe8b84a], caos: [0x34205a, 0x5c3fa6, 0xc58bff] };
+  function portaFeita(reinoId) {
+    const [moldura, madeira, brilho] = COR_PORTA[reinoId] || COR_PORTA.valhala;
+    const g = new THREE.Group();
+    g.add(em(caixa(0.26, 1.5, 0.34, moldura), -0.55, 0.75, 0)); g.add(em(caixa(0.26, 1.5, 0.34, moldura), 0.55, 0.75, 0));
+    g.add(em(caixa(1.45, 0.26, 0.34, moldura), 0, 1.55, 0));
+    const arco = cil(0.5, 0.5, 0.34, moldura, 14); arco.rotation.x = Math.PI / 2; arco.scale.set(1, 1, 0.5); g.add(em(arco, 0, 1.45, 0));
+    const painel = em(caixa(0.86, 1.34, 0.12, madeira), 0, 0.68, 0);
+    g.add(painel);
+    painel.add(em(caixa(0.86, 0.06, 0.14, moldura), 0, 0.05, 0)); painel.add(em(esfera(0.07, brilho, { emissive: brilho }), 0.28, 0, 0.09));
+    const luz = new THREE.Mesh(new THREE.PlaneGeometry(0.86, 1.34), new THREE.MeshBasicMaterial({ color: brilho, transparent: true, opacity: 0.6, depthWrite: false }));
+    luz.position.set(0, 0.68, 0.02); luz.visible = false; g.add(luz);
+    return { grupo: g, painel, luz };
+  }
+  function bauFeito() {
+    const g = new THREE.Group();
+    g.add(em(caixa(0.9, 0.42, 0.58, 0x8a5a2a), 0, 0.21, 0));
+    g.add(em(caixa(0.94, 0.07, 0.62, 0xd8a63a), 0, 0.12, 0)); g.add(em(caixa(0.94, 0.07, 0.62, 0xd8a63a), 0, 0.36, 0));
+    const tampa = new THREE.Group(); tampa.position.set(0, 0.42, -0.29); g.add(tampa);   // gira em volta da dobradiça, atrás
+    const madeira = mat(0x9a6a32, { side: THREE.DoubleSide });
+    const cupula = new THREE.Mesh(new THREE.CylinderGeometry(0.29, 0.29, 0.9, 14, 1, false, 0, Math.PI), madeira);
+    cupula.rotation.z = Math.PI / 2; cupula.position.set(0, 0, 0.29); tampa.add(cupula);
+    [-1, 1].forEach(l => { const t = new THREE.Mesh(new THREE.CircleGeometry(0.29, 14, 0, Math.PI), madeira); t.rotation.y = Math.PI / 2; t.position.set(l * 0.45, 0, 0.29); tampa.add(t); });
+    tampa.add(em(caixa(0.94, 0.06, 0.06, 0xd8a63a), 0, 0.02, 0.59));
+    g.add(em(caixa(0.12, 0.16, 0.06, 0xf5d062), 0, 0.4, 0.31));
+    const luz = new THREE.Mesh(new THREE.PlaneGeometry(0.8, 0.5), new THREE.MeshBasicMaterial({ color: 0xffe08a, transparent: true, opacity: 0.5, depthWrite: false }));
+    luz.rotation.x = -Math.PI / 2; luz.position.set(0, 0.46, 0); luz.visible = false; g.add(luz);
+    g.add(em(esfera(0.1, 0xffd34d, { emissive: 0x6a4a08 }), 0.15, 0.44, 0.05));
+    return { grupo: g, tampa, luz };
+  }
+  function moedaFeita() {
+    const g = new THREE.Group();
+    const m = cil(0.22, 0.22, 0.06, 0xf5c542, 16, { emissive: 0x6a4a08 }); m.rotation.x = Math.PI / 2; g.add(m);
+    const a = cil(0.15, 0.15, 0.07, 0xd9a21c, 16); a.rotation.x = Math.PI / 2; g.add(a);
+    return g;
+  }
+
   /* ---------- Criação da cena ---------- */
   function montar(cont, T, opcoes = {}) {
     destruir();
@@ -266,17 +304,15 @@ const Cena3D = (() => {
     marca.rotation.x = -Math.PI / 2; marca.rotation.z = Math.PI / 6; marca.position.set(ps.x, ts.topo + 0.04, ps.z); cena.add(marca);
     if (T.porta) {
       const pp = pos3d(T.porta.c, T.porta.r), tp = E.tiles.get(chave(T.porta.c, T.porta.r));
-      const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: texSvg(`porta:${T.reinoId}:0`, portaSvg(T.reinoId, false), '-18 -26 36 44', 180, 220), transparent: true, alphaTest: 0.08 }));
-      sp.center.set(0.5, 0.1); sp.scale.set(1.5, 1.83, 1); sp.position.set(pp.x, tp.topo, pp.z); cena.add(sp);
-      E.porta = { sprite: sp, aberta: false };
+      E.porta = { ...portaFeita(T.reinoId), aberta: false };
+      E.porta.grupo.position.set(pp.x, tp.topo, pp.z); cena.add(E.porta.grupo);
     }
     if (T.bau) {
       const pb = pos3d(T.bau.c, T.bau.r), tb = E.tiles.get(chave(T.bau.c, T.bau.r));
-      const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: texSvg('bau:0', bauSvg(false), '-18 -22 36 38', 180, 190), transparent: true, alphaTest: 0.08 }));
-      sp.center.set(0.5, 0.08); sp.scale.set(1.2, 1.27, 1); sp.position.set(pb.x, tb.topo, pb.z); cena.add(sp);
+      const bf = bauFeito(); bf.grupo.position.set(pb.x, tb.topo, pb.z); cena.add(bf.grupo);
       const anel = new THREE.Mesh(new THREE.RingGeometry(0.55, 0.72, 6), new THREE.MeshBasicMaterial({ color: 0xffd34d, transparent: true, opacity: 0.8, side: THREE.DoubleSide }));
       anel.rotation.x = -Math.PI / 2; anel.rotation.z = Math.PI / 6; anel.position.set(pb.x, tb.topo + 0.04, pb.z); cena.add(anel);
-      E.bau = { sprite: sp, anel, aberto: false };
+      E.bau = { ...bf, anel, aberto: false, abre: 0 };
     }
 
     // cores das bases: cada TIPO de inimigo tem a sua (as cartas na tela usam as mesmas)
@@ -286,15 +322,17 @@ const Cena3D = (() => {
       E.cores.set(e.tipo, e.chefe ? COR_CHEFE : CORES_BASE[i++ % CORES_BASE.length]);
     }
 
-    // câmera inicial: no meio entre o herói e os inimigos
     const vs = T.inim.filter(e => e.vivo);
-    const mc = vs.length ? vs.reduce((a, e) => a + e.c, 0) / vs.length : T.heroi.c, mr = vs.length ? vs.reduce((a, e) => a + e.r, 0) / vs.length : T.heroi.r;
-    const ini = pos3d((T.heroi.c + mc) / 2, (T.heroi.r + mr) / 2);
-    // afasta o bastante para o herói e os inimigos aparecerem juntos na tela
+    // câmera inicial: mais perto do herói; afasta até o herói e os inimigos caberem na tela (fora dos botões da direita)
     const pts = [T.heroi, ...vs].map(u => pos3d(u.c, u.r));
-    const vao = Math.max(Math.max(...pts.map(p => p.x)) - Math.min(...pts.map(p => p.x)), 1.2 * (Math.max(...pts.map(p => p.z)) - Math.min(...pts.map(p => p.z))));
-    const dist = Math.min(24, Math.max(11, 7 + vao * 0.85));
-    Object.assign(E.cam, { x: ini.x, z: ini.z, alvoX: ini.x, alvoZ: ini.z, dist, alvoDist: dist });
+    const cxm = pts.slice(1).reduce((a, p) => a + p.x, 0) / Math.max(1, pts.length - 1), czm = pts.slice(1).reduce((a, p) => a + p.z, 0) / Math.max(1, pts.length - 1);
+    const ph0 = pts[0], ini = { x: ph0.x * 0.55 + cxm * 0.45, z: ph0.z * 0.55 + czm * 0.45 };
+    Object.assign(E.cam, { x: ini.x, z: ini.z, alvoX: ini.x, alvoZ: ini.z });
+    for (let d = 11; d <= 28; d += 1) {
+      E.cam.dist = E.cam.alvoDist = d; posicionarCamera(); E.camera.updateMatrixWorld();
+      const cabe = pts.every(p => [0, 1.9].every(y => { const v = new THREE.Vector3(p.x, y, p.z).project(E.camera); return v.x > -0.86 && v.x < 0.68 && v.y > -0.8 && v.y < 0.82; }));
+      if (cabe) break;
+    }
     ajustarLimites(); posicionarCamera();
 
     ligarControles();
@@ -315,7 +353,7 @@ const Cena3D = (() => {
   function ajustarLimites() {
     const c = E.cam, l = E.limites;
     c.alvoX = Math.min(l.x1, Math.max(l.x0, c.alvoX)); c.alvoZ = Math.min(l.z1, Math.max(l.z0, c.alvoZ));
-    c.alvoDist = Math.min(26, Math.max(6, c.alvoDist));
+    c.alvoDist = Math.min(30, Math.max(6, c.alvoDist));
   }
   function posicionarCamera() {
     const c = E.cam, cosE = Math.cos(c.elev);
@@ -401,7 +439,7 @@ const Cena3D = (() => {
     const ndc = new THREE.Vector2(((clientX - rect.left) / rect.width) * 2 - 1, -((clientY - rect.top) / rect.height) * 2 + 1);
     const rc = new THREE.Raycaster(); rc.setFromCamera(ndc, E.camera);
     const alvos = [...E.pick];
-    for (const u of E.unid.values()) if (!u.morrendo) alvos.push(u.sprite);
+    for (const u of E.unid.values()) if (!u.morrendo) alvos.push(u.pick);
     const hits = rc.intersectObjects(alvos, false);
     for (const h of hits) {
       if (h.object.userData.hex) return h.object.userData.hex;
@@ -433,11 +471,21 @@ const Cena3D = (() => {
     const sombra = new THREE.Mesh(new THREE.CircleGeometry(0.75 * esc, 20), new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.28, depthWrite: false }));
     sombra.rotation.x = -Math.PI / 2; sombra.position.y = 0.01; grupo.add(sombra);
 
-    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: texMini(miniId), transparent: true, alphaTest: 0.08 }));
-    sprite.center.set(0.5, 0.11);
-    const alt = 1.7 * esc; sprite.scale.set(alt * 44 / 46, alt, 1); sprite.position.y = 0.15;
-    sprite.userData.uid = chaveU;
-    grupo.add(sprite);
+    // a miniatura esculpida em 3D (js/modelos3d.js); se faltar o modelo, usa o desenho 2D de antes
+    const modelo = Modelos3D.existe(miniId) ? Modelos3D.criar(miniId) : null;
+    let sprite = null, alt, pick;
+    if (modelo) {
+      modelo.raiz.scale.setScalar(esc * 1.18); modelo.raiz.position.y = 0.15; grupo.add(modelo.raiz);
+      alt = modelo.altura * esc * 1.18;
+      pick = new THREE.Mesh(new THREE.CylinderGeometry(0.5 * esc, 0.5 * esc, alt, 8), new THREE.MeshBasicMaterial({ visible: false }));
+      pick.position.y = alt / 2 + 0.15; grupo.add(pick);
+    } else {
+      sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: texMini(miniId), transparent: true, alphaTest: 0.08 }));
+      sprite.center.set(0.5, 0.11);
+      alt = 1.7 * esc; sprite.scale.set(alt * 44 / 46, alt, 1); sprite.position.y = 0.15;
+      grupo.add(sprite); pick = sprite;
+    }
+    pick.userData.uid = chaveU;
 
     // barra de vida
     const mk = (cor, op) => { const s = new THREE.Sprite(new THREE.SpriteMaterial({ color: cor, transparent: true, opacity: op, depthTest: false })); s.renderOrder = 10; return s; };
@@ -450,7 +498,7 @@ const Cena3D = (() => {
     const status = new THREE.Group(); status.position.set(0, yBarra + 0.26, 0); grupo.add(status);
 
     E.cena.add(grupo);
-    return { grupo, sprite, base, frente, larg, status, statusTxt: '', esc, alt, cor: corBase,
+    return { grupo, sprite, modelo, pick, foco: null, base, frente, larg, status, statusTxt: '', esc, alt, cor: corBase,
       x: 0, z: 0, de: null, para: null, t: 1, dur: 0.4, fase: Math.random() * 6.28, flash: 0, lunge: null, morrendo: 0, hpFrac: 1, heroi: !!opc.heroi, c: 0, r: 0 };
   }
 
@@ -493,14 +541,12 @@ const Cena3D = (() => {
     // porta
     if (E.porta && T.porta && E.porta.aberta !== T.porta.aberta) {
       E.porta.aberta = T.porta.aberta;
-      E.porta.sprite.material.map = texSvg(`porta:${T.reinoId}:${T.porta.aberta ? 1 : 0}`, portaSvg(T.reinoId, T.porta.aberta), '-18 -26 36 44', 180, 220);
-      E.porta.sprite.material.needsUpdate = true;
+      E.porta.painel.visible = !T.porta.aberta; E.porta.luz.visible = T.porta.aberta;
     }
     // baú
     if (E.bau && T.bau && E.bau.aberto !== T.bau.aberto) {
       E.bau.aberto = T.bau.aberto;
-      E.bau.sprite.material.map = texSvg('bau:1', bauSvg(true), '-18 -22 36 38', 180, 190); E.bau.sprite.material.needsUpdate = true;
-      E.bau.anel.visible = false;
+      E.bau.luz.visible = true; E.bau.anel.visible = false;
     }
     // armadilhas
     for (const [k, a] of E.arm) if (!T.armadilhas.has(k)) { E.saindo.push({ obj: a, t: 0, tipo: 'arm' }); E.arm.delete(k); }
@@ -516,8 +562,8 @@ const Cena3D = (() => {
     for (const [k] of T.moedas) {
       if (E.moedas.has(k)) continue;
       const [c, r] = k.split(',').map(Number), p = pos3d(c, r), t = E.tiles.get(k);
-      const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: texSvg('moeda', moedaSvg(), '-14 -14 28 28', 128, 128), transparent: true, alphaTest: 0.08 }));
-      sp.scale.set(0.62, 0.62, 1); sp.position.set(p.x, t.topo + 0.45, p.z); sp.userData.base = t.topo + 0.45; sp.userData.fase = Math.random() * 6;
+      const sp = moedaFeita();
+      sp.position.set(p.x, t.topo + 0.42, p.z); sp.userData.base = t.topo + 0.42; sp.userData.fase = Math.random() * 6;
       E.cena.add(sp); E.moedas.set(k, sp);
     }
     // unidades
@@ -539,6 +585,11 @@ const Cena3D = (() => {
       u.hpFrac = Math.max(0, e.hp / e.hpMax);
       atualizarStatus(u, [...e.efeitos.map(ef => (ef.tipo === 'gelo' ? '❄️' : '☠️')), ...(e.bonusAtq > 0 ? ['💪'] : []), ...(e.escudo > 0 ? ['🛡️'] : [])]);
     }
+    // para onde cada miniatura olha quando está parada
+    const ph = pos3d(T.heroi.c, T.heroi.r);
+    const perto = combatentes(T).sort((a, b) => dist(T.heroi, a) - dist(T.heroi, b))[0];
+    uh.foco = perto ? pos3d(perto.c, perto.r) : null;
+    for (const e of T.inim) { const u = E.unid.get(e.uid); if (u) u.foco = e.estrutura ? null : ph; }
   }
 
   /* ---------- Efeitos: números flutuantes, golpes, brilhos ---------- */
@@ -584,12 +635,23 @@ const Cena3D = (() => {
       let ox = 0, oz = 0;
       if (u.lunge) { u.lunge.t += dt / 0.32; const s = Math.sin(Math.min(1, u.lunge.t) * Math.PI) * 0.55; ox = u.lunge.dx * s; oz = u.lunge.dz * s; if (u.lunge.t >= 1) u.lunge = null; }
       u.grupo.position.set(u.x + ox, u.y + hop, u.z + oz);
+      if (u.modelo) {
+        // encara para onde anda, em quem golpeia, ou no "foco" (o herói olha o inimigo mais perto e vice-versa)
+        let dx = 0, dz = 0;
+        if (u.t < 1 && u.de) { dx = u.para.x - u.de.x; dz = u.para.z - u.de.z; }
+        else if (u.lunge) { dx = u.lunge.dx; dz = u.lunge.dz; }
+        else if (u.foco) { dx = u.foco.x - u.x; dz = u.foco.z - u.z; }
+        if (Math.abs(dx) + Math.abs(dz) > 0.01) u.modelo.alvoYaw = Math.atan2(dx, dz);
+        Modelos3D.animar(u.modelo, { tempo: E.tempo, dt, andando: u.t < 1, golpe: u.lunge ? u.lunge.t : null });
+        if (u.flash > 0) { u.flash -= dt; Modelos3D.brilho(u.modelo, 1, 0.12, 0.08, Math.max(0, u.flash / 0.35)); }
+        else if (u.brilho > 0) { u.brilho -= dt; Modelos3D.brilho(u.modelo, 0.2, 1, 0.3, Math.max(0, u.brilho / 0.5)); }
+      } else {
       // respirar
       const resp = 1 + Math.sin(E.tempo * 2.2 + u.fase) * 0.025;
       u.sprite.scale.y = u.alt * resp; u.sprite.scale.x = (u.alt * 44 / 46) * (2 - resp);
-      // piscar de dano / brilho de cura
       if (u.flash > 0) { u.flash -= dt; u.sprite.material.color.setRGB(1, 0.35 + 0.65 * (1 - u.flash / 0.35), 0.35 + 0.65 * (1 - u.flash / 0.35)); if (u.flash <= 0) u.sprite.material.color.setRGB(1, 1, 1); }
       if (u.brilho > 0) { u.brilho -= dt; u.sprite.material.color.setRGB(0.6 + 0.4 * (1 - u.brilho / 0.5), 1, 0.6 + 0.4 * (1 - u.brilho / 0.5)); if (u.brilho <= 0) u.sprite.material.color.setRGB(1, 1, 1); }
+      }
       // vida
       const alvoF = u.hpFrac, atual = u.frente.scale.x / u.larg;
       u.frente.scale.x = Math.max(0.0001, (atual + (alvoF - atual) * Math.min(1, dt * 8))) * u.larg;
@@ -597,23 +659,26 @@ const Cena3D = (() => {
       if (u.morrendo) {
         u.morrendo += dt;
         const k = Math.min(1, u.morrendo / 0.7);
-        u.sprite.material.opacity = 1 - k; u.sprite.position.y = 0.15 - k * 0.3; u.grupo.scale.setScalar(1 - k * 0.25);
+        if (u.modelo) { Modelos3D.esmaecer(u.modelo, k); if (!u.modelo.estrutura) u.modelo.corpo.rotation.x = -k * 1.3; u.modelo.corpo.position.y = -k * 0.25; }
+        else { u.sprite.material.opacity = 1 - k; u.sprite.position.y = 0.15 - k * 0.3; }
+        u.grupo.scale.setScalar(1 - k * 0.2);
         u.frente.visible = false; u.status.visible = false;
         if (k >= 1) { E.cena.remove(u.grupo); E.unid.delete(id); }
       }
     }
     // armadilhas pulsam, moedas giram, lava brilha
     for (const [, a] of E.arm) { const s = 1 + Math.sin(E.tempo * 3) * 0.04; a.scale.set(s, s, 1); a.material.opacity = 0.85 + Math.sin(E.tempo * 3) * 0.15; }
-    for (const [, m] of E.moedas) { m.position.y = m.userData.base + Math.sin(E.tempo * 2.4 + m.userData.fase) * 0.08; m.scale.x = 0.62 * Math.max(0.25, Math.abs(Math.cos(E.tempo * 2 + m.userData.fase))); }
+    for (const [, m] of E.moedas) { m.position.y = m.userData.base + Math.sin(E.tempo * 2.4 + m.userData.fase) * 0.08; m.rotation.y = E.tempo * 2.2 + m.userData.fase; }
     if (E.liqMat && E.T && E.T.liquido === 'lava') E.liqMat.emissive.setRGB(0.3 + Math.sin(E.tempo * 2) * 0.1, 0.12, 0.03);
     E.mats.alvo.opacity = 0.5 + Math.sin(E.tempo * 6) * 0.14;
     if (E.mats.porta) E.mats.porta.opacity = 0.5 + Math.sin(E.tempo * 4) * 0.15;
-    if (E.bau && !E.bau.aberto) { E.bau.sprite.position.y += (Math.sin(E.tempo * 2) * 0.0015); E.bau.anel.rotation.z += dt * 0.6; }
+    if (E.bau) { E.bau.anel.rotation.z += dt * 0.6; const alvoA = E.bau.aberto ? 1 : 0; E.bau.abre += (alvoA - E.bau.abre) * Math.min(1, dt * 6); E.bau.tampa.rotation.x = -E.bau.abre * 1.9; E.bau.luz.material.opacity = 0.35 + 0.25 * Math.sin(E.tempo * 5); E.bau.luz.visible = E.bau.abre > 0.1; if (!E.bau.aberto) E.bau.grupo.position.y += Math.sin(E.tempo * 2) * 0.0008; }
+    if (E.porta && E.porta.aberta) E.porta.luz.material.opacity = 0.5 + 0.2 * Math.sin(E.tempo * 4);
     for (let i = E.saindo.length - 1; i >= 0; i--) {
       const s = E.saindo[i]; s.t += dt / 0.35;
       const k = Math.min(1, s.t);
       if (s.tipo === 'arm') { s.obj.material.opacity = 1 - k; s.obj.scale.set(1 + k * 0.6, 1 + k * 0.6, 1); }
-      else { s.obj.position.y += dt * 2; s.obj.material.opacity = 1 - k; }
+      else { s.obj.position.y += dt * 2; s.obj.scale.setScalar(Math.max(0.01, 1 - k)); }   // a moeda sobe e encolhe
       if (k >= 1) { E.cena.remove(s.obj); E.saindo.splice(i, 1); }
     }
     E.renderer.render(E.cena, E.camera);

@@ -33,7 +33,10 @@ const srv = http.createServer((q, r) => {
   await shot('02-criar');
   await click('[data-a=comecar]');
   for (let i = 0; i < 3; i++) await click('[data-a=hist-prox]');
+  if (!(await page.$('#tut'))) throw new Error('o tutorial deveria aparecer no mapa do jogo novo');
   await shot('03-mapa');
+  await click('[data-a=tut-pular]');                      // o tutorial tem teste próprio (tests/tutorial.js)
+  if (await page.$('#tut')) throw new Error('Pular tutorial não escondeu o cartão');
   if ((await page.$$('.chip-dif')).length !== 4) throw new Error('faltam as 4 dificuldades no mapa');
   await click('[data-a=reino][data-id=valhala]');
   await click('[data-a=hist-prox]');                     // introdução do reino

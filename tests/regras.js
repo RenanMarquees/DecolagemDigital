@@ -294,12 +294,12 @@ teste('habilidades em área empurram todos os atingidos', () => {
   igual(r.join(), '2,2');
 });
 teste('cartas dos inimigos também empurram e puxam o herói', () => {
-  const r = R(`(() => { const out = {};
+  const r = R(`(() => { const out = {}; const sorteio = Math.random; Math.random = () => 0.99;   // sem esquiva do herói
     { const { p, T } = cen(1, { vivos: true }); const e = T.inim[0]; T.inim.slice(1).forEach(x => { x.parado = true; x.c = 11; x.r = 0; });
-      e.tipo = 'troll_gelo'; e.c = 5; e.r = 7; T.heroi = { c: 4, r: 7 }; p.hp = 99999; atacarHeroi(T, p, derivados(p), e, K('t', 1, { atq: 0, empurrarHeroi: 2 })); out.empurrado = T.heroi.c; }
+      for (let c = 0; c < 12; c++) T.g.cel[7][c] = '.'; e.tipo = 'troll_gelo'; e.c = 5; e.r = 7; T.heroi = { c: 4, r: 7 }; p.hp = 99999; atacarHeroi(T, p, derivados(p), e, K('t', 1, { atq: 0, empurrarHeroi: 2 })); out.empurrado = T.heroi.c; }
     { const { p, T } = cen(1, { vivos: true }); const e = T.inim[0]; T.inim.slice(1).forEach(x => { x.parado = true; x.c = 11; x.r = 0; });
-      e.tipo = 'harpia'; e.alc = 4; e.c = 8; e.r = 7; T.heroi = { c: 4, r: 7 }; p.hp = 99999; atacarHeroi(T, p, derivados(p), e, K('t', 1, { atq: 0, puxarHeroi: 2 })); out.puxado = T.heroi.c; }
-    return out; })()`);
+      for (let c = 0; c < 12; c++) T.g.cel[7][c] = '.'; e.tipo = 'harpia'; e.alc = 4; e.c = 8; e.r = 7; T.heroi = { c: 4, r: 7 }; p.hp = 99999; atacarHeroi(T, p, derivados(p), e, K('t', 1, { atq: 0, puxarHeroi: 2 })); out.puxado = T.heroi.c; }
+    Math.random = sorteio; return out; })()`);
   igual(r.empurrado, 2, 'empurrado 2 para longe do inimigo'); igual(r.puxado, 6, 'puxado 2 em direção ao inimigo');
 });
 
@@ -315,7 +315,7 @@ teste('o nível do cenário sobe com o nível do herói e com a dificuldade', ()
   igual(r.join(' '), '1/1/2/3 2/3/4/5 9/10/11/12');
 });
 teste('os inimigos ficam mais fortes conforme o nível do herói sobe', () => {
-  const r = R(`[2, 10, 20].map(n => { const { T } = cen(1, { nivel: n, vivos: true }); return T.inim[0].hpMax * 100 + T.inim[0].atk; })`);
+  const r = R(`[2, 10, 20].map(n => { const { T } = cen(1, { nivel: n, vivos: true }); return T.exp.stat; })`);   // força do cenário (não depende de qual inimigo foi sorteado)
   verdade(r[0] < r[1] && r[1] < r[2], JSON.stringify(r));
 });
 teste('quanto mais difícil, mais fortes os inimigos e maiores as recompensas', () => {

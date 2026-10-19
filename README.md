@@ -37,7 +37,9 @@ RPG de turnos para celular sobre os deuses antigos. Feito em HTML + JavaScript p
 | Duat | ☠️ veneno | dano por 3 rodadas |
 | Abismo do Caos | 🌀 vazio | dano e drena 30% da mana |
 
-**Miniaturas:** desenhos em SVG (`js/minis.js`) viram "bonecos de pé" sobre bases coloridas 3D (`js/cena3d.js`). **Ainda não são modelos esculpidos em 3D** (isso é um próximo passo possível).
+**Miniaturas 3D esculpidas:** cada herói, inimigo, chefe e estrutura é um modelo 3D feito de formas simples (esferas, cilindros, cones), com contorno de miniatura pintada (`js/modelos3d.js`). Eles encaram o alvo, andam balançando pernas e braços, golpeiam com a arma, piscam em vermelho ao apanhar, caem ao morrer, e têm asas que batem, chamas que tremem e cristais que giram. O baú (com tampa que abre), a porta e as moedas também são 3D. A base colorida de cada miniatura combina com a cor da carta do inimigo.
+
+**Tutorial:** os 3 primeiros cenários (Valhala) ensinam o jogo com cartões que aparecem na hora certa e esperam você fazer a ação: câmera e zoom, objetivo, andar, cartas dos inimigos, atacar, encerrar o turno, vida e mana, armadilhas, moedas, portas, loja, inventário, pontos de atributo, habilidades, empurrar/puxar, baú e estruturas. Dá para pular (✕ no cartão) e rever depois pelo link no mapa dos reinos. Os textos ficam em `js/tutorial.js`.
 
 ## Como jogar
 
@@ -56,7 +58,9 @@ RPG de turnos para celular sobre os deuses antigos. Feito em HTML + JavaScript p
 | tipos e efeitos das armadilhas, recuperação nas portas | `js/data.js` (`ARMADILHAS`, `RECUPERA_PORTA`) |
 | miniaturas, árvores, colunas, lava... | `js/minis.js` |
 | movimento, inimigos andando, empurrar/puxar, moedas, baú, objetivos | `js/tatica.js` |
-| o mapa 3D (câmera, zoom, miniaturas, animações) | `js/cena3d.js` (usa o three.js de `js/vendor/`) |
+| o mapa 3D (câmera, zoom, animações) | `js/cena3d.js` (usa o three.js de `js/vendor/`) |
+| a aparência 3D de cada monstro, herói e estrutura | `js/modelos3d.js` (um bloco por personagem, as cores estão no próprio bloco) |
+| textos e passos do tutorial | `js/tutorial.js` (lista `PASSOS`) |
 | telas e botões | `js/ui.js` + `style.css` |
 
 ## Testes
@@ -65,5 +69,6 @@ RPG de turnos para celular sobre os deuses antigos. Feito em HTML + JavaScript p
 - `node tests/sim.js 8 todas expert` — um robô joga os 20 cenários e mostra a taxa de vitória por cenário (argumentos: vezes, classe, dificuldade). `BAL_FORCA=1.2 BAL_XP=0.5 node tests/sim.js ...` experimenta o equilíbrio sem mexer no jogo.
 - `node tests/mapas.js --ver` — confere todos os mapas (portas, armadilhas, caminhos) e desenha em texto.
 - `node tests/smoke.js` — abre o jogo num celular virtual: menus, cenário, mapa 3D, toque, pinça de zoom, cartas, rodadas (precisa do Playwright).
+- `node tests/tutorial.js` — um jogador novo segue os cartões do tutorial nos cenários 1, 2 e 3 (inclui loja e inventário).
 - `node tests/boss.js` — um herói superforte joga os 20 cenários pela tela (objetivos, portas, baú, moedas, chefes, final).
 - `python3 tools/gerar-pagina-unica.py saida/index.html` — junta tudo numa página só, para publicar.

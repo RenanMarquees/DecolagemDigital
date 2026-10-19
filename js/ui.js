@@ -155,9 +155,11 @@ function telaMapa() {
           <span class="selo">${feitos === lista.length ? '✅' : ''}</span>
         </button>`;
       }).join('')}
+      <button class="btn link" data-a="tut-reiniciar">❔ Rever o tutorial</button>
     </div>
     ${rodapeNav()}
   </div>`;
+  Tutorial.checar('mapa');
 }
 
 function rodapeNav() {
@@ -197,6 +199,7 @@ function telaReino() {
     </div>
     ${rodapeNav()}
   </div>`;
+  Tutorial.checar('reino');
 }
 
 /* ---------- preparação do cenário ---------- */
@@ -233,6 +236,7 @@ function telaBriefing() {
       </div>
     </div>
   </div>`;
+  Tutorial.checar('briefing');
 }
 
 /* ---------- loja ---------- */
@@ -268,6 +272,7 @@ function telaLoja() {
       <button class="btn link" data-a="voltar-reino">← Sair da loja</button>
     </div>
   </div>`;
+  Tutorial.checar('loja');
 }
 
 /* ---------- batalha tática em 3D ---------- */
@@ -402,6 +407,7 @@ function atualizarHud() {
   hud.innerHTML = hudHtml();
   const obj = document.getElementById('obj');
   if (obj) obj.innerHTML = objetivoHtml();
+  Tutorial.checar('batalha');
   const rod = document.getElementById('rod');
   if (rod) rod.innerHTML = `Etapa ${T.etapa}/${T.totalEtapas} · ` + (T.livre ? '<b>Sala limpa</b>' : `Rodada ${T.rodada} · ${OCUPADO || T.fase === 'inimigos' ? '<b class="ini">Inimigos agindo…</b>' : '<b>Seu turno</b>'}`);
 }
@@ -535,7 +541,7 @@ function executar(acao, uid) {
   let ok = false;
   const alvo = uid !== undefined ? T.inim.find(e => e.uid === uid) : null;
   if (acao.tipo === 'atacar') ok = tAtacar(T, P, uid);
-  else if (acao.tipo === 'hab') ok = tHabilidade(T, P, acao.id, uid);
+  else if (acao.tipo === 'hab') { ok = tHabilidade(T, P, acao.id, uid); if (ok) Tutorial.evento('habilidade'); }
   else if (acao.tipo === 'item') ok = tUsarItem(T, P, acao.id);
   else if (acao.tipo === 'defender') ok = tDefender(T, P);
   if (ok && alvo && (acao.tipo === 'atacar' || acao.tipo === 'hab')) Cena3D.investir('heroi', alvo.c, alvo.r);
@@ -674,6 +680,7 @@ const ACOES = {
   comecar() {
     const nome = (document.getElementById('nome').value || '').trim() || 'Herói';
     P = novoJogador(nome, CRIAR.classe);
+    P.dificuldade = 'facil';   // o tutorial começa na dificuldade Fácil (dá para trocar no mapa)
     salvar();
     historia(HISTORIA_PROLOGO, telaMapa);
   },
@@ -684,18 +691,20 @@ const ACOES = {
   mapa() { telaMapa(); },
   reino(el) {
     REINO = reinoPorId(el.dataset.id);
+    Tutorial.evento('reino');
     if (!P.vistos[REINO.id]) {
       P.vistos[REINO.id] = true; salvar();
       historia([{ icone: REINO.icone, texto: REINO.intro }], telaReino);
     } else telaReino();
   },
-  'voltar-reino'() { telaReino(); },
-  cenario(el) { CEN = cenarioPorId(+el.dataset.id); REINO = reinoPorId(CEN.reino); telaBriefing(); },
+  'voltar-reino'() { if (app.querySelector('.tela.loja')) Tutorial.evento('saiuloja'); telaReino(); },
+  cenario(el) { CEN = cenarioPorId(+el.dataset.id); REINO = reinoPorId(CEN.reino); Tutorial.evento('cenario' + CEN.id); telaBriefing(); },
   dif(el) {
     P.dificuldade = el.dataset.id; salvar();
     if (CEN) telaBriefing(); else telaMapa();
   },
   iniciar() {
+    Tutorial.evento('iniciou' + CEN.id);
     if (P.hp < derivados(P).hpMax * 0.5) confirmar('Sua vida está baixa. Começar o cenário mesmo assim?', iniciarBatalha);
     else iniciarBatalha();
   },
@@ -705,9 +714,9 @@ const ACOES = {
     if (!descansar(P, REINO)) { toast('Ouro insuficiente para acampar.'); return; }
     salvar(); telaReino(); toast('Vida e mana restauradas. 🏕️');
   },
-  loja() { LOJA_ABA = 'comprar'; telaLoja(); },
+  loja() { LOJA_ABA = 'comprar'; Tutorial.evento('loja'); telaLoja(); },
   'aba-loja'(el) { LOJA_ABA = el.dataset.id; telaLoja(); },
-  comprar(el) { if (comprar(P, el.dataset.id)) { salvar(); telaLoja(); toast(`Comprou ${ITENS[el.dataset.id].nome}`); } },
+  comprar(el) { if (comprar(P, el.dataset.id)) { Tutorial.evento('comprou'); salvar(); telaLoja(); toast(`Comprou ${ITENS[el.dataset.id].nome}`); } },
   vender(el) { if (vender(P, el.dataset.id)) { salvar(); telaLoja(); } },
 
   // batalha tática
@@ -771,9 +780,15 @@ const ACOES = {
   'tat-centro'() { if (T) centralizar(T.heroi); },
   'bat-fim'() { fimBatalha(); },
 
+  // tutorial
+  'tut-ok'() { Tutorial.concluirAtual(); Tutorial.checar(); },
+  'tut-passo'() { Tutorial.concluirAtual(); Tutorial.checar(); },
+  'tut-pular'() { Tutorial.pular(); toast('Tutorial desligado. Dá para rever pelo mapa dos reinos.'); },
+  'tut-reiniciar'() { Tutorial.reiniciar(); telaMapa(); },
+
   // janelas
-  personagem() { modalPersonagem(); },
-  inventario() { modalInventario(); },
+  personagem() { Tutorial.evento('personagem'); modalPersonagem(); },
+  inventario() { Tutorial.evento('inventario'); modalInventario(); },
   fechar() { MODAL_ATUAL = null; fecharModal(); if (!T && CEN) telaBriefing(); else if (!T && REINO) telaReino(); else if (!T && P && !HIST) telaMapa(); },
   ponto(el) { if (distribuirPonto(P, el.dataset.id)) { salvar(); atualizarModal(); } },
   equipar(el) { const r = equipar(P, el.dataset.id); if (r.ok) { salvar(); atualizarModal(); } else toast(r.msg); },

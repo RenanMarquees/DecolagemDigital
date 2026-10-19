@@ -265,3 +265,15 @@ b { font-weight: 700; }
 .grade-acoes .span2 { grid-column: span 2; }
 .cen-tag { margin-left: auto; font-size: .7rem; color: var(--suave); }
 .sobras { color: var(--ouro); font-size: .88rem; }
+
+/* ---------- tutorial ---------- */
+.tut { flex: none; position: relative; z-index: 12; margin: 6px 8px 2px; padding: 8px 12px 10px; max-height: 42vh; overflow-y: auto; background: linear-gradient(180deg, #2a2150, #1a1530); border: 2px solid var(--ouro); border-radius: 14px; box-shadow: 0 6px 18px #000a; font-size: .86rem; line-height: 1.4; }
+.tut-cab { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: .7rem; color: var(--suave); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 2px; }
+.tut-x { background: none; border: none; color: var(--suave); font-size: .7rem; padding: 4px 0; text-decoration: underline; }
+.tut-titulo { display: block; color: var(--ouro); font-size: 1rem; margin: 2px 0 4px; }
+.tut-texto { color: var(--texto); }
+.tut-bts { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 8px; }
+.tut-bts .btn { min-height: 40px; padding: 6px 18px; }
+.tut-espera { color: var(--ouro); font-weight: 700; font-size: .8rem; }
+.tut-alvo { outline: 3px solid var(--ouro) !important; outline-offset: 2px; animation: tutpisca 1s ease-in-out infinite alternate; border-radius: 10px; position: relative; z-index: 3; }
+@keyframes tutpisca { from { box-shadow: 0 0 0 0 #ffd16600; } to { box-shadow: 0 0 14px 4px #ffd166aa; } }
