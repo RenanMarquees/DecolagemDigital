@@ -278,6 +278,7 @@ function telaLoja() {
         <button class="${LOJA_ABA === 'vender' ? 'on' : ''}" data-a="aba-loja" data-id="vender">Vender</button>
       </div>
       <p class="dica">Você leva: 1 na cabeça, 1 no peito, 1 nos pés, 2 nas mãos e ${tamanhoMochila(P.nivel)} na mochila. Compras de mochila entram sozinhas, se houver lugar.</p>
+      <p class="dica">🛒 Equipamentos de nível ${tierDaLoja(P)} liberados. ${tierDaLoja(P) < 4 ? `Os melhores chegam em ${5 - (Object.keys(P.cenarios).length % 5)} cenário(s) concluído(s).` : 'Você já vê o melhor que os mercadores têm!'}</p>
       <div class="lista">${linhas}</div>
       <button class="btn link" data-a="voltar-reino">← Sair da loja</button>
     </div>
@@ -312,6 +313,7 @@ function telaTatica() {
       </div>
       <div id="dock" class="dock"></div>
       <div id="gaveta" class="gaveta"></div>
+      <div id="modcarta" class="modcarta"></div>
       <div id="centro" class="centro"></div>
     </div>
   </div>`;
@@ -349,9 +351,38 @@ function atualizarTabuleiro() {
 }
 
 function mostrarFxT() {
-  if (!T || !T.fx.length) return;
+  if (!T) return;
+  if (T.modFx.length) { FILA_MOD.push(...T.modFx); T.modFx = []; proximaCartaMod(); }
+  if (!T.fx.length) return;
   Cena3D.fx(T.fx);
   T.fx = [];
+}
+
+/* A carta de modificador de cada ataque aparece sozinha no meio do mapa (uma depois da outra) e some; o jogo não espera por ela. */
+const FILA_MOD = [];
+let CARTA_MOD_NA_TELA = false;
+function proximaCartaMod() {
+  const alvo = document.getElementById('modcarta');
+  if (CARTA_MOD_NA_TELA || !alvo || !FILA_MOD.length) return;
+  const m = FILA_MOD.shift(), c = m.carta;
+  CARTA_MOD_NA_TELA = true;
+  const resumo = c.tipo === 'bloqueio' ? (m.quem === 'heroi' ? 'Seu ataque falhou!' : `${esc(m.nome)} errou!`) : `${m.base} ${c.tipo === 'x2' ? '×2' : c.rotulo.replace('−', '−')} = <b>${m.golpe}</b>`;
+  alvo.innerHTML = `<div class="modcarta-cx ${c.tipo} ${c.tipo === 'valor' ? (c.v > 0 ? 'bom' : c.v < 0 ? 'ruim' : 'neutro') : ''} ${m.quem}">
+    <span class="mc-quem">${m.quem === 'heroi' ? '🎴 Seu ataque' : `🎴 ${esc(m.nome)}`}</span>
+    <div class="mc-carta"><b>${c.rotulo}</b><small>${c.nome}</small></div>
+    <span class="mc-res">${resumo}</span>${m.embaralhou ? '<span class="mc-emb">🔀 baralho embaralhado</span>' : ''}</div>`;
+  setTimeout(() => { alvo.innerHTML = ''; CARTA_MOD_NA_TELA = false; proximaCartaMod(); }, FILA_MOD.length ? 900 : 1500);
+}
+/** Baralho de modificadores como fileira de cartinhas: as já viradas ficam apagadas até o próximo embaralhamento. */
+function baralhoChips(b, ids) {
+  const ordem = ['bloq', '-2', '-1', '0', '+1', '+2', '+3', '+4', 'x2'];
+  const total = {}, resta = {};
+  for (const id of (b ? b.todas : ids)) total[id] = (total[id] || 0) + 1;
+  if (b) for (const id of b.compra) resta[id] = (resta[id] || 0) + 1;
+  return `<div class="mods">${ordem.filter(id => total[id]).map(id => {
+    const c = CARTAS_MOD[id], n = total[id], r = b ? (resta[id] || 0) : n;
+    return `<span class="mod ${c.tipo} ${c.tipo === 'valor' ? (c.v > 0 ? 'bom' : c.v < 0 ? 'ruim' : 'neutro') : ''} ${r === 0 ? 'gasta' : ''}" title="${c.nome}"><b>${c.rotulo}</b>${n > 1 || b ? `<i>${b ? `${r}/${n}` : `×${n}`}</i>` : ''}</span>`;
+  }).join('')}</div>`;
 }
 const centralizar = pos => Cena3D.centralizar(pos.c, pos.r);
 const garantirVisivel = pos => Cena3D.garantirVisivel(pos.c, pos.r);
@@ -449,6 +480,10 @@ function gavetaHtml() {
   return `<div class="gaveta-cab"><b>📋 Detalhes da batalha</b><button class="btn-x" data-a="tat-gaveta" aria-label="Fechar">✕</button></div>
     ${T.livre ? '' : `<div class="cartas-titulo">🃏 Cartas dos inimigos nesta rodada</div><div class="cartas">${cartasHtml()}</div>`}
     ${defArm ? `<div class="dica-arm" style="--cor:${defArm.cor}">${defArm.icone} <b>${defArm.nome}</b> · ${defArm.desc} <small>(${T.armadilhas.size} no mapa)</small></div>` : ''}
+    <div class="cartas-titulo">🎴 Baralhos de ataque (a sorte)</div>
+    <div class="baralhos"><div><small>Seu baralho · ${T.exp.baralhos.heroi.compra.length} no monte</small>${baralhoChips(T.exp.baralhos.heroi)}</div>
+      ${T.livre ? '' : `<div><small>Baralho dos monstros · ${T.exp.baralhos.inim.compra.length} no monte</small>${baralhoChips(T.exp.baralhos.inim)}</div>`}
+      <small class="dica-mod">Cada ataque vira uma carta sozinha. Só quando sai ×2 ou ✖ o baralho é embaralhado de novo.</small></div>
     <div class="cartas-titulo">Histórico</div><div class="log">${log}</div>
     ${!T.livre && !T.chefeId ? `<button class="btn sec" data-a="tat-fugir" ${naSaida && (T.fase === 'heroi' || T.fase === 'escolha') && !OCUPADO ? '' : 'disabled'}>🚪 Fugir do cenário <small>${naSaida ? '' : '(só na entrada)'}</small></button>` : ''}`;
 }
@@ -479,7 +514,7 @@ function dockHtml() {
   const ult = T.log[T.log.length - 1];
   const barras = `<div class="hud-heroi">
       <div class="hh-barras">${miniIcone(P.classe, 26)}${barra('hp', P.hp, d.hpMax, '❤️ ')}<span class="ouro-mini">🪙 ${P.gold}</span></div>
-      <div class="pips">${T.livre ? '<span class="on">Sala limpa: ande livre</span>' : (T.fase === 'heroi' ? `<span class="${T.movRest > 0 ? 'on' : ''}">👣 ${T.movRest}</span><span class="${T.acaoUsada || !c.atq ? '' : 'on'}">${!c.atq ? '⚔️ sem ataque' : T.acaoUsada ? '⚔️ ataque usado' : `⚔️ dano ${danoDoHeroi(T, P)}`}</span>` : '')}${T.cartaHeroi && !T.livre ? `<span class="on carta-atual">🃏 ${esc(T.cartaHeroi.nome)}</span>` : ''}${etiquetas}
+      <div class="pips">${T.livre ? '<span class="on">Sala limpa: ande livre</span>' : (T.fase === 'heroi' ? `<span class="${T.movRest > 0 ? 'on' : ''}">👣 ${T.movRest}</span><span class="${T.acaoUsada || !c.atq ? '' : 'on'}">${!c.atq ? '⚔️ sem ataque' : T.acaoUsada ? '⚔️ ataque usado' : `⚔️ dano ${danoDoHeroi(T, P)}`}</span>` : '')}${T.cartaHeroi && !T.livre ? `<span class="on carta-atual">🃏 ${esc(T.cartaHeroi.nome)}</span>` : ''}${etiquetas}<button class="tag baralho-tag" data-a="tat-gaveta" title="Seu baralho de modificadores">🎴 ${T.exp.baralhos.heroi.compra.length}/${T.exp.baralhos.heroi.todas.length}</button>
         <span class="cen-tag">${DIFICULDADES[T.exp.difId].icone} Nv ${T.exp.nivelCen}</span></div>
     </div>`;
   const tick = ult ? `<div class="tick l-${ult.cls}">${esc(ult.msg)}</div>` : '';
@@ -530,7 +565,8 @@ function atualizarHud() {
 }
 
 function derrotaHtml() {
-  return `<div class="fim"><h3>💀 Você caiu</h3><p>Os deuses te trazem de volta, mas perdem 20% do seu ouro.</p>
+  const perdidas = T.exp.moedasColetadas;
+  return `<div class="fim"><h3>💀 Você caiu</h3><p>Os deuses te trazem de volta, mas perdem 20% do seu ouro.${perdidas ? ` As ${perdidas} moedas que você carregava ficaram para trás.` : ''}</p>
     <button class="btn grande" data-a="bat-fim">Despertar</button></div>`;
 }
 
@@ -540,11 +576,14 @@ function painelVitoria() {
   const subidas = r.subidas.map(s => `<p class="nivelup">⭐ Nível ${s.nivel}! +${PONTOS_POR_NIVEL} ponto de atributo${s.ganhouMochila ? ` · A mochila agora tem ${s.mochila} lugares!` : ''}</p>`).join('');
   const ultima = T.ultimaEtapa;
   const sobras = [r.moedasNoChao ? `🪙 ${r.moedasNoChao} moedas no chão` : '', r.bauFechado ? '🧰 o baú ainda está fechado' : ''].filter(Boolean).join(' · ');
+  const guardadas = T.exp.moedasColetadas, vm = valorDaMoeda(T.exp.cenario.id);
+  const carregando = guardadas ? `<p class="moedas-carga">🪙 Você carrega ${guardadas} ${guardadas > 1 ? 'moedas' : 'moeda'} <small>(valem ${vm} de ouro cada, pagas no fim do cenário)</small></p>` : '';
+  const marcos = (r.marcos || []).map(m => `<p class="marco">🎴 <b>Conquista!</b> ${esc(m.marco.nome)} → carta <b>${CARTAS_MOD[m.marco.carta].rotulo}</b> no seu baralho${m.trocou ? ` <small>(saiu a ${CARTAS_MOD[m.trocou].rotulo})</small>` : ''}</p>`).join('');
   const botoes = ultima
     ? `${sobras ? '<button class="btn" data-a="tat-saquear">🪙 Saquear o que ficou</button>' : ''}<button class="btn grande" data-a="bat-fim">✅ Concluir cenário</button>`
     : '<button class="btn grande" data-a="tat-seguir">🚪 Abrir a porta</button>';
   return `<div class="fim"><h3>${ultima ? '🏆 Objetivo cumprido!' : `✅ Sala limpa! Etapa ${T.etapa}/${T.totalEtapas}`}</h3>
-    <p>+${r.xp} XP</p>${itens ? `<p class="drops">${itens}</p>` : ''}${subidas}
+    <p>+${r.xp} XP</p>${itens ? `<p class="drops">${itens}</p>` : ''}${subidas}${marcos}${carregando}
     ${sobras ? `<p class="sobras">${sobras}${ultima ? '' : ' (pare em cima para pegar)'}</p>` : ''}
     ${botoes}</div>`;
 }
@@ -675,6 +714,10 @@ function fimBatalha() {
   }
   const premio = rec.tipo === 'gold' ? `+${rec.gold} moedas de ouro` : rec.tipo === 'xp' ? `+${rec.xp} de XP${rec.subidas.length ? ` (você chegou ao nível ${rec.subidas[rec.subidas.length - 1].nivel}!)` : ''}` : `o item ${ITENS[rec.id].nome} ${ITENS[rec.id].icone}`;
   paginas.push({ icone: '🏆', texto: `Cenário concluído: ${c.nome}! Recompensa: ${premio}.${rec.primeira ? '' : ' (cenário já concluído antes)'}` });
+  if (rec.moedas && rec.moedas.n) paginas.push({ icone: '🪙', texto: `Moedas que você juntou: ${rec.moedas.n} × ${rec.moedas.valor} = ${rec.moedas.ouro} de ouro!` });
+  for (const m of rec.marcos || []) paginas.push({ icone: '🎴', texto: `Conquista: ${m.marco.nome}! A carta ${CARTAS_MOD[m.marco.carta].rotulo} (${CARTAS_MOD[m.marco.carta].nome}) entrou no seu baralho de ataque${m.trocou ? `, no lugar de uma carta ${CARTAS_MOD[m.trocou].rotulo}` : ''}.` });
+  const feitos = Object.keys(P.cenarios).length;
+  if (rec.primeira && feitos % 5 === 0 && feitos < 20) paginas.push({ icone: '🛒', texto: `Os mercadores receberam equipamentos melhores (nível ${tierDaLoja(P)})! Visite a loja de qualquer reino.` });
   historia(paginas, () => {
     if (c.id === CENARIOS.length) { P.finalizado = true; salvar(); historia(HISTORIA_FINAL, telaTitulo); }
     else if (chefe && res && res.primeira && P.fragmentos.length >= 4) historia([{ icone: '🌌', texto: 'O Abismo do Caos está aberto. Volte ao mapa dos reinos quando estiver pronto para o confronto final.' }], telaReino);
@@ -719,7 +762,12 @@ function modalPersonagem() {
     ${slotHtml('Cabeça', '🪖', e.cabeca, 'cabeca', 0)}${slotHtml('Peito', '🥋', e.peito, 'peito', 0)}${slotHtml('Pés', '🥾', e.pes, 'pes', 0)}
     ${slotHtml('Mão 1', '🗡️', e.maos[0], 'maos', 0)}${slotHtml('Mão 2', '🛡️', e.maos[1], 'maos', 1)}
     <h3>Mochila (${e.mochila.length}/${tamanhoMochila(P.nivel)}) <small>cresce nos níveis 5, 10 e 15</small></h3>${mochila}
-    <h3>Suas cartas</h3><ul class="habs">${cartas}</ul>`);
+    <h3>Suas cartas de iniciativa</h3><ul class="habs">${cartas}</ul>
+    <h3>🎴 Baralho de ataque <small>${P.baralho.length}/${BARALHO_MAX} cartas</small></h3>
+    <p class="dica-mod">Cada ataque seu vira uma destas cartas, sozinha: +N soma dano, −N tira, ×2 dobra, ✖ falha. Só quando sai ×2 ou ✖ o baralho é embaralhado de novo. Conquistas colocam cartas melhores aqui (com 15 cartas, a nova toma o lugar da pior).</p>
+    ${baralhoChips(null, P.baralho)}
+    <h3>🏅 Conquistas <small>${MARCOS.filter(m => P.marcos[m.id]).length}/${MARCOS.length}</small></h3>
+    <ul class="marcos">${MARCOS.map(m => { const feito = !!P.marcos[m.id], v = Math.min(m.meta, P.stats[m.stat] || 0); return `<li class="${feito ? 'feito' : ''}"><span>${feito ? '✅' : '⬜'} ${esc(m.nome)}</span><b class="mod-pq ${CARTAS_MOD[m.carta].tipo}">${CARTAS_MOD[m.carta].rotulo}</b><small>${feito ? 'recebida' : `${v}/${m.meta}`}</small></li>`; }).join('')}</ul>`);
 }
 
 function modalInventario() {

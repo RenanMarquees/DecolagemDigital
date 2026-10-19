@@ -28,6 +28,9 @@ function novoJogador(nome, classe) {
     cenarios: {},                       // cenários concluídos: { 1: true, 2: true... }
     dificuldade: DIFICULDADE_PADRAO,
     tutorial: { off: false, feitos: {} },   // passos do tutorial já vistos (js/tutorial.js)
+    baralho: BARALHO_BASE.slice(),          // cartas de modificador do herói (a sorte dos ataques; melhora com as conquistas)
+    stats: { xp: 0, ouro: 0, abates: 0, baus: 0, cenarios: 0, chefes: 0 },   // contagens da campanha para as conquistas
+    marcos: {},                             // conquistas já recebidas
   };
   p.hp = derivados(p).hpMax;
   return p;
@@ -64,6 +67,7 @@ function ajustarVida(p) { p.hp = Math.min(p.hp, derivados(p).hpMax); }
 
 function ganharXp(p, xp) {
   const subidas = [];
+  p.stats.xp += xp;
   if (p.nivel >= NIVEL_MAX) return subidas;
   p.xp += xp;
   while (p.nivel < NIVEL_MAX && p.xp >= xpParaProximo(p.nivel)) {
@@ -76,6 +80,9 @@ function ganharXp(p, xp) {
   if (p.nivel >= NIVEL_MAX) p.xp = 0;
   return subidas;
 }
+
+/** Ouro que entra (moedas, baú, recompensa): também conta para as conquistas. */
+function ganharOuro(p, n) { p.gold += n; p.stats.ouro += n; }
 
 function distribuirPonto(p, attr) {
   if (p.pontos <= 0) return false;
@@ -176,10 +183,14 @@ function usarMochila(p, i, T) {
 }
 
 /* ---------- Loja ---------- */
+/** Melhor nível de equipamento liberado: começa no 1 e sobe 1 a cada 5 cenários concluídos (até o 4). */
+function tierDaLoja(p) { return Math.min(4, 1 + Math.floor(Object.keys(p.cenarios).length / 5)); }
+/** O mercador vende os consumíveis do reino e os equipamentos do nível liberado (e do anterior, mais baratos). */
 function estoqueLoja(p, reino) {
-  const t = Math.min(reino.tier, 4);   // o Abismo do Caos (nível 5) vende o melhor equipamento comum (nível 4)
-  const ids = [...reino.consumiveis, `${p.classe}_${t}`, `cabeca_${t}`, `peito_${t}`, `pes_${t}`, `escudo_${t}`];
-  return ids.filter(id => ITENS[id]);
+  const t = tierDaLoja(p), tiers = t > 1 ? [t - 1, t] : [t];
+  const equip = [];
+  for (const k of tiers) equip.push(`${p.classe}_${k}`, `cabeca_${k}`, `peito_${k}`, `pes_${k}`, `escudo_${k}`);
+  return [...reino.consumiveis, ...equip].filter(id => ITENS[id]);
 }
 function precoVenda(id) { return Math.max(1, Math.floor(ITENS[id].preco * 0.4)); }
 
@@ -216,6 +227,9 @@ function migrarSave(p) {
     p.gold = Math.min(p.gold || 0, 60);
   }
   delete p.mp;
+  if (!Array.isArray(p.baralho)) p.baralho = BARALHO_BASE.slice();
+  if (!p.stats) p.stats = { xp: 0, ouro: 0, abates: 0, baus: 0, cenarios: Object.keys(p.cenarios).length, chefes: Object.keys(p.derrotados || {}).length };
+  if (!p.marcos) p.marcos = {};
   REINOS.forEach((r, i) => {
     if (p.derrotados && p.derrotados[r.chefe]) for (let k = 0; k <= i; k++) for (const c of cenariosDoReino(REINOS[k].id)) p.cenarios[c.id] = true;
   });

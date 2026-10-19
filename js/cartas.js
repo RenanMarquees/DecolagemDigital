@@ -258,3 +258,118 @@ function descreverCarta(c) {
   if (c.puxarHeroi) out.push({ icone: '🧲', texto: 'puxa você ' + c.puxarHeroi });
   return out;
 }
+
+/* ============================================================
+   BARALHO DE MODIFICADORES (a "sorte" do jogo, estilo Gloomhaven)
+
+   Todo ataque vira UMA carta do baralho do atacante, automaticamente, e a carta aparece na tela:
+     +N / −N   soma ou tira N do dano (nunca deixa o ataque abaixo de 1)
+     ×2        dano em dobro
+     ✖ bloqueio  o ataque falha (dano 0, e empurrar/puxar não acontecem)
+   O baralho só é EMBARALHADO de novo quando sai um ×2 ou um bloqueio (todas as cartas voltam para o monte).
+   O herói e os monstros têm um baralho cada (o dos monstros vale para todos eles) com no máximo 15 cartas.
+   O herói melhora o seu baralho com conquistas (MARCOS, logo abaixo).
+   ============================================================ */
+const BARALHO_MAX = 15;
+const CARTAS_MOD = {
+  '-2':   { id: '-2',   tipo: 'valor',    v: -2, rotulo: '−2', nome: 'Fraqueza' },
+  '-1':   { id: '-1',   tipo: 'valor',    v: -1, rotulo: '−1', nome: 'Tropeço' },
+  '0':    { id: '0',    tipo: 'valor',    v: 0,  rotulo: '+0', nome: 'Golpe normal' },
+  '+1':   { id: '+1',   tipo: 'valor',    v: 1,  rotulo: '+1', nome: 'Golpe firme' },
+  '+2':   { id: '+2',   tipo: 'valor',    v: 2,  rotulo: '+2', nome: 'Golpe forte' },
+  '+3':   { id: '+3',   tipo: 'valor',    v: 3,  rotulo: '+3', nome: 'Golpe brutal' },
+  '+4':   { id: '+4',   tipo: 'valor',    v: 4,  rotulo: '+4', nome: 'Golpe lendário' },
+  'x2':   { id: 'x2',   tipo: 'x2',       rotulo: '×2', nome: 'Dano em dobro' },
+  'bloq': { id: 'bloq', tipo: 'bloqueio', rotulo: '✖', nome: 'Bloqueio' },
+};
+/** Baralho inicial (12 cartas): o herói e os monstros começam iguais. */
+const BARALHO_BASE = ['0', '0', '0', '0', '+1', '+1', '-1', '-1', '+2', '-2', 'x2', 'bloq'];
+/** Baralho dos monstros em cada dificuldade: Fácil não tem ×2 e erra bastante; Difícil e Expert ganham golpes melhores. */
+const BARALHO_INIM = {
+  facil:         ['0', '0', '0', '0', '+1', '+2', '-1', '-1', '-2', 'bloq', 'bloq'],
+  intermediario: BARALHO_BASE,
+  dificil:       [...BARALHO_BASE, '+1'],
+  expert:        [...BARALHO_BASE, '+1', '+2'],
+};
+const baralhoInimigos = difId => (BARALHO_INIM[difId] || BARALHO_BASE).slice();
+
+/** Liga/desliga a sorte (os testes de regras desligam para os números ficarem exatos: sem sorte = sempre +0). */
+const SORTE = { ativa: true };
+
+function misturar(lista) {
+  const a = lista.slice();
+  for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+  return a;
+}
+/** Um baralho em jogo: monte de comprar + descarte. */
+function novoBaralhoMod(ids) { return { compra: misturar(ids), descarte: [], todas: ids.slice() }; }
+/** Vira a carta do topo. Se for ×2 ou bloqueio, todas as cartas voltam ao monte e são embaralhadas. */
+function sacarMod(b) {
+  if (!SORTE.ativa) return { ...CARTAS_MOD['0'], embaralhou: false };
+  let embaralhou = false;
+  if (!b.compra.length) { b.compra = misturar(b.descarte.length ? b.descarte : b.todas); b.descarte = []; embaralhou = true; }   // acabou o monte
+  const id = b.compra.shift();
+  b.descarte.push(id);
+  const c = CARTAS_MOD[id];
+  if (c.tipo !== 'valor') { b.compra = misturar(b.todas); b.descarte = []; embaralhou = true; }
+  return { ...c, embaralhou };
+}
+/** Aplica a carta ao ataque (valor do golpe antes das defesas). Devolve o novo valor do golpe (0 = errou). */
+function aplicarMod(ataque, carta) {
+  if (carta.tipo === 'bloqueio') return 0;
+  if (carta.tipo === 'x2') return ataque * 2;
+  return Math.max(1, ataque + carta.v);
+}
+/** Texto curto do resultado: "+2 → 5", "×2 → 8", "bloqueio". */
+function resumoMod(carta, ataque, final) {
+  if (carta.tipo === 'bloqueio') return 'ataque falhou!';
+  return `${ataque} ${carta.tipo === 'x2' ? '×2' : (carta.v >= 0 ? '+' : '−') + Math.abs(carta.v)} = ${final}`;
+}
+
+/* ---------- Conquistas: cada uma põe uma carta melhor no baralho do herói ---------- */
+/** stat: o que conta (xp, ouro, abates, baus, cenarios, chefes). Os números valem para a campanha toda. */
+const MARCOS = [
+  { id: 'xp100',    stat: 'xp',       meta: 100,  carta: '+1', nome: 'Ganhar 100 XP' },
+  { id: 'ouro50',   stat: 'ouro',     meta: 50,   carta: '+1', nome: 'Juntar 50 moedas de ouro' },
+  { id: 'abates10', stat: 'abates',   meta: 10,   carta: '+2', nome: 'Derrotar 10 inimigos' },
+  { id: 'baus2',    stat: 'baus',     meta: 2,    carta: '+1', nome: 'Abrir 2 baús' },
+  { id: 'cen4',     stat: 'cenarios', meta: 4,    carta: '+2', nome: 'Vencer 4 cenários' },
+  { id: 'xp300',    stat: 'xp',       meta: 300,  carta: '+2', nome: 'Ganhar 300 XP' },
+  { id: 'chefe1',   stat: 'chefes',   meta: 1,    carta: 'x2', nome: 'Derrotar um chefe' },
+  { id: 'ouro200',  stat: 'ouro',     meta: 200,  carta: '+2', nome: 'Juntar 200 moedas de ouro' },
+  { id: 'abates40', stat: 'abates',   meta: 40,   carta: '+3', nome: 'Derrotar 40 inimigos' },
+  { id: 'baus6',    stat: 'baus',     meta: 6,    carta: '+3', nome: 'Abrir 6 baús' },
+  { id: 'cen10',    stat: 'cenarios', meta: 10,   carta: '+3', nome: 'Vencer 10 cenários' },
+  { id: 'chefe3',   stat: 'chefes',   meta: 3,    carta: 'x2', nome: 'Derrotar 3 chefes' },
+  { id: 'xp600',    stat: 'xp',       meta: 600,  carta: '+3', nome: 'Ganhar 600 XP' },
+  { id: 'ouro600',  stat: 'ouro',     meta: 600,  carta: '+4', nome: 'Juntar 600 moedas de ouro' },
+  { id: 'cen20',    stat: 'cenarios', meta: 20,   carta: '+4', nome: 'Vencer os 20 cenários' },
+];
+const STATS_ROTULO = { xp: 'XP', ouro: 'moedas de ouro', abates: 'inimigos', baus: 'baús', cenarios: 'cenários', chefes: 'chefes' };
+
+/** Coloca a carta no baralho do herói. Se já tem 15, ela toma o lugar da pior (−2, −1, +0, +1: bloqueio e ×2 ficam). */
+function adicionarCartaMod(p, id) {
+  const pior = ['-2', '-1', '0', '+1'];
+  if (p.baralho.length >= BARALHO_MAX) {
+    const i = pior.map(x => p.baralho.indexOf(x)).find(k => k >= 0);
+    if (i === undefined) return { ok: false };
+    const saiu = p.baralho.splice(i, 1)[0];
+    p.baralho.push(id);
+    return { ok: true, trocou: saiu };
+  }
+  p.baralho.push(id);
+  return { ok: true };
+}
+/** Confere as conquistas. Devolve as novas: [{ marco, trocou }] (e já coloca as cartas no baralho). */
+function verificarMarcos(p) {
+  const novos = [];
+  for (const m of MARCOS) {
+    if (p.marcos[m.id]) continue;
+    if ((p.stats[m.stat] || 0) >= m.meta) {
+      p.marcos[m.id] = true;
+      const r = adicionarCartaMod(p, m.carta);
+      novos.push({ marco: m, trocou: r.trocou || null });
+    }
+  }
+  return novos;
+}

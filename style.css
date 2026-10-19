@@ -359,3 +359,37 @@ b { font-weight: 700; }
 .slot { margin-bottom: 8px; }
 .slot-nome { display: block; font-size: .78rem; color: var(--suave); margin: 2px 2px 3px; text-transform: uppercase; letter-spacing: .04em; }
 .slot .linha-item { margin-bottom: 0; }
+
+/* ---------- baralho de modificadores ---------- */
+.modcarta { position: absolute; left: 50%; top: 36%; transform: translate(-50%, -50%); z-index: 7; pointer-events: none; }
+@media (orientation: landscape) and (max-height: 520px) { .modcarta { left: calc((100% - min(330px, 42%)) / 2); top: 48%; } }
+.modcarta-cx { display: flex; flex-direction: column; align-items: center; gap: 4px; animation: modcarta 1.5s ease-out forwards; }
+@keyframes modcarta { 0% { opacity: 0; transform: scale(.5) rotateY(90deg); } 14% { opacity: 1; transform: scale(1.12) rotateY(0); } 24% { transform: scale(1); } 80% { opacity: 1; } 100% { opacity: 0; transform: translateY(-14px) scale(.95); } }
+.mc-quem { font-size: .78rem; font-weight: 700; color: #fff; background: #000b; border-radius: 10px; padding: 2px 10px; }
+.mc-carta { width: 84px; height: 112px; border-radius: 12px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; border: 3px solid #e8d9a8; background: linear-gradient(160deg, #3a2f1e, #1d1710); box-shadow: 0 6px 18px #000c; text-align: center; padding: 4px; }
+.mc-carta b { font-size: 2.4rem; line-height: 1; color: #fff; text-shadow: 0 2px 4px #000; }
+.mc-carta small { font-size: .62rem; color: #e8d9a8; line-height: 1.1; }
+.modcarta-cx.bom .mc-carta { border-color: #5fd068; background: linear-gradient(160deg, #1f4a2a, #11251a); } .modcarta-cx.bom .mc-carta b { color: #b6ffbd; }
+.modcarta-cx.ruim .mc-carta { border-color: #ff6b6b; background: linear-gradient(160deg, #5a1f24, #2a1013); } .modcarta-cx.ruim .mc-carta b { color: #ffb3b3; }
+.modcarta-cx.x2 .mc-carta { border-color: #ffd166; background: linear-gradient(160deg, #6a4c10, #2d2106); box-shadow: 0 0 22px #ffd166aa, 0 6px 18px #000c; } .modcarta-cx.x2 .mc-carta b { color: #ffe08a; font-size: 2.8rem; }
+.modcarta-cx.bloqueio .mc-carta { border-color: #9aa0b4; background: linear-gradient(160deg, #3a3d4a, #14151c); } .modcarta-cx.bloqueio .mc-carta b { color: #ff8a8a; }
+.modcarta-cx.inim .mc-carta { transform: scale(.88); }
+.mc-res { font-size: .9rem; color: #fff; background: #000b; border-radius: 10px; padding: 2px 12px; } .mc-res b { color: #ffe08a; font-size: 1.05rem; }
+.mc-emb { font-size: .72rem; color: #cfe3ff; background: #1d2a4aee; border-radius: 10px; padding: 1px 10px; }
+.mods { display: flex; flex-wrap: wrap; gap: 5px; margin: 4px 0 6px; }
+.mod { position: relative; min-width: 42px; height: 54px; border-radius: 9px; border: 2px solid #e8d9a8; background: linear-gradient(160deg, #3a2f1e, #1d1710); display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1.05; padding: 0 4px; }
+.mod b { font-size: 1.2rem; color: #fff; } .mod i { font-style: normal; font-size: .62rem; color: var(--suave); }
+.mod.bom { border-color: #5fd068; } .mod.bom b { color: #b6ffbd; }
+.mod.ruim { border-color: #ff6b6b; } .mod.ruim b { color: #ffb3b3; }
+.mod.x2 { border-color: #ffd166; box-shadow: 0 0 8px #ffd16666; } .mod.x2 b { color: #ffe08a; }
+.mod.bloqueio { border-color: #9aa0b4; } .mod.bloqueio b { color: #ff8a8a; }
+.mod.gasta { opacity: .35; }
+.dica-mod { display: block; font-size: .76rem; color: var(--suave); line-height: 1.35; }
+.baralhos { display: flex; flex-direction: column; gap: 4px; }
+.baralho-tag { border-color: #e8d9a8; color: #e8d9a8; }
+.marco { color: #ffe08a; } .moedas-carga { color: var(--ouro); }
+.marcos { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.marcos li { display: flex; align-items: center; gap: 8px; background: var(--painel2); border-radius: 10px; padding: 6px 10px; font-size: .84rem; }
+.marcos li span { flex: 1; } .marcos li.feito { opacity: .55; }
+.mod-pq { min-width: 30px; text-align: center; border: 2px solid #e8d9a8; border-radius: 7px; font-size: .85rem; padding: 0 4px; }
+.mod-pq.x2 { border-color: #ffd166; color: #ffe08a; }

@@ -242,7 +242,7 @@ const robo = `(function () {
           for (const v of velhos) { const rv = REINOS.find(x => x.id === v.reino); preparar(rv); repousar(rv); jogarCenario(p, v, difId); lutas++; }
         }
       }
-      linhas.push({ id: cen.id, obj: cen.objetivo, nivelIni, nivelFim: p.nivel, derrotas, venceu, rodadas: rod });
+      linhas.push({ id: cen.id, obj: cen.objetivo, nivelIni, nivelFim: p.nivel, derrotas, venceu, rodadas: rod, ouro: p.gold, cartas: p.baralho.length, ouroTotal: p.stats.ouro });
       if (!venceu) break;
     }
     return linhas;
@@ -266,8 +266,8 @@ for (const dif of difs) {
       const rel = fn(classe, dif);
       if (rel.length === 20 && rel[19].venceu) zerou++;
       for (const r of rel) {
-        const a = (agg[r.id] ||= { obj: r.obj, n: 0, nivelIni: 0, nivelFim: 0, derrotas: 0, rod: 0, vitorias: 0, primeira: 0 });
-        a.n++; a.nivelIni += r.nivelIni; a.nivelFim += r.nivelFim; a.derrotas += r.derrotas; a.rod += r.rodadas; a.vitorias += r.venceu ? 1 : 0; a.primeira += r.derrotas === 0 && r.venceu ? 1 : 0;
+        const a = (agg[r.id] ||= { obj: r.obj, n: 0, nivelIni: 0, nivelFim: 0, derrotas: 0, rod: 0, vitorias: 0, primeira: 0, ouro: 0, cartas: 0, ouroTotal: 0 });
+        a.n++; a.nivelIni += r.nivelIni; a.nivelFim += r.nivelFim; a.derrotas += r.derrotas; a.rod += r.rodadas; a.vitorias += r.venceu ? 1 : 0; a.ouro += r.ouro; a.cartas += r.cartas; a.ouroTotal += r.ouroTotal; a.primeira += r.derrotas === 0 && r.venceu ? 1 : 0;
       }
     }
     if (process.env.RESUMO) {      // só uma linha por classe/dificuldade: % de vitória de primeira por faixa de cenários
@@ -276,9 +276,9 @@ for (const dif of difs) {
       continue;
     }
     console.log(`\n=== ${classe} · ${dif} (${N} jogos, zerou ${zerou}/${N}) ===`);
-    console.log('cen  objetivo   nv_ini→fim  1ª tentativa  derrotas  rodadas');
+    console.log('cen  objetivo   nv_ini→fim  1ª tentativa  derrotas  rodadas  ouro(sobra)  ouro(total)  cartas');
     for (const [id, a] of Object.entries(agg)) {
-      console.log(`${String(id).padStart(3)}  ${OBJ[a.obj].padEnd(9)}  ${(a.nivelIni / a.n).toFixed(1).padStart(4)}→${(a.nivelFim / a.n).toFixed(1).padEnd(5)}  ${String(a.primeira + '/' + a.n).padStart(8)}      ${(a.derrotas / a.n).toFixed(2).padStart(5)}    ${(a.rod / a.n).toFixed(0).padStart(5)}`);
+      console.log(`${String(id).padStart(3)}  ${OBJ[a.obj].padEnd(9)}  ${(a.nivelIni / a.n).toFixed(1).padStart(4)}→${(a.nivelFim / a.n).toFixed(1).padEnd(5)}  ${String(a.primeira + '/' + a.n).padStart(8)}      ${(a.derrotas / a.n).toFixed(2).padStart(5)}    ${(a.rod / a.n).toFixed(0).padStart(5)}   ${(a.ouro / a.n).toFixed(0).padStart(8)}  ${(a.ouroTotal / a.n).toFixed(0).padStart(10)}  ${(a.cartas / a.n).toFixed(1).padStart(6)}`);
     }
   }
 }

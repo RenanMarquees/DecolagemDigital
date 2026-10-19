@@ -6,6 +6,7 @@ const fs = require('fs'), path = require('path'), vm = require('vm');
 const ctx = vm.createContext({ Math, console });
 for (const f of ['data.js', 'cartas.js', 'cenarios.js', 'logic.js', 'mapas.js', 'tatica.js']) vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'js', f), 'utf8'), ctx);
 const R = (code) => vm.runInContext(code, ctx);
+R('SORTE.ativa = false');   // os testes de dano são contas exatas; os testes do baralho de modificadores ligam a sorte de volta
 
 let ok = 0, falhas = [];
 function teste(nome, f) {
@@ -176,11 +177,11 @@ teste('a pedra de amolar só vale até o fim do turno', () => {
 });
 teste('loja: vende consumíveis do reino e 1 item de cada tipo de slot; comprar e vender', () => {
   const r = R(`(() => { const p = novoJogador('T', 'cacador'); const reino = REINOS[1]; const est = estoqueLoja(p, reino); const tipos = new Set(est.map(id => ITENS[id].tipo));
-    p.gold = 100; const g0 = p.gold; const comprou = comprar(p, 'peito_2'); const gasto = g0 - p.gold; const pobre = (() => { p.gold = 0; return comprar(p, 'peito_2'); })();
-    p.inv = { peito_2: 1 }; p.gold = 0; vender(p, 'peito_2');
-    return { tipos: [...tipos].sort().join(), classe: est.includes('cacador_2'), outra: est.includes('guerreiro_2'), comprou, gasto, pobre, ganhou: p.gold, esperado: precoVenda('peito_2') }; })()`);
+    p.gold = 100; const g0 = p.gold; const comprou = comprar(p, 'peito_1'); const gasto = g0 - p.gold; const pobre = (() => { p.gold = 0; return comprar(p, 'peito_1'); })();
+    p.inv = { peito_1: 1 }; p.gold = 0; vender(p, 'peito_1');
+    return { tipos: [...tipos].sort().join(), classe: est.includes('cacador_1'), outra: est.includes('guerreiro_1'), comprou, gasto, pobre, ganhou: p.gold, esperado: precoVenda('peito_1') }; })()`);
   igual(r.tipos, 'cabeca,maos,mochila,peito,pes'); verdade(r.classe, 'arma do caçador'); verdade(!r.outra, 'sem arma de outra classe');
-  verdade(r.comprou && !r.pobre, 'compra só com ouro'); igual(r.gasto, 30); igual(r.ganhou, r.esperado);
+  verdade(r.comprou && !r.pobre, 'compra só com ouro'); igual(r.gasto, 12); igual(r.ganhou, r.esperado);
 });
 
 console.log('\nObjetivos');
@@ -225,14 +226,14 @@ teste('concluir o cenário marca como feito e sorteia ouro, XP ou item', () => {
 
 console.log('\nMoedas e baú');
 teste('cada inimigo derrotado solta uma moeda no hexágono onde caiu (e dá XP pequeno)', () => {
-  const r = R(`(() => { const { p, T } = cen(1, { etapa: 1, vivos: true }); const e = T.inim[0]; pe(e, 5, 5); e.gold = 3; e.hp = 0; verificarMortes(T); return T.moedas.get(chave(5, 5)); })()`);
+  const r = R(`(() => { const { p, T } = cen(1, { etapa: 1, vivos: true }); const e = T.inim[0]; pe(e, 5, 5); e.moedas = 3; e.hp = 0; verificarMortes(T); return T.moedas.get(chave(5, 5)); })()`);
   igual(r && r.valor, 3);
 });
 teste('só pega a moeda quem PARA em cima dela (passar por cima não vale)', () => {
   const r = R(`(() => { const { p, T } = cen(1, { etapa: 1 }); T.moedas.set(chave(2, 10), { valor: 5 });
-    const g0 = p.gold; tMover(T, p, 3, 10); const passou = p.gold - g0; T.heroi = { c: 0, r: 10 }; T.movRest = 3;
-    tMover(T, p, 2, 10); return { passou, parou: p.gold - g0, restam: T.moedas.size }; })()`);
-  igual(r.passou, 0, 'ouro ao só passar'); igual(r.parou, 5, 'ouro ao parar'); igual(r.restam, 0);
+    const g0 = T.exp.moedasColetadas; tMover(T, p, 3, 10); const passou = T.exp.moedasColetadas - g0; T.heroi = { c: 0, r: 10 }; T.movRest = 3;
+    tMover(T, p, 2, 10); return { passou, parou: T.exp.moedasColetadas - g0, restam: T.moedas.size, ouro: p.gold }; })()`);
+  igual(r.passou, 0, 'moedas ao só passar'); igual(r.parou, 5, 'moedas ao parar'); igual(r.restam, 0); igual(r.ouro, 10, 'o ouro só entra no fim do cenário');
 });
 teste('há 1 baú só, na última etapa; só abre se o herói terminar o turno parado nele', () => {
   const r = R(`(() => { const { p, c } = cen(1); const exp = criarExpedicao(c, p); const out = [];
@@ -243,8 +244,8 @@ teste('há 1 baú só, na última etapa; só abre se o herói terminar o turno p
   igual(r.baus, 'false,true'); igual(r.antes, false); igual(r.depois, true); verdade(r.ouro > 0 && r.itens >= 1, 'o baú dá ouro e item');
 });
 teste('com a sala livre, parar no baú abre na hora; "saquear" deixa pegar o que sobrou', () => {
-  const r = R(`(() => { const { p, T } = cen(1, { etapa: 1, vivos: true }); const e = T.inim[0]; pe(e, 5, 7); e.gold = 4; matarTodos(T); const antes = T.fim; tSaquear(T);
-    T.heroi = { c: 4, r: 7 }; const g0 = p.gold; tMover(T, p, 5, 7); const ganhou = p.gold - g0;
+  const r = R(`(() => { const { p, T } = cen(1, { etapa: 1, vivos: true }); const e = T.inim[0]; pe(e, 5, 7); e.moedas = 4; matarTodos(T); const antes = T.fim; tSaquear(T);
+    T.heroi = { c: 4, r: 7 }; const g0 = T.exp.moedasColetadas; tMover(T, p, 5, 7); const ganhou = T.exp.moedasColetadas - g0;
     const v = vizinhos(T.g, T.bau.c, T.bau.r)[0]; T.heroi = { ...v }; tMover(T, p, T.bau.c, T.bau.r); return { antes, livre: T.livre, ganhou, bau: T.bau.aberto }; })()`);
   igual(r.antes, 'vitoria'); igual(r.livre, true); verdade(r.ganhou >= 4, 'saqueou a moeda'); igual(r.bau, true);
 });
@@ -565,6 +566,116 @@ teste('só dá para fugir pela entrada, e nunca na arena do chefe', () => {
     const b = cen(1); b.T.heroi = { c: 4, r: 4 }; const longe = tFugir(b.T);
     const c = cen(4, { etapa: 2 }); c.T.heroi = { ...c.T.saida }; const arena = tFugir(c.T); return [livre, longe, arena]; })()`);
   igual(r.join(), 'true,false,false');
+});
+
+console.log('\nBaralho de modificadores (a sorte)');
+teste('o baralho inicial tem 12 cartas (+N, −N, bloqueio e ×2) e nunca passa de 15', () => {
+  const r = R(`(() => { const p = novoJogador('T', 'guerreiro'); const t = p.baralho.reduce((a, id) => (a[id] = (a[id] || 0) + 1, a), {});
+    return { n: p.baralho.length, tipos: Object.keys(t).sort().join(), bloq: t.bloq, x2: t.x2, max: BARALHO_MAX, inim: Object.keys(DIFICULDADES).map(d => baralhoInimigos(d).length).join() }; })()`);
+  igual(r.n, 12); igual(r.tipos, '+1,+2,-1,-2,0,bloq,x2'); igual(r.bloq, 1); igual(r.x2, 1); igual(r.max, 15); igual(r.inim, '11,12,13,14');
+});
+teste('as cartas: +N soma, −N tira (mínimo 1), ×2 dobra, bloqueio zera', () => {
+  const r = R(`['+2', '-2', '0', 'x2', 'bloq'].map(id => aplicarMod(3, CARTAS_MOD[id])).concat([aplicarMod(1, CARTAS_MOD['-2'])])`);
+  igual(r.join(), '5,1,3,6,0,1');
+});
+teste('o baralho só embaralha quando sai ×2 ou bloqueio (aí todas as cartas voltam ao monte)', () => {
+  const r = R(`(() => { SORTE.ativa = true; const b = novoBaralhoMod(['+1', '+2', '-1', 'x2', '0', '0']); const vistas = []; let embaralhou = [];
+    b.compra = ['+1', '+2', '-1', 'x2', '0', '0']; b.descarte = [];
+    for (let i = 0; i < 5; i++) { const c = sacarMod(b); vistas.push(c.id); embaralhou.push(c.embaralhou); }
+    const r = { vistas: vistas.join(), embaralhou: embaralhou.join(), monte: b.compra.length, descarte: b.descarte.length }; SORTE.ativa = false; return r; })()`);
+  igual(r.vistas.split(',').slice(0, 4).join(), '+1,+2,-1,x2'); igual(r.embaralhou, 'false,false,false,true,false');
+  igual(r.monte, 5, 'depois do ×2 as 6 cartas voltaram ao monte e uma já foi virada'); igual(r.descarte, 1);
+});
+teste('cada ataque do herói vira uma carta sozinha: +2 dá 5, ×2 dá 6 e bloqueio perde o ataque (e o empurrão)', () => {
+  const r = R(`(() => { SORTE.ativa = true; const out = [];
+    for (const id of ['+2', 'x2', 'bloq']) {
+      const { p, T } = cen(1, { etapa: 1, vivos: true, carta: { empurrar: 2 } }); const e = T.inim[0]; pe(e, 1, 10); e.hp = e.hpMax = 99; e.def = 0; e.parado = true;
+      const d = derivados(p).dano; baralhoMod(T, 'heroi').compra = [id, ...baralhoMod(T, 'heroi').compra];
+      tAtacar(T, p, e.uid); out.push([99 - e.hp, e.c, T.acaoUsada, T.modFx.length, T.modFx[0].carta.id, 3 + d]);
+    } SORTE.ativa = false; return out; })()`);
+  const base = r[0][5];
+  igual(r[0][0], base + 2); igual(r[1][0], base * 2); igual(r[2][0], 0, 'bloqueio: nenhum dano'); igual(r[2][1], 1, 'bloqueio: sem empurrão');
+  verdade(r.every(x => x[2] && x[3] === 1), 'gasta a ação e registra 1 carta por ataque');
+  verdade(r[0][1] > 1, 'com o golpe normal o empurrão acontece');
+});
+teste('ataque em área (ao redor) usa UMA carta só para todos os alvos', () => {
+  const r = R(`(() => { SORTE.ativa = true; const { p, T } = cen(1, { etapa: 1, vivos: true, carta: { alvo: 'ao-redor' } });
+    const [a, b] = T.inim; pe(a, 1, 10); pe(b, 0, 9); [a, b].forEach(e => { e.hp = e.hpMax = 99; e.def = 0; e.parado = true; });
+    tAtacar(T, p, a.uid); const out = [T.modFx.length, 99 - a.hp === 99 - b.hp]; SORTE.ativa = false; return out; })()`);
+  igual(r[0], 1); verdade(r[1], 'mesmo dano nos dois');
+});
+teste('os monstros também viram carta a cada ataque (baralho único dos monstros, que muda com a dificuldade)', () => {
+  const r = R(`(() => { SORTE.ativa = true; const out = [];
+    for (const id of ['+2', 'x2', 'bloq']) {
+      const { p, T } = cen(1, { etapa: 1, vivos: true }); const e = T.inim.find(x => !x.estrutura); e.parado = false; e.atk = 3; pe(e, 1, 10); p.hp = 99;
+      baralhoMod(T, 'inim').compra = [id, ...baralhoMod(T, 'inim').compra]; T.escudoHeroi = 0;
+      const carta = { atq: 0, nome: 'T' }; atacarHeroi(T, p, derivados(p), e, carta); out.push([99 - p.hp, T.modFx[0].quem, T.modFx[0].carta.id]);
+    } SORTE.ativa = false; return out; })()`);
+  igual(r[0][0], 5); igual(r[1][0], 6); igual(r[2][0], 0, 'bloqueio: o monstro erra'); igual(r[0][1], 'inim');
+});
+teste('o baralho vale para o cenário inteiro (passa de uma etapa para a outra)', () => {
+  igual(R(`(() => { const { p, T, exp } = cen(1, { etapa: 0 }); const b = T.exp.baralhos; const T2 = criarTatica(exp, p); return T2.exp.baralhos === b && !!b.heroi && !!b.inim; })()`), true);
+});
+
+console.log('\nConquistas e cartas novas');
+teste('conquista dá uma carta melhor ao baralho do herói (100 XP, 50 moedas, 10 abates...)', () => {
+  const r = R(`(() => { const p = novoJogador('T', 'guerreiro'); const n0 = p.baralho.length;
+    ganharXp(p, 100); const a = verificarMarcos(p); ganharOuro(p, 50); const b = verificarMarcos(p); p.stats.abates = 10; const c = verificarMarcos(p);
+    return { a: a.map(x => x.marco.id).join(), b: b.map(x => x.marco.id).join(), c: c.map(x => x.marco.id).join(), n: p.baralho.length - n0, repete: verificarMarcos(p).length, tem: ['+1', '+2'].every(id => p.baralho.includes(id)) }; })()`);
+  igual(r.a, 'xp100'); igual(r.b, 'ouro50'); igual(r.c, 'abates10'); igual(r.n, 3); igual(r.repete, 0, 'cada conquista só vale uma vez'); verdade(r.tem);
+});
+teste('com 15 cartas, a nova carta troca a pior (−2, −1, +0...) e o bloqueio e o ×2 ficam', () => {
+  const r = R(`(() => { const p = novoJogador('T', 'guerreiro'); for (let i = 0; i < 6; i++) adicionarCartaMod(p, '+3');
+    const n = p.baralho.length, sem2 = !p.baralho.includes('-2'), sem1 = !p.baralho.includes('-1');
+    for (let i = 0; i < 12; i++) adicionarCartaMod(p, '+3');
+    return { n, depois: p.baralho.length, sem2, sem1, bloq: p.baralho.includes('bloq'), x2: p.baralho.includes('x2') }; })()`);
+  igual(r.n, 15); igual(r.depois, 15); verdade(r.sem2 && r.sem1, 'saíram as piores'); verdade(r.bloq && r.x2, 'bloqueio e ×2 permanecem');
+});
+teste('todas as conquistas têm meta crescente e dão carta que existe', () => {
+  verdade(R(`MARCOS.every(m => CARTAS_MOD[m.carta] && m.meta > 0) && new Set(MARCOS.map(m => m.id)).size === MARCOS.length`), 'marcos válidos');
+});
+teste('vencer um chefe pela 1ª vez conta como conquista de chefe (carta ×2)', () => {
+  const r = R(`(() => { const { p, T } = cen(4, { etapa: 2, vivos: true }); const boss = T.inim.find(e => e.chefe); boss.hp = 0; verificarMortes(T);
+    const res = aplicarVitoriaT(T, p); return { chefes: p.stats.chefes, marcos: res.marcos.map(m => m.marco.id).join(), x2: p.baralho.filter(c => c === 'x2').length }; })()`);
+  igual(r.chefes, 1); verdade(r.marcos.includes('chefe1')); igual(r.x2, 2);
+});
+teste('saves antigos ganham baralho, contagens e conquistas', () => {
+  const r = R(`(() => { const p = novoJogador('T', 'oraculo'); delete p.baralho; delete p.stats; delete p.marcos; p.cenarios = { 1: true, 2: true }; migrarSave(p);
+    return [p.baralho.length, p.stats.cenarios, typeof p.marcos]; })()`);
+  igual(r.join(), '12,2,object');
+});
+
+console.log('\nMoedas e itens por etapa da campanha');
+teste('cada moeda vale 2 de ouro até o cenário 10 e 3 do 11 em diante, pago no FIM do cenário', () => {
+  const r = R(`(() => { const out = [];
+    for (const id of [1, 10, 11, 20]) { const { p, T, exp } = cen(id, { etapa: cenarioPorId(id).etapas.length - 1 }); exp.moedasColetadas = 5; const g0 = p.gold;
+      T.inim.forEach(e => { e.hp = 0; }); verificarMortes(T); const rec = concluirCenario(T, p); out.push([id, rec.moedas.valor, rec.moedas.ouro, p.gold - g0 >= 5 * rec.moedas.valor, exp.moedasColetadas]); }
+    return out; })()`);
+  igual(r.map(x => x[1]).join(), '2,2,3,3'); igual(r.map(x => x[2]).join(), '10,10,15,15'); verdade(r.every(x => x[3] && x[4] === 0), 'ouro entrou e zerou o contador');
+});
+teste('moedas não pegas ou perdidas na derrota não viram ouro (só o que o herói saqueou)', () => {
+  const r = R(`(() => { const { p, T, exp } = cen(1, { etapa: 1, vivos: true }); const e = T.inim.find(x => !x.estrutura); e.moedas = 4; pe(e, 5, 5); e.hp = 0; verificarMortes(T); return [exp.moedasColetadas, T.moedas.size]; })()`);
+  igual(r.join(), '0,1');
+});
+teste('cada tipo de inimigo solta moedas (1 a 3 os comuns; os chefes mais) e estruturas não soltam', () => {
+  const r = R(`(() => { const { T } = cen(3, { etapa: 1, vivos: true }); const est = T.inim.filter(e => e.estrutura).every(e => e.moedas === 0);
+    const comuns = Object.entries(INIMIGOS).filter(([id, b]) => !b.chefe).map(([id]) => Math.max(1, Math.round(INIMIGOS[id].gold / 3)));
+    return [est, Math.min(...comuns), Math.max(...comuns)]; })()`);
+  verdade(r[0]); verdade(r[1] >= 1 && r[2] <= 3);
+});
+teste('os equipamentos da loja são liberados a cada 5 cenários concluídos (e os melhores vão entrando)', () => {
+  const r = R(`(() => { const out = []; const p = novoJogador('T', 'guerreiro');
+    for (const n of [0, 4, 5, 9, 10, 15, 20]) { p.cenarios = {}; for (let i = 1; i <= n; i++) p.cenarios[i] = true; const est = estoqueLoja(p, REINOS[0]);
+      out.push([n, tierDaLoja(p), est.includes('guerreiro_1'), est.includes('guerreiro_2'), est.includes('guerreiro_3'), est.includes('guerreiro_4')].join()); }
+    return out; })()`);
+  igual(r.join('|'), '0,1,true,false,false,false|4,1,true,false,false,false|5,2,true,true,false,false|9,2,true,true,false,false|10,3,false,true,true,false|15,4,false,false,true,true|20,4,false,false,true,true');
+});
+teste('baú e recompensa sorteiam equipamento só do nível liberado', () => {
+  const r = R(`(() => { const p = novoJogador('T', 'guerreiro'); const vistos = new Set();
+    for (let k = 0; k < 400; k++) vistos.add(sortearEquipamento(REINOS[3], p));
+    p.cenarios = {}; for (let i = 1; i <= 10; i++) p.cenarios[i] = true; const v2 = new Set(); for (let k = 0; k < 400; k++) v2.add(sortearEquipamento(REINOS[3], p));
+    return [[...vistos].every(id => /_1$/.test(id)), [...v2].every(id => /_3$/.test(id))]; })()`);
+  verdade(r[0] && r[1], 'tier segue o progresso, não o reino');
 });
 
 console.log(`\n${ok} testes passaram${falhas.length ? `, ${falhas.length} FALHARAM: ${falhas.join('; ')}` : ''}.`);

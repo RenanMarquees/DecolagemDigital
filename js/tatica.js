@@ -138,7 +138,7 @@ function criarInimigoT(id, esc, uid, pos, ehChefe, exp) {
     uid, id, tipo: id, nome: b.nome, icone: b.icone, chefe: ehChefe, estrutura: false,
     hp, hpMax: hp, atk, def: b.def,
     mov: b.mov || 2, alc: b.alc || 1,
-    xp: ganho(b.xp), gold: ganho(b.gold),
+    xp: ganho(b.xp), moedas: b.gold > 0 ? (ehChefe ? Math.max(2, Math.round(b.gold / 5)) : Math.max(1, Math.round(b.gold / 3))) : 0,   // quantas moedas ele solta
     drops: b.drops || [], reliquia: b.reliquia, fragmento: b.fragmento,
     c: pos.c, r: pos.r, vivo: true, efeitos: [], bonusAtq: 0, escudo: 0,
   };
@@ -150,7 +150,7 @@ function criarEstrutura(reinoId, uid, pos, exp) {
   return {
     uid, id: e.mini, tipo: e.mini, nome: e.nome, icone: '🏗️', chefe: false, estrutura: true,
     hp, hpMax: hp, atk: 0, def: e.def, mov: 0, alc: 0,
-    xp: Math.max(1, Math.round(2 * exp.rec * BALANCO.xp)), gold: 0, drops: [],
+    xp: Math.max(1, Math.round(2 * exp.rec * BALANCO.xp)), moedas: 0, drops: [],
     c: pos.c, r: pos.r, vivo: true, efeitos: [], bonusAtq: 0, escudo: 0,
   };
 }
@@ -161,6 +161,8 @@ function criarExpedicao(cenario, p, difId = DIFICULDADE_PADRAO) {
   return {
     cenario, reinoId: cenario.reino, difId, dif: resumo.dif, nivelCen: resumo.nivel,
     stat: resumo.stat, rec: resumo.rec, etapas: cenario.etapas, idx: 0,
+    baralhos: { heroi: novoBaralhoMod(p.baralho), inim: novoBaralhoMod(baralhoInimigos(difId)) },   // a sorte dos ataques (o cenário todo usa os mesmos)
+    moedasColetadas: 0,                                                                                // moedas saqueadas; viram ouro no fim do cenário
   };
 }
 
@@ -226,7 +228,7 @@ function criarTatica(exp, p) {
     moedas: new Map(), bau: null, objetivoCumprido: false,
     heroi, saida: { ...heroi }, inim, mortos: [],
     rodada: 1, fase: 'escolha', movRest: 0, acaoUsada: false, bonusItem: { atq: 0 }, efeitos: [],
-    baralhos: {}, cartas: {}, fila: [], fim: null, log: [], fx: [],
+    baralhos: {}, cartas: {}, fila: [], fim: null, log: [], fx: [], modFx: [],
     mao: null, descarte: null, cartaHeroi: null, escudoHeroi: 0, heroiJogou: false,
   };
   // as cartas do herói acompanham o cenário inteiro (a mão e o descarte passam de uma etapa para a outra)
@@ -314,14 +316,16 @@ function danoDoHeroi(T, p) { const c = cartaAtual(T); return (c.atq || 0) + deri
 /* ---------- Moedas e baú ---------- */
 /** Quando um inimigo cai, deixa uma moeda no hexágono (o herói precisa PARAR lá para pegar). */
 function soltarMoeda(T, e) {
-  if (e.estrutura || !(e.gold > 0)) return;
+  if (e.estrutura || !(e.moedas > 0)) return;
   const k = chave(e.c, e.r);
   const atual = T.moedas.get(k);
-  T.moedas.set(k, { valor: (atual ? atual.valor : 0) + e.gold });
+  T.moedas.set(k, { valor: (atual ? atual.valor : 0) + e.moedas });   // `valor` = quantas moedas (cada uma vale 2 de ouro até o cenário 10 e 3 depois, no fim do cenário)
 }
+/** Quanto ouro vale cada moeda no cenário: 2 até o cenário 10, 3 do 11 em diante. */
+const valorDaMoeda = cenarioId => (cenarioId <= 10 ? 2 : 3);
 
 function sortearEquipamento(reino, p) {
-  const t = Math.min(reino.tier, 4);
+  const t = tierDaLoja(p);
   const pool = [`${p.classe}_${t}`, `cabeca_${t}`, `peito_${t}`, `pes_${t}`, `escudo_${t}`].filter(id => ITENS[id]);
   return pool[Math.floor(Math.random() * pool.length)];
 }
@@ -332,9 +336,9 @@ function lootarAqui(T, p) {
   const m = T.moedas.get(k);
   if (m) {
     T.moedas.delete(k);
-    p.gold += m.valor;
+    T.exp.moedasColetadas += m.valor;
     T.fx.push({ alvo: 'heroi', v: 0, texto: `+${m.valor} 🪙`, cura: true });
-    logar(T, `🪙 Você saqueia ${m.valor} moedas de ouro.`, 'cura');
+    logar(T, `🪙 Você pega ${m.valor} ${m.valor > 1 ? 'moedas' : 'moeda'} (${T.exp.moedasColetadas} no total; viram ouro no fim do cenário).`, 'cura');
   }
   if (T.livre && T.bau && !T.bau.aberto && T.bau.c === T.heroi.c && T.bau.r === T.heroi.r) abrirBau(T, p);
 }
@@ -345,12 +349,13 @@ function abrirBau(T, p) {
   const gold = Math.max(2, Math.round((4 + 3 * reino.tier) * rec));
   const itens = [reino.consumiveis[Math.floor(Math.random() * reino.consumiveis.length)]];
   if (Math.random() < 0.35) itens.push(sortearEquipamento(reino, p));
-  p.gold += gold;
+  ganharOuro(p, gold);
+  p.stats.baus++;
   for (const id of itens) darItem(p, id);
   T.bau.aberto = true;
   T.bau.recompensa = { gold, itens };
   T.fx.push({ alvo: 'heroi', v: 0, texto: '🧰', cura: true });
-  logar(T, `🧰 Você abre o baú! +${gold} moedas e ${itens.map(id => ITENS[id].nome).join(', ')}.`, 'cura');
+  logar(T, `🧰 Você abre o baú! +${gold} de ouro e ${itens.map(id => ITENS[id].nome).join(', ')}.`, 'cura');
   checarFim(T);
 }
 
@@ -434,6 +439,23 @@ function tMover(T, p, c, r) {
   return true;
 }
 
+/** Baralho de modificadores de quem ataca ('heroi' ou 'inim') neste cenário. */
+function baralhoMod(T, quem) {
+  const exp = T.exp;
+  if (!exp.baralhos) exp.baralhos = { heroi: novoBaralhoMod(BARALHO_BASE), inim: novoBaralhoMod(baralhoInimigos(exp.difId)) };
+  return exp.baralhos[quem];
+}
+/** Vira a carta do ataque (sozinha, sem o jogador fazer nada), registra para a tela mostrar e devolve o golpe final (0 = falhou). */
+function sacarParaAtaque(T, quem, base, nome) {
+  const carta = sacarMod(baralhoMod(T, quem));
+  const golpe = aplicarMod(base, carta);
+  T.modFx.push({ quem, carta, base, golpe, nome, embaralhou: carta.embaralhou });
+  if (SORTE.ativa) {
+    logar(T, `🎴 ${quem === 'heroi' ? 'Carta do seu ataque' : `Carta de ${nome}`}: ${carta.rotulo} (${carta.tipo === 'bloqueio' ? 'bloqueio!' : resumoMod(carta, base, golpe)})${carta.embaralhou ? ' · 🔀 baralho embaralhado' : ''}`, carta.tipo === 'bloqueio' ? (quem === 'heroi' ? 'aviso' : 'info') : carta.tipo === 'x2' ? 'forte' : 'info');
+  }
+  return golpe;
+}
+
 /** Um golpe do herói: dano fixo menos a defesa e o escudo do alvo (sempre causa pelo menos 1). */
 function golpeT(T, alvo, ataque) {
   const dano = Math.max(1, ataque - alvo.def - (alvo.escudo || 0));
@@ -463,7 +485,12 @@ function tAtacar(T, p, uid) {
     if (!principal) { logar(T, 'Esse inimigo está fora de alcance.', 'erro'); return false; }
     alvos = c.alvo === 'vizinhos' ? vivos(T).filter(e => e === principal || dist(e, principal) === 1) : [principal];
   }
-  const ataque = danoDoHeroi(T, p);
+  const ataque = sacarParaAtaque(T, 'heroi', danoDoHeroi(T, p), 'você');    // a carta de modificador vira sozinha
+  if (ataque === 0) {                                                       // bloqueio: o ataque inteiro se perde
+    T.acaoUsada = true;
+    logar(T, `🚫 ${c.nome} falhou! Você perdeu o ataque.`, 'aviso');
+    return true;
+  }
   let total = 0;
   for (const alvo of alvos) total += golpeT(T, alvo, ataque);
   logar(T, `⚔️ ${c.nome}: ${total} de dano${alvos.length > 1 ? ` em ${alvos.length} inimigos` : ` em ${alvos[0].nome}`}.`, 'dano');
@@ -727,9 +754,15 @@ function moverInimigo(T, p, e, mov, alc) {
 
 function atacarHeroi(T, p, d, e, carta) {
   const mod = carta.atq + e.bonusAtq;
-  const dano = Math.max(0, e.atk + mod - T.escudoHeroi);        // o escudo (carta + equipamento) tira pontos de cada golpe
+  const golpe = sacarParaAtaque(T, 'inim', Math.max(1, e.atk + mod), e.nome.split(',')[0]);   // carta de modificador do monstro
+  if (golpe === 0) {
+    logar(T, `💨 ${e.nome} errou o ataque!`, 'info');
+    T.fx.push({ alvo: 'heroi', v: 0, texto: '✖ errou', esquiva: true, de: e.uid });
+    return;
+  }
+  const dano = Math.max(0, golpe - T.escudoHeroi);              // o escudo (carta + equipamento) tira pontos de cada golpe
   p.hp = Math.max(0, p.hp - dano);
-  const forte = mod >= 2;
+  const forte = mod >= 2 || golpe >= 2 * (e.atk + mod);
   if (dano === 0) {
     logar(T, `🛡️ Seu escudo bloqueia o ataque de ${e.nome}!`, 'info');
     T.fx.push({ alvo: 'heroi', v: 0, texto: '🛡️ 0', esquiva: false });
@@ -861,10 +894,13 @@ function aplicarVitoriaT(T, p) {
     if (b.fragmento) p.fragmentos.push(b.fragmento);
   }
   for (const id of itens) darItem(p, id);
-  p.kills += T.mortos.filter(e => !e.estrutura).length;
+  const abates = T.mortos.filter(e => !e.estrutura).length;
+  p.kills += abates; p.stats.abates += abates;
+  if (primeira) p.stats.chefes++;
   const subidas = ganharXp(p, xp);
+  const marcos = verificarMarcos(p);
   const moedasNoChao = [...T.moedas.values()].reduce((a, m) => a + m.valor, 0);
-  return { xp, gold: 0, itens, subidas, primeira, moedasNoChao, bauFechado: !!(T.bau && !T.bau.aberto) };
+  return { xp, gold: 0, itens, subidas, primeira, moedasNoChao, marcos, bauFechado: !!(T.bau && !T.bau.aberto) };
 }
 
 /** Conclusão do cenário: marca como feito e dá uma recompensa aleatória (ouro, XP ou um item). */
@@ -873,11 +909,16 @@ function concluirCenario(T, p) {
   const reino = REINOS.find(r => r.id === c.reino);
   const primeira = !p.cenarios[c.id];
   p.cenarios[c.id] = true;
+  if (primeira) p.stats.cenarios++;
+  // as moedas que o herói juntou viram ouro agora (2 por moeda até o cenário 10, 3 depois)
+  const moedas = { n: exp.moedasColetadas, valor: valorDaMoeda(c.id) };
+  moedas.ouro = moedas.n * moedas.valor;
+  ganharOuro(p, moedas.ouro); exp.moedasColetadas = 0;
   const sorte = Math.random();
   let r;
   if (sorte < 0.4) {
     const gold = Math.max(3, Math.round((8 + 4 * reino.tier) * exp.rec));
-    p.gold += gold; r = { tipo: 'gold', gold };
+    ganharOuro(p, gold); r = { tipo: 'gold', gold };
   } else if (sorte < 0.75) {
     const xp = Math.max(1, Math.round(xpParaProximo(p.nivel) * 0.4 * exp.rec * BALANCO.xp));
     r = { tipo: 'xp', xp, subidas: ganharXp(p, xp) };
@@ -885,6 +926,7 @@ function concluirCenario(T, p) {
     const id = sortearEquipamento(reino, p);
     darItem(p, id); r = { tipo: 'item', id };
   }
-  r.primeira = primeira;
+  r.primeira = primeira; r.moedas = moedas;
+  r.marcos = verificarMarcos(p);
   return r;
 }

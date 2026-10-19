@@ -98,6 +98,7 @@ const srv = http.createServer((q, r) => {
   await esperarCartao('r_inv');
   await click('[data-a=inventario]'); await click('[data-a=fechar]');
   await tratarPontos();
+  await esperarCartao('r_baralho'); await click('[data-a=tut-ok]');
   await esperarCartao('r_cen2');
   await click('[data-a=cenario][data-id="2"]');
   await esperarCartao('br2');
@@ -116,7 +117,7 @@ const srv = http.createServer((q, r) => {
 
   /* ---- conferência final ---- */
   const feitos = await page.evaluate(() => P.tutorial.feitos);
-  const obrigatorios = ['m_bemvindo', 'r_cen1', 'br1', 'b_mapa', 'b_objetivo', 'b_iniciativa', 'b_escolher', 'b_mover', 'b_atacar', 'b_fimturno', 'b_salalimpa', 'b_porta', 'b_ultima', 'b_vitoria1', 'r_loja', 'l_loja', 'l_voltar', 'r_inv', 'r_cen2', 'br2', 'b2_cartas', 'b2_bau', 'b2_vitoria', 'r_cen3', 'br3', 'b3_estrutura', 'r_fim'];
+  const obrigatorios = ['m_bemvindo', 'r_cen1', 'br1', 'b_mapa', 'b_objetivo', 'b_iniciativa', 'b_escolher', 'b_mover', 'b_atacar', 'b_modcarta', 'b_fimturno', 'b_salalimpa', 'b_porta', 'b_ultima', 'b_vitoria1', 'r_loja', 'l_loja', 'l_voltar', 'r_inv', 'r_baralho', 'r_cen2', 'br2', 'b2_cartas', 'b2_bau', 'b2_vitoria', 'r_cen3', 'br3', 'b3_estrutura', 'r_fim'];
   const faltou = obrigatorios.filter(i => !feitos[i]);
   const todos = await page.evaluate(() => Tutorial.passos());
   const opcionais = todos.filter(i => !obrigatorios.includes(i) && !feitos[i]);

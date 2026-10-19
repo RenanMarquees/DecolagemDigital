@@ -4,7 +4,7 @@ RPG de turnos para celular sobre os deuses antigos. Feito em HTML + JavaScript p
 
 **Reinos:** Valhala → Olimpo → Inferno → Duat → Abismo do Caos
 **Classes:** Guerreiro, Caçador, Oráculo
-**Sistemas:** atributos (FOR/DES/INT/VIT), níveis (até 20), **5 tipos de item** (cabeça, peito, mãos, pés e mochila), loja, salvamento automático. **Números pequenos:** vida máxima do jogo = 30, dano de 2, 3, 6… sem sorte (nada de crítico/esquiva) e **sem mana**.
+**Sistemas:** atributos (FOR/DES/INT/VIT), níveis (até 20), **5 tipos de item** (cabeça, peito, mãos, pés e mochila), loja, salvamento automático. **Números pequenos:** vida máxima do jogo = 30, dano de 2, 3, 6… e **sem mana**. A única sorte do jogo é o **baralho de modificadores** (abaixo).
 
 **Campanha de 20 cenários:** 4 por reino, em sequência (terminar um destrava o próximo; o último de cada reino abre o reino seguinte). Cada cenário tem um **objetivo**:
 
@@ -18,6 +18,12 @@ RPG de turnos para celular sobre os deuses antigos. Feito em HTML + JavaScript p
 **Combate tático em 3D (estilo Gloomhaven):** o mapa de hexágonos ocupa a tela toda (arraste para mover a câmera, **pinça com dois dedos para aproximar/afastar**, gire com ↻, 🎯 volta para o herói). Por cima do mapa ficam os atalhos: a **faixa de iniciativa** no topo, os botões de zoom ao lado e, embaixo, a **mão de cartas** e as ações (⚔️ Atacar, 🎒 Mochila, ⏭️ Encerrar). Nada de rolar a tela. Com o **celular deitado**, o painel vai para a direita e o mapa fica à esquerda. O botão 📋 abre os detalhes (cartas completas dos inimigos, armadilhas, histórico).
 
 **Cartas de iniciativa do herói:** você tem uma mão de 10 cartas por classe (`BARALHOS_HEROI` em `js/cartas.js`). Em cada rodada joga **uma**: ela define o seu turno (andar, atacar, alcance, empurrar/puxar, escudo, cura…) e o número dourado é a sua **iniciativa**. Quem tem o menor número age primeiro — inimigos e você se intercalam. A carta jogada vai para o descarte; 💤 **Descansar** (iniciativa 99) cura um pouco e devolve todas as cartas. As habilidades da classe **são as cartas** (sem mana).
+
+**Baralho de modificadores (a sorte):** cada ataque — seu e dos monstros — vira **uma carta, automaticamente**, e ela aparece no meio do mapa por um instante (o jogo não espera). As cartas: **+N** soma ao dano, **−N** tira (o golpe nunca fica abaixo de 1), **×2** dobra o dano e **✖ bloqueio** faz o ataque falhar (e o empurrar/puxar também). O baralho só é **embaralhado de novo quando sai um ×2 ou um ✖**. O baralho tem no máximo **15 cartas**; o seu começa com 12 (`BARALHO_BASE` em `js/cartas.js`) e os monstros têm o deles (`BARALHO_INIM`, que muda com a dificuldade: o Fácil não tem ×2 e erra mais). Um ataque em área usa uma carta só. O botão 🎴 (embaixo) e o 📋 mostram o baralho e quais cartas já saíram.
+
+**Conquistas (cartas melhores):** `MARCOS` em `js/cartas.js` — ganhar 100 XP, juntar 50 moedas, derrotar inimigos, abrir baús, vencer cenários e chefes… cada uma coloca uma carta melhor (+1 até +4, ou ×2) no seu baralho. Com 15 cartas, a nova toma o lugar da pior (−2, −1, +0, +1; o ✖ e o ×2 ficam). Veja o progresso em 🧙 Personagem.
+
+**Moedas:** cada monstro solta moedas no chão (pare em cima para pegar). Elas viram ouro **no fim do cenário**: **2 de ouro por moeda até o cenário 10 e 3 do cenário 11 em diante** (se você cair, as moedas que carregava ficam para trás). **Itens por etapa:** os mercadores liberam equipamentos melhores **a cada 5 cenários concluídos** (nível 1; 5 cenários → nível 2; 10 → 3; 15 → 4), e baús e recompensas também só dão equipamento do nível liberado.
 
 **Itens:** usar um item da mochila **não gasta a sua jogada**. Slots: 1 de cabeça, 1 de peito, 1 de pés, 2 de mãos, e a **mochila** começa com 2 lugares e vai a 5 (níveis 5, 10 e 15).
 
@@ -70,7 +76,7 @@ RPG de turnos para celular sobre os deuses antigos. Feito em HTML + JavaScript p
 
 ## Testes
 
-- `node tests/regras.js` — testa o motor sem navegador: cartas de iniciativa, ordem de turnos, itens/slots, cenários, objetivos, empurrar/puxar, dificuldades, moedas, baú, armadilhas, portas (rápido).
+- `node tests/regras.js` — testa o motor sem navegador: cartas de iniciativa, ordem de turnos, baralho de modificadores, conquistas, moedas, itens/slots, cenários, objetivos, empurrar/puxar, dificuldades, moedas, baú, armadilhas, portas (rápido).
 - `node tests/sim.js 8 todas expert` — um robô joga os 20 cenários e mostra a taxa de vitória por cenário (argumentos: vezes, classe, dificuldade). `BAL_FORCA=0.6 BAL_FPN=0.03 RESUMO=1 node tests/sim.js 20 todas` experimenta o equilíbrio sem mexer no jogo (RESUMO=1 mostra uma linha por classe/dificuldade).
 - `node tests/mapas.js --ver` — confere todos os mapas (portas, armadilhas, caminhos) e desenha em texto.
 - `node tests/smoke.js` — abre o jogo num celular virtual: menus, cenário, mapa 3D, toque, pinça de zoom, cartas, atalhos sem rolar a tela, rodadas (precisa do Playwright).
