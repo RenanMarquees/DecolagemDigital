@@ -125,39 +125,81 @@ b { font-weight: 700; }
 .melhor { color: var(--ok); } .pior { color: var(--ruim); }
 .vazio { color: var(--suave); text-align: center; padding: 14px; font-size: .9rem; }
 
-/* ---------- batalha ---------- */
-.batalha { padding: 10px 12px calc(10px + var(--safe-b)); gap: 8px; }
-.lado { background: #0d0b14aa; border: 1px solid var(--borda); border-radius: 14px; padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; position: relative; }
-.lado .nome { font-weight: 700; }
-.lado.inim { align-items: stretch; }
-.lado.inim.chefe { border-color: var(--ouro); box-shadow: 0 0 18px #e8b84a33; }
-.sprite { text-align: center; font-size: 5rem; line-height: 1.15; position: relative; }
-.lado.chefe .sprite { font-size: 6rem; }
-.buff { color: var(--ouro); font-size: .8rem; margin-left: 6px; }
-.log { flex: 1; min-height: 80px; overflow-y: auto; background: #00000055; border-radius: 12px; padding: 8px 10px; font-size: .88rem; line-height: 1.4; }
-.log p { padding: 2px 0; color: var(--suave); }
+/* ---------- batalha tática ---------- */
+.reino-valhala { --chao: #2a3f66; --chao2: #3a5584; --parede: #121a2c; }
+.reino-olimpo  { --chao: #55659a; --chao2: #6c7db4; --parede: #232c4a; }
+.reino-inferno { --chao: #5a2222; --chao2: #7a2f2a; --parede: #200a0a; }
+.reino-duat    { --chao: #6a5428; --chao2: #866930; --parede: #2a1f0c; }
+.reino-caos    { --chao: #33185e; --chao2: #4a2585; --parede: #0d0618; }
+
+.tatica { padding: 6px 8px calc(10px + var(--safe-b)); gap: 6px; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+.tat-topo { display: flex; justify-content: space-between; align-items: center; padding: 4px 6px; font-size: .85rem; color: var(--suave); }
+.tat-topo b { color: var(--acento, var(--ouro)); }
+.tat-topo b.ini { color: var(--ruim); }
+.tabuleiro { background: #0d0b14aa; border: 1px solid var(--borda); border-radius: 14px; padding: 4px; }
+#tab { width: 100%; height: auto; display: block; user-select: none; -webkit-user-select: none; touch-action: manipulation; }
+.hex { fill: var(--chao); stroke: #00000070; stroke-width: 1.3; cursor: pointer; transition: fill .15s; }
+.hex:active { fill: var(--chao2); }
+.hex.alcancavel { fill: #3f7be0aa; stroke: #9cc4ff; stroke-width: 1.8; }
+.hex.alvo { fill: #e0434a99; stroke: #ff8a8a; stroke-width: 2.6; animation: pulso .8s ease-in-out infinite alternate; }
+@keyframes pulso { to { fill: #e0434a55; } }
+.hex-parede { fill: var(--parede); stroke: #00000090; stroke-width: 1.3; pointer-events: none; }
+.parede-ico { font-size: 22px; text-anchor: middle; pointer-events: none; opacity: .75; }
+.saida-ico { font-size: 14px; text-anchor: middle; pointer-events: none; opacity: .9; }
+
+.unid { transition: transform .3s ease-out; pointer-events: none; }
+.unid .anel { fill: #0d0b14bb; stroke: #ff7b7b; stroke-width: 2; }
+.unid.heroi .anel { stroke: #7fb2ff; }
+.unid.chefe .anel { stroke: var(--ouro); stroke-width: 3.2; fill: #2a1d05cc; }
+.unid.buff .anel { stroke: var(--ouro); filter: drop-shadow(0 0 4px var(--ouro)); }
+.unid.defende .anel { stroke: #5fd0d0; stroke-width: 3.5; }
+.unid .emoji { font-size: 25px; text-anchor: middle; transform-origin: center; transform-box: fill-box; }
+.unid.chefe .emoji { font-size: 29px; }
+.unid .hp-bg { fill: #000000b0; }
+.unid .hp-fg { fill: var(--hp); transition: width .3s; }
+.unid.heroi .hp-fg { fill: var(--ok); }
+.unid.golpeado .emoji { animation: golpe .35s; }
+.unid.morto { opacity: 0; transition: opacity .4s, transform .3s; }
+@keyframes golpe { 20% { transform: translateX(-4px) scale(1.15); } 50% { transform: translateX(4px); } 80% { transform: translateX(-2px); } }
+
+.flutua-s { font-weight: 800; font-size: 17px; text-anchor: middle; fill: #fff; stroke: #000; stroke-width: 3.5px; paint-order: stroke; pointer-events: none; animation: subirS 1s ease-out forwards; }
+.flutua-s.cura { fill: #8dfc94; }
+.flutua-s.crit { fill: #ffd34d; font-size: 21px; }
+.flutua-s.forte { fill: #ff7b7b; font-size: 21px; }
+.flutua-s.esq { fill: #bfe3ff; font-size: 13px; }
+@keyframes subirS { to { transform: translateY(-30px); opacity: 0; } }
+
+#hud { display: flex; flex-direction: column; gap: 6px; }
+.hud-heroi { background: #0d0b14aa; border: 1px solid var(--borda); border-radius: 12px; padding: 8px 10px; display: flex; flex-direction: column; gap: 5px; }
+.hud-linha { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.tag { font-size: .72rem; background: var(--painel2); border: 1px solid var(--borda); border-radius: 8px; padding: 2px 7px; }
+.tag.ouro { color: var(--ouro); border-color: var(--ouro); }
+.pontos-turno { gap: 10px; font-size: .85rem; }
+.pontos-turno span { background: #00000044; border-radius: 8px; padding: 3px 9px; color: var(--suave); }
+.pontos-turno span.on { color: var(--texto); background: #3f7be044; }
+.inims { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; }
+.chip-inim { flex: 1 0 104px; background: #0d0b14aa; border: 1px solid #7a2f35; border-radius: 10px; padding: 5px 8px; display: flex; flex-direction: column; gap: 3px; font-size: .78rem; }
+.chip-inim.chefe { border-color: var(--ouro); }
+.chip-inim b { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.barra.mini { height: 13px; } .barra.mini span { font-size: .62rem; line-height: 13px; }
+.log { min-height: 58px; max-height: 84px; overflow-y: auto; background: #00000055; border-radius: 12px; padding: 6px 10px; font-size: .84rem; line-height: 1.35; }
+.log p { padding: 1px 0; color: var(--suave); }
 .log p:last-child { color: var(--texto); }
 .l-dano { color: #ffd1a8 !important; } .l-crit { color: var(--ouro) !important; font-weight: 700; }
 .l-inimigo { color: #ff9c9c !important; } .l-forte { color: var(--ruim) !important; font-weight: 700; }
 .l-cura { color: var(--ok) !important; } .l-aviso { color: #ffb02e !important; font-weight: 700; } .l-erro { color: var(--ruim) !important; }
-.acoes { min-height: 168px; }
+.acoes { min-height: 120px; }
 .grade-acoes { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.grade-acoes .btn { min-height: 52px; }
-.sub-menu { display: flex; flex-direction: column; gap: 6px; max-height: 240px; overflow-y: auto; }
+.grade-acoes .btn { min-height: 50px; }
+.grade-acoes .btn small { font-weight: 400; color: var(--suave); }
+.btn.fim-turno { background: linear-gradient(180deg, #6a4bb3, #4b3585); border-color: #8a6bd6; }
+.sub-menu { display: flex; flex-direction: column; gap: 6px; max-height: 250px; overflow-y: auto; }
 .btn.hab { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; text-align: left; min-height: 46px; padding: 8px 12px; }
 .btn.hab small { font-weight: 400; }
 .fim { text-align: center; display: flex; flex-direction: column; gap: 8px; padding: 6px; }
 .fim h3 { color: var(--ouro); font-size: 1.3rem; }
 .drops { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 12px; }
 .nivelup { color: var(--ouro); font-weight: 700; }
-
-.flutua { position: absolute; left: 50%; top: 20%; transform: translateX(-50%); font-weight: 800; font-size: 1.7rem; color: #fff; text-shadow: 0 2px 6px #000, 0 0 10px var(--hp); pointer-events: none; animation: subir 1s ease-out forwards; z-index: 5; white-space: nowrap; }
-.flutua.cura { color: var(--ok); text-shadow: 0 2px 6px #000; }
-.flutua.crit { color: var(--ouro); font-size: 2.2rem; }
-.flutua.forte { color: var(--ruim); font-size: 2.2rem; }
-@keyframes subir { to { transform: translate(-50%, -52px); opacity: 0; } }
-.treme { animation: tremer .3s; }
-@keyframes tremer { 20% { transform: translateX(-6px); } 40% { transform: translateX(6px); } 60% { transform: translateX(-4px); } 80% { transform: translateX(3px); } }
 
 /* ---------- janela (personagem / inventário) ---------- */
 #modal { position: fixed; inset: 0; background: #000000b0; display: none; align-items: flex-end; justify-content: center; z-index: 20; }

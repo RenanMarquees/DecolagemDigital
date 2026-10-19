@@ -48,6 +48,8 @@ function derivados(p) {
     crit: Math.min(0.6, 0.05 + A.DES * 0.008),
     esquiva: Math.min(0.35, A.DES * 0.005),
     danoMult: CLASSES[p.classe].danoMult,
+    danoRecebido: CLASSES[p.classe].danoRecebido,
+    mov: CLASSES[p.classe].mov + Math.floor(A.DES / 15),
     regenMp: CLASSES[p.classe].regenMp + Math.floor(A.INT / 10),
   };
 }
@@ -177,149 +179,6 @@ function penalidadeDerrota(p) {
   p.mp = Math.ceil(d.mpMax / 2);
 }
 
-/* ---------- Batalha ---------- */
+/* ---------- Sorteio e fórmulas usadas na batalha (o motor está em tatica.js) ---------- */
 function rand(min, max) { return min + Math.random() * (max - min); }
 function reducaoDefesa(def) { return 50 / (50 + def); }
-
-function criarBatalha(idInimigo) {
-  const base = INIMIGOS[idInimigo];
-  return {
-    id: idInimigo, inim: { ...base, hpMax: base.hp },
-    turno: 0, defendendo: false, buff: null, fim: null,
-    log: [], fx: [], inicioLog: 0,
-  };
-}
-
-function logar(b, msg, cls = '') { b.log.push({ msg, cls }); }
-
-function golpe(b, d, ataque, bonusCrit = 0) {
-  const mult = b.buff ? b.buff.mult : 1;
-  let dano = ataque * mult * d.danoMult * rand(0.9, 1.1) * reducaoDefesa(b.inim.def);
-  const crit = Math.random() < d.crit + bonusCrit;
-  if (crit) dano *= 1.75;
-  dano = Math.max(1, Math.round(dano));
-  b.inim.hp = Math.max(0, b.inim.hp - dano);
-  b.fx.push({ alvo: 'inimigo', v: dano, crit });
-  return { dano, crit };
-}
-
-function executarAcao(b, p, d, acao) {
-  const nomeI = b.inim.nome;
-  switch (acao.tipo) {
-    case 'atacar': {
-      const stat = d[CLASSES[p.classe].basico];
-      const r = golpe(b, d, stat * 1.5 + d.atk);
-      logar(b, `Você ataca ${nomeI}: ${r.dano} de dano${r.crit ? ' (CRÍTICO!)' : ''}.`, r.crit ? 'crit' : 'dano');
-      return true;
-    }
-    case 'habilidade': {
-      const h = HABILIDADES[acao.id];
-      if (!h || h.nivel > p.nivel) return false;
-      if (p.mp < h.custo) { logar(b, 'Mana insuficiente!', 'erro'); return false; }
-      p.mp -= h.custo;
-      if (h.tipo === 'dano' || h.tipo === 'dreno') {
-        let total = 0, algumCrit = false;
-        for (let i = 0; i < (h.golpes || 1); i++) {
-          const r = golpe(b, d, d[h.stat] * h.mult + d.atk, h.critBonus || 0);
-          total += r.dano; algumCrit = algumCrit || r.crit;
-        }
-        logar(b, `${h.icone} ${h.nome}: ${total} de dano${algumCrit ? ' (CRÍTICO!)' : ''}.`, algumCrit ? 'crit' : 'dano');
-        if (h.tipo === 'dreno') {
-          const cura = Math.min(d.hpMax - p.hp, Math.round(total / 2));
-          p.hp += cura;
-          if (cura > 0) { logar(b, `Você drena ${cura} de vida.`, 'cura'); b.fx.push({ alvo: 'jogador', v: cura, cura: true }); }
-        }
-      } else if (h.tipo === 'cura') {
-        const cura = Math.min(d.hpMax - p.hp, Math.round(d.hpMax * 0.15 + d[h.stat] * h.mult * 0.7));
-        p.hp += cura;
-        logar(b, `${h.icone} ${h.nome}: você recupera ${cura} de vida.`, 'cura');
-        b.fx.push({ alvo: 'jogador', v: cura, cura: true });
-      } else if (h.tipo === 'buff') {
-        b.buff = { mult: h.mult, turnos: h.turnos + 1 };
-        logar(b, `${h.icone} ${h.nome}! Seu dano aumenta por ${h.turnos} turnos.`, 'cura');
-      }
-      return true;
-    }
-    case 'item': {
-      const msg = usarConsumivel(p, acao.id);
-      if (!msg) { logar(b, 'Isso não teria efeito agora.', 'erro'); return false; }
-      logar(b, msg, 'cura');
-      return true;
-    }
-    case 'defender':
-      b.defendendo = true;
-      p.mp = Math.min(d.mpMax, p.mp + Math.round(d.mpMax * 0.1));
-      logar(b, '🛡️ Você se protege (dano pela metade) e recupera o fôlego (+mana).', 'info');
-      return true;
-    case 'fugir':
-      if (b.inim.chefe) { logar(b, 'Não há como fugir de um deus!', 'erro'); return false; }
-      if (Math.random() < 0.6) { logar(b, 'Você escapou!', 'info'); b.fim = 'fugiu'; }
-      else logar(b, 'Você tentou fugir, mas não conseguiu!', 'erro');
-      return true;
-  }
-  return false;
-}
-
-function turnoInimigo(b, p, d) {
-  const e = b.inim;
-  b.turno++;
-  const esp = e.especial;
-  const ehEspecial = esp && b.turno % esp.cada === 0;
-  if (!ehEspecial && Math.random() < d.esquiva) {
-    logar(b, `Você esquiva do ataque de ${e.nome}!`, 'info');
-    b.fx.push({ alvo: 'jogador', v: 0, esquiva: true });
-  } else {
-    let dano = e.atk * (ehEspecial ? esp.mult : 1) * rand(0.9, 1.1) * reducaoDefesa(d.def);
-    if (b.defendendo) dano *= 0.5;
-    dano = Math.max(1, Math.round(dano));
-    p.hp = Math.max(0, p.hp - dano);
-    b.fx.push({ alvo: 'jogador', v: dano, forte: ehEspecial });
-    logar(b, ehEspecial ? `💢 ${e.nome} usa ${esp.nome}: ${dano} de dano!` : `${e.nome} ataca: ${dano} de dano.`, ehEspecial ? 'forte' : 'inimigo');
-  }
-  b.defendendo = false;
-}
-
-function fimDeTurno(b, p, d) {
-  if (b.buff && --b.buff.turnos <= 0) b.buff = null;
-  p.mp = Math.min(d.mpMax, p.mp + d.regenMp);
-  const esp = b.inim.especial;
-  if (esp && (b.turno + 1) % esp.cada === 0) {
-    logar(b, `⚠️ ${b.inim.nome} está carregando ${esp.nome}! Defenda-se!`, 'aviso');
-  }
-}
-
-/**
- * Executa um turno completo (ação do jogador + resposta do inimigo).
- * Retorna: 'invalido' | 'continua' | 'vitoria' | 'derrota' | 'fugiu'
- */
-function jogarTurno(b, p, acao) {
-  b.fx = [];
-  b.inicioLog = b.log.length;
-  const d = derivados(p);
-  if (!executarAcao(b, p, d, acao)) return 'invalido';
-  if (b.fim) return b.fim;
-  if (b.inim.hp <= 0) { b.fim = 'vitoria'; return b.fim; }
-  turnoInimigo(b, p, d);
-  if (p.hp <= 0) { b.fim = 'derrota'; return b.fim; }
-  fimDeTurno(b, p, d);
-  return 'continua';
-}
-
-/** Aplica recompensas da vitória. */
-function aplicarVitoria(b, p) {
-  const e = b.inim;
-  const gold = Math.round(e.gold * rand(0.8, 1.2));
-  const itens = [];
-  for (const dr of e.drops || []) if (Math.random() < dr.chance) itens.push(dr.id);
-  const primeira = e.chefe && !p.derrotados[b.id];
-  if (primeira) {
-    p.derrotados[b.id] = true;
-    if (e.reliquia) itens.push(e.reliquia);
-    if (e.fragmento) p.fragmentos.push(e.fragmento);
-  }
-  for (const id of itens) darItem(p, id);
-  p.gold += gold;
-  p.kills++;
-  const subidas = ganharXp(p, e.xp);
-  return { xp: e.xp, gold, itens, subidas, primeira };
-}

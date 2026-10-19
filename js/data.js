@@ -9,7 +9,7 @@ const ATRIBUTOS = ['FOR', 'DES', 'INT', 'VIT'];
 const ATRIBUTO_NOME = { FOR: 'Força', DES: 'Destreza', INT: 'Inteligência', VIT: 'Vitalidade' };
 const ATRIBUTO_DESC = {
   FOR: 'Aumenta o dano físico do Guerreiro',
-  DES: 'Dano do Caçador, crítico e esquiva',
+  DES: 'Dano do Caçador, crítico, esquiva e movimento',
   INT: 'Dano e cura do Oráculo, mana',
   VIT: 'Vida máxima e defesa',
 };
@@ -21,19 +21,19 @@ const RARIDADE_COR = { comum: '#b8b8c4', incomum: '#5fd068', raro: '#4aa3ff', ep
 /* ---------- CLASSES ---------- */
 const CLASSES = {
   guerreiro: {
-    nome: 'Guerreiro', icone: '⚔️', basico: 'FOR', hpMult: 1.3, danoMult: 1.12, regenMp: 3,
-    desc: 'Força bruta, muita vida e +12% de dano. Aguenta os golpes dos deuses e responde com fúria.',
+    nome: 'Guerreiro', icone: '⚔️', mov: 4, alcanceBasico: 1, basico: 'FOR', hpMult: 1.3, danoMult: 1.12, danoRecebido: 0.85, regenMp: 6,
+    desc: 'Força bruta, muita vida, +12% de dano e recebe 15% menos dano. Aguenta os golpes dos deuses e responde com fúria.',
     attr: { FOR: 8, DES: 4, INT: 2, VIT: 7 },
     habilidades: ['golpe_poderoso', 'grito_guerra', 'furia_tor', 'martelo_titas'],
   },
   cacador: {
-    nome: 'Caçador', icone: '🏹', basico: 'DES', hpMult: 1.05, danoMult: 1, regenMp: 3,
+    nome: 'Caçador', icone: '🏹', mov: 3, alcanceBasico: 3, basico: 'DES', hpMult: 1.05, danoMult: 1, danoRecebido: 1, regenMp: 3,
     desc: 'Rápido e preciso. Acerta golpes críticos e desvia dos ataques.',
     attr: { FOR: 3, DES: 9, INT: 3, VIT: 6 },
     habilidades: ['tiro_certeiro', 'flecha_dupla', 'chuva_artemis', 'flecha_apolo'],
   },
   oraculo: {
-    nome: 'Oráculo', icone: '🔮', basico: 'INT', hpMult: 0.9, danoMult: 1, regenMp: 2,
+    nome: 'Oráculo', icone: '🔮', mov: 3, alcanceBasico: 3, basico: 'INT', hpMult: 1, danoMult: 1, danoRecebido: 1, regenMp: 2,
     desc: 'Mestre da magia. Fere com raios, cura aliados e drena a alma dos inimigos.',
     attr: { FOR: 2, DES: 4, INT: 9, VIT: 5 },
     habilidades: ['raio_zeus', 'bencao_apolo', 'drenar_alma', 'julgamento_deuses'],
@@ -43,20 +43,20 @@ const CLASSES = {
 /* ---------- HABILIDADES ----------
    tipo: dano | cura | dreno | buff   —   custo em mana (MP) */
 const HABILIDADES = {
-  golpe_poderoso:    { nome: 'Golpe Poderoso',       icone: '💥', custo: 6,  nivel: 1,  tipo: 'dano', stat: 'FOR', mult: 2.0, desc: 'Um golpe pesado.' },
-  grito_guerra:      { nome: 'Grito de Guerra',      icone: '📣', custo: 6,  nivel: 3,  tipo: 'buff', mult: 1.5, turnos: 4, desc: '+50% de dano por 4 turnos.' },
-  furia_tor:         { nome: 'Fúria de Thor',        icone: '⚡', custo: 11, nivel: 5,  tipo: 'dano', stat: 'FOR', mult: 3.2, desc: 'O trovão desce sobre o inimigo.' },
-  martelo_titas:     { nome: 'Martelo dos Titãs',    icone: '🔨', custo: 20, nivel: 9,  tipo: 'dano', stat: 'FOR', mult: 4.8, desc: 'Dano devastador.' },
+  golpe_poderoso:    { nome: 'Golpe Poderoso',       icone: '💥', alcance: 1, custo: 6,  nivel: 1,  tipo: 'dano', stat: 'FOR', mult: 2.0, desc: 'Um golpe pesado.' },
+  grito_guerra:      { nome: 'Grito de Guerra',      icone: '📣', alcance: 0, custo: 6,  nivel: 3,  tipo: 'buff', mult: 1.5, turnos: 4, desc: '+50% de dano por 4 turnos.' },
+  furia_tor:         { nome: 'Fúria de Thor',        icone: '⚡', alcance: 3, custo: 11, nivel: 5,  tipo: 'dano', stat: 'FOR', mult: 3.2, desc: 'O trovão atinge um inimigo a até 3 hexágonos.' },
+  martelo_titas:     { nome: 'Martelo dos Titãs',    icone: '🔨', alcance: 0, area: 'ao-redor', custo: 20, nivel: 9,  tipo: 'dano', stat: 'FOR', mult: 4.8, desc: 'Golpeia todos os inimigos ao seu redor.' },
 
-  tiro_certeiro:     { nome: 'Tiro Certeiro',        icone: '🎯', custo: 5,  nivel: 1,  tipo: 'dano', stat: 'DES', mult: 1.9, critBonus: 0.25, desc: 'Mais chance de crítico.' },
-  flecha_dupla:      { nome: 'Flecha Dupla',         icone: '🏹', custo: 9,  nivel: 3,  tipo: 'dano', stat: 'DES', mult: 1.3, golpes: 2, desc: 'Duas flechas seguidas.' },
-  chuva_artemis:     { nome: 'Chuva de Ártemis',     icone: '🌧️', custo: 15, nivel: 5,  tipo: 'dano', stat: 'DES', mult: 3.3, desc: 'Uma saraivada prateada.' },
-  flecha_apolo:      { nome: 'Flecha de Apolo',      icone: '☀️', custo: 20, nivel: 9,  tipo: 'dano', stat: 'DES', mult: 4.8, critBonus: 0.4, desc: 'Luz solar em forma de flecha.' },
+  tiro_certeiro:     { nome: 'Tiro Certeiro',        icone: '🎯', alcance: 4, custo: 5,  nivel: 1,  tipo: 'dano', stat: 'DES', mult: 1.9, critBonus: 0.25, desc: 'Mais chance de crítico.' },
+  flecha_dupla:      { nome: 'Flecha Dupla',         icone: '🏹', alcance: 3, custo: 9,  nivel: 3,  tipo: 'dano', stat: 'DES', mult: 1.3, golpes: 2, desc: 'Duas flechas seguidas.' },
+  chuva_artemis:     { nome: 'Chuva de Ártemis',     icone: '🌧️', alcance: 3, area: 'alvo+vizinhos', custo: 15, nivel: 5,  tipo: 'dano', stat: 'DES', mult: 3.3, desc: 'Atinge o alvo e os inimigos ao lado dele.' },
+  flecha_apolo:      { nome: 'Flecha de Apolo',      icone: '☀️', alcance: 5, custo: 20, nivel: 9,  tipo: 'dano', stat: 'DES', mult: 4.8, critBonus: 0.4, desc: 'Luz solar em forma de flecha.' },
 
-  raio_zeus:         { nome: 'Raio de Zeus',         icone: '⚡', custo: 6,  nivel: 1,  tipo: 'dano', stat: 'INT', mult: 2.1, desc: 'Um raio divino.' },
-  bencao_apolo:      { nome: 'Bênção de Apolo',      icone: '☀️', custo: 12, nivel: 3,  tipo: 'cura', stat: 'INT', mult: 3.5, desc: 'Cura suas feridas.' },
-  drenar_alma:       { nome: 'Drenar Alma',          icone: '💀', custo: 13, nivel: 5,  tipo: 'dreno', stat: 'INT', mult: 2.4, desc: 'Fere o inimigo e recupera metade do dano.' },
-  julgamento_deuses: { nome: 'Julgamento dos Deuses', icone: '⚖️', custo: 24, nivel: 9, tipo: 'dano', stat: 'INT', mult: 5.0, desc: 'O veredito final.' },
+  raio_zeus:         { nome: 'Raio de Zeus',         icone: '⚡', alcance: 4, custo: 6,  nivel: 1,  tipo: 'dano', stat: 'INT', mult: 2.1, desc: 'Um raio divino.' },
+  bencao_apolo:      { nome: 'Bênção de Apolo',      icone: '☀️', alcance: 0, custo: 12, nivel: 3,  tipo: 'cura', stat: 'INT', mult: 3.5, desc: 'Cura suas feridas.' },
+  drenar_alma:       { nome: 'Drenar Alma',          icone: '💀', alcance: 3, custo: 13, nivel: 5,  tipo: 'dreno', stat: 'INT', mult: 2.4, desc: 'Fere o inimigo e recupera metade do dano.' },
+  julgamento_deuses: { nome: 'Julgamento dos Deuses', icone: '⚖️', alcance: 4, area: 'alvo+vizinhos', custo: 24, nivel: 9, tipo: 'dano', stat: 'INT', mult: 5.0, desc: 'Atinge o alvo e os inimigos ao lado dele.' },
 };
 
 /* ---------- ITENS ---------- */
@@ -124,12 +124,12 @@ const AMULETO_PRECO = [150, 420, 950, 1900];
    especial: o chefe carrega um ataque forte a cada N turnos (o jogo avisa antes!) */
 const INIMIGOS = {
   // --- Valhala ---
-  draugr:      { nome: 'Draugr',              icone: '🧟', hp: 48,  atk: 14, def: 3,  xp: 18, gold: 9,  drops: [{ id: 'pocao', chance: 0.25 }] },
-  lobo_gelo:   { nome: 'Lobo de Gelo',        icone: '🐺', hp: 42,  atk: 17, def: 2,  xp: 18, gold: 8,  drops: [{ id: 'pocao', chance: 0.2 }] },
-  valquiria:   { nome: 'Valquíria Caída',     icone: '🧝‍♀️', hp: 58,  atk: 18, def: 5,  xp: 26, gold: 13, drops: [{ id: 'pocao_mana', chance: 0.25 }] },
-  troll_gelo:  { nome: 'Troll de Gelo',       icone: '🧌', hp: 82,  atk: 20, def: 6,  xp: 32, gold: 17, drops: [{ id: 'hidromel', chance: 0.12 }, { id: 'pocao', chance: 0.3 }] },
+  draugr:      { nome: 'Draugr',              icone: '🧟', mov: 2, alc: 1, hp: 48,  atk: 14, def: 3,  xp: 18, gold: 9,  drops: [{ id: 'pocao', chance: 0.25 }] },
+  lobo_gelo:   { nome: 'Lobo de Gelo',        icone: '🐺', mov: 4, alc: 1, hp: 42,  atk: 17, def: 2,  xp: 18, gold: 8,  drops: [{ id: 'pocao', chance: 0.2 }] },
+  valquiria:   { nome: 'Valquíria Caída',     icone: '🧝‍♀️', mov: 2, alc: 3, hp: 58,  atk: 18, def: 5,  xp: 26, gold: 13, drops: [{ id: 'pocao_mana', chance: 0.25 }] },
+  troll_gelo:  { nome: 'Troll de Gelo',       icone: '🧌', mov: 2, alc: 1, hp: 82,  atk: 20, def: 6,  xp: 32, gold: 17, drops: [{ id: 'hidromel', chance: 0.12 }, { id: 'pocao', chance: 0.3 }] },
   fenrir: {
-    nome: 'Fenrir, o Lobo Devorador', icone: '🐺', chefe: true, hp: 240, atk: 23, def: 6, xp: 170, gold: 140,
+    nome: 'Fenrir, o Lobo Devorador', icone: '🐺', mov: 4, alc: 1, chefe: true, hp: 240, atk: 23, def: 6, xp: 170, gold: 140,
     especial: { nome: 'Mordida do Ragnarök', mult: 1.9, cada: 3 },
     reliquia: 'presa_fenrir', fragmento: 'Fragmento do Destino: Gelo',
     drops: [{ id: 'hidromel', chance: 1 }],
@@ -142,12 +142,12 @@ const INIMIGOS = {
   },
 
   // --- Olimpo ---
-  harpia:      { nome: 'Harpia',              icone: '🦅', hp: 95, atk: 27, def: 6,  xp: 55,  gold: 22, drops: [{ id: 'pocao_mana', chance: 0.25 }, { id: 'hidromel', chance: 0.15 }] },
-  satiro:      { nome: 'Sátiro Furioso',      icone: '🐐', hp: 105, atk: 29, def: 5,  xp: 58,  gold: 24, drops: [{ id: 'hidromel', chance: 0.2 }] },
-  ciclope:     { nome: 'Ciclope',             icone: '👁️', hp: 160, atk: 33, def: 10, xp: 82,  gold: 34, drops: [{ id: 'ambrosia', chance: 0.1 }, { id: 'hidromel', chance: 0.25 }] },
-  minotauro:   { nome: 'Minotauro',           icone: '🐂', hp: 180, atk: 36, def: 12, xp: 96,  gold: 40, drops: [{ id: 'ambrosia', chance: 0.12 }] },
+  harpia:      { nome: 'Harpia',              icone: '🦅', mov: 4, alc: 1, hp: 95, atk: 27, def: 6,  xp: 55,  gold: 22, drops: [{ id: 'pocao_mana', chance: 0.25 }, { id: 'hidromel', chance: 0.15 }] },
+  satiro:      { nome: 'Sátiro Furioso',      icone: '🐐', mov: 3, alc: 1, hp: 105, atk: 29, def: 5,  xp: 58,  gold: 24, drops: [{ id: 'hidromel', chance: 0.2 }] },
+  ciclope:     { nome: 'Ciclope',             icone: '👁️', mov: 2, alc: 4, hp: 160, atk: 33, def: 10, xp: 82,  gold: 34, drops: [{ id: 'ambrosia', chance: 0.1 }, { id: 'hidromel', chance: 0.25 }] },
+  minotauro:   { nome: 'Minotauro',           icone: '🐂', mov: 3, alc: 1, hp: 180, atk: 36, def: 12, xp: 96,  gold: 40, drops: [{ id: 'ambrosia', chance: 0.12 }] },
   ares: {
-    nome: 'Ares, Deus da Guerra', icone: '🔱', chefe: true, hp: 440, atk: 44, def: 14, xp: 520, gold: 320,
+    nome: 'Ares, Deus da Guerra', icone: '🔱', mov: 3, alc: 1, chefe: true, hp: 440, atk: 44, def: 14, xp: 520, gold: 320,
     especial: { nome: 'Fúria de Ares', mult: 2.0, cada: 3 },
     reliquia: 'elmo_ares', fragmento: 'Fragmento do Destino: Guerra',
     drops: [{ id: 'ambrosia', chance: 1 }],
@@ -160,12 +160,12 @@ const INIMIGOS = {
   },
 
   // --- Inferno ---
-  alma_penada: { nome: 'Alma Penada',         icone: '👻', hp: 190, atk: 46, def: 10, xp: 125, gold: 52, drops: [{ id: 'pocao_mana', chance: 0.3 }] },
-  diabrete:    { nome: 'Diabrete',            icone: '😈', hp: 185, atk: 50, def: 12, xp: 130, gold: 55, drops: [{ id: 'ambrosia', chance: 0.15 }] },
-  cerbero:     { nome: 'Cérbero',             icone: '🐕‍🦺', hp: 250, atk: 54, def: 15, xp: 175, gold: 70, drops: [{ id: 'ambrosia', chance: 0.2 }, { id: 'nectar', chance: 0.05 }] },
-  demonio:     { nome: 'Demônio Alado',       icone: '🦇', hp: 280, atk: 57, def: 17, xp: 195, gold: 80, drops: [{ id: 'ambrosia', chance: 0.2 }, { id: 'nectar', chance: 0.06 }] },
+  alma_penada: { nome: 'Alma Penada',         icone: '👻', mov: 3, alc: 2, hp: 190, atk: 46, def: 10, xp: 125, gold: 52, drops: [{ id: 'pocao_mana', chance: 0.3 }] },
+  diabrete:    { nome: 'Diabrete',            icone: '😈', mov: 3, alc: 3, hp: 185, atk: 50, def: 12, xp: 130, gold: 55, drops: [{ id: 'ambrosia', chance: 0.15 }] },
+  cerbero:     { nome: 'Cérbero',             icone: '🐕‍🦺', mov: 4, alc: 1, hp: 250, atk: 54, def: 15, xp: 175, gold: 70, drops: [{ id: 'ambrosia', chance: 0.2 }, { id: 'nectar', chance: 0.05 }] },
+  demonio:     { nome: 'Demônio Alado',       icone: '🦇', mov: 4, alc: 1, hp: 280, atk: 57, def: 17, xp: 195, gold: 80, drops: [{ id: 'ambrosia', chance: 0.2 }, { id: 'nectar', chance: 0.06 }] },
   hades: {
-    nome: 'Hades, Senhor do Inferno', icone: '👑', chefe: true, hp: 820, atk: 64, def: 20, xp: 1100, gold: 650,
+    nome: 'Hades, Senhor do Inferno', icone: '👑', mov: 2, alc: 3, chefe: true, hp: 700, atk: 60, def: 20, xp: 1100, gold: 650,
     especial: { nome: 'Toque da Morte', mult: 2.0, cada: 3 },
     reliquia: 'coroa_hades', fragmento: 'Fragmento do Destino: Morte',
     drops: [{ id: 'nectar', chance: 1 }],
@@ -178,12 +178,12 @@ const INIMIGOS = {
   },
 
   // --- Duat (Egito) ---
-  escaravelho: { nome: 'Escaravelho Devorador', icone: '🪲', hp: 300, atk: 62, def: 16, xp: 215, gold: 90, drops: [{ id: 'agua_nilo', chance: 0.2 }] },
-  mumia:       { nome: 'Múmia Amaldiçoada',   icone: '🪦', hp: 350, atk: 67, def: 20, xp: 250, gold: 105, drops: [{ id: 'agua_nilo', chance: 0.22 }, { id: 'nectar', chance: 0.06 }] },
-  chacal:      { nome: 'Guardião Chacal',     icone: '🦊', hp: 380, atk: 72, def: 22, xp: 280, gold: 115, drops: [{ id: 'agua_nilo', chance: 0.25 }, { id: 'nectar', chance: 0.08 }] },
-  serpente:    { nome: 'Serpente de Apófis',  icone: '🐍', hp: 430, atk: 77, def: 24, xp: 320, gold: 130, drops: [{ id: 'nectar', chance: 0.1 }] },
+  escaravelho: { nome: 'Escaravelho Devorador', icone: '🪲', mov: 3, alc: 1, hp: 300, atk: 62, def: 16, xp: 215, gold: 90, drops: [{ id: 'agua_nilo', chance: 0.2 }] },
+  mumia:       { nome: 'Múmia Amaldiçoada',   icone: '🪦', mov: 2, alc: 1, hp: 350, atk: 67, def: 20, xp: 250, gold: 105, drops: [{ id: 'agua_nilo', chance: 0.22 }, { id: 'nectar', chance: 0.06 }] },
+  chacal:      { nome: 'Guardião Chacal',     icone: '🦊', mov: 4, alc: 1, hp: 380, atk: 72, def: 22, xp: 280, gold: 115, drops: [{ id: 'agua_nilo', chance: 0.25 }, { id: 'nectar', chance: 0.08 }] },
+  serpente:    { nome: 'Serpente de Apófis',  icone: '🐍', mov: 3, alc: 3, hp: 430, atk: 77, def: 24, xp: 320, gold: 130, drops: [{ id: 'nectar', chance: 0.1 }] },
   set: {
-    nome: 'Set, Deus do Caos', icone: '🦂', chefe: true, hp: 1250, atk: 86, def: 28, xp: 2200, gold: 1200,
+    nome: 'Set, Deus do Caos', icone: '🦂', mov: 3, alc: 2, chefe: true, hp: 1000, atk: 80, def: 28, xp: 2200, gold: 1200,
     especial: { nome: 'Tempestade de Areia', mult: 2.0, cada: 3 },
     reliquia: 'olho_set', fragmento: 'Fragmento do Destino: Caos',
     drops: [{ id: 'nectar', chance: 1 }],
@@ -197,7 +197,7 @@ const INIMIGOS = {
 
   // --- Final ---
   caos: {
-    nome: 'Caos Primordial', icone: '🌌', chefe: true, hp: 1800, atk: 94, def: 30, xp: 0, gold: 0,
+    nome: 'Caos Primordial', icone: '🌌', mov: 3, alc: 5, chefe: true, hp: 1300, atk: 88, def: 30, xp: 0, gold: 0,
     especial: { nome: 'Colapso do Cosmos', mult: 2.2, cada: 3 },
     drops: [],
     falaAntes: [
@@ -207,40 +207,48 @@ const INIMIGOS = {
   },
 };
 
+/* ---------- GRUPOS EM BATALHA ----------
+   Como agora há vários inimigos no mapa, cada um é mais fraco que o "solo" da lista acima.
+   stat = multiplicador de vida e ataque; xp = multiplicador de XP e ouro. */
+const ESCALA_GRUPO = { 2: { stat: 0.62, xp: 0.6 }, 3: { stat: 0.5, xp: 0.42 } };
+const ESCALA_ADD = { stat: 0.4, xp: 0.15 }; // capangas que acompanham um chefe
+const ADDS_CHEFE = 2;
+
 /* ---------- REINOS ---------- */
 const REINOS = [
   {
-    id: 'valhala', nome: 'Valhala', icone: '🛡️', tier: 1, nivelRec: '1–4',
+    id: 'valhala', parede: '🪨', nome: 'Valhala', icone: '🛡️', tier: 1, nivelRec: '1–4',
     intro: 'O grande salão dos guerreiros mortos está coberto de neve e silêncio. Os einherjar, antes honrados, vagam como draugr. No fundo do salão, algo uiva.',
     inimigos: ['draugr', 'lobo_gelo', 'valquiria', 'troll_gelo'], chefe: 'fenrir',
     mercador: { nome: 'Brokkr, o Ferreiro Anão', icone: '🧔', fala: 'Aço é aço, em qualquer reino! O que vai ser?' },
     consumiveis: ['pocao', 'pocao_mana', 'hidromel'], descanso: 15,
   },
   {
-    id: 'olimpo', nome: 'Olimpo', icone: '🏛️', tier: 2, nivelRec: '5–8',
+    id: 'olimpo', parede: '🏛️', nome: 'Olimpo', icone: '🏛️', tier: 2, nivelRec: '5–8',
     intro: 'Colunas de mármore flutuam entre as nuvens. As harpias dominam os jardins dos deuses e o trovão de Zeus ecoa, sem dono, pelos corredores vazios.',
     inimigos: ['harpia', 'satiro', 'ciclope', 'minotauro'], chefe: 'ares',
     mercador: { nome: 'Hefesto, o Ferreiro Divino', icone: '🔥', fala: 'Forjado no Etna! Escolha com sabedoria, mortal.' },
     consumiveis: ['pocao_mana', 'hidromel', 'ambrosia'], descanso: 30,
   },
   {
-    id: 'inferno', nome: 'Inferno', icone: '🔥', tier: 3, nivelRec: '9–12',
+    id: 'inferno', parede: '🌋', nome: 'Inferno', icone: '🔥', tier: 3, nivelRec: '9–12',
     intro: 'Rios de fogo cortam um mundo sem céu. As almas condenadas gritam em coro e demônios patrulham as muralhas de Dite. Cada passo queima.',
     inimigos: ['alma_penada', 'diabrete', 'cerbero', 'demonio'], chefe: 'hades',
     mercador: { nome: 'Caronte, o Barqueiro', icone: '🛶', fala: 'Só aceito ouro. Ouro, e nunca perguntas.' },
     consumiveis: ['pocao_mana', 'ambrosia', 'nectar'], descanso: 60,
   },
   {
-    id: 'duat', nome: 'Duat', icone: '🏜️', tier: 4, nivelRec: '13–17',
+    id: 'duat', parede: '🗿', nome: 'Duat', icone: '🏜️', tier: 4, nivelRec: '13–17',
     intro: 'O mundo dos mortos egípcio é um deserto infinito sob um sol negro. Pirâmides sussurram o nome de Set, e a Balança de Maat pende torta.',
     inimigos: ['escaravelho', 'mumia', 'chacal', 'serpente'], chefe: 'set',
     mercador: { nome: 'Khenti, o Embalsamador', icone: '🏺', fala: 'Tudo se conserva no Duat... menos a esperança.' },
     consumiveis: ['ambrosia', 'agua_nilo', 'nectar'], descanso: 100,
   },
   {
-    id: 'caos', nome: 'Abismo do Caos', icone: '🌌', tier: 5, nivelRec: '17+', final: true,
+    id: 'caos', parede: '🕳️', nome: 'Abismo do Caos', icone: '🌌', tier: 5, nivelRec: '17+', final: true,
     intro: 'Não há chão aqui. Os Fragmentos do Destino flutuam ao seu redor, formando uma escada de luz até a escuridão primordial.',
-    inimigos: [], chefe: 'caos',
+    inimigos: ['escaravelho', 'mumia', 'chacal', 'serpente'], // ecos do Duat que acompanham o Caos
+    chefe: 'caos',
     descanso: 0,
   },
 ];
