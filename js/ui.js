@@ -214,6 +214,8 @@ const RAIZ3 = Math.sqrt(3);
 const NS = 'http://www.w3.org/2000/svg';
 const dormir = ms => new Promise(r => setTimeout(r, ms));
 let POLI = {};                  // "c,r" -> polígono do hexágono
+const ZOOMS = [0.75, 1, 0.6];   // o botão 🔍 passa de um para o próximo
+let ZOOM = ZOOMS[0];            // começa com uma visão aberta, para ver os inimigos
 
 function hexCentro(c, r) {
   return { x: RAIZ3 * HEX * (c + 0.5 * (r & 1)) + (RAIZ3 * HEX) / 2, y: 1.5 * HEX * r + HEX };
@@ -233,54 +235,93 @@ function telaTatica() {
   const g = T.g;
   const larg = RAIZ3 * HEX * (g.cols + 0.5);
   const alt = 1.5 * HEX * (g.rows - 1) + 2 * HEX;
-  let tiles = '';
+  let chao = '', objetos = '';
   for (let r = 0; r < g.rows; r++) {
     for (let c = 0; c < g.cols; c++) {
       const ch = g.cel[r][c];
       if (ch === ' ') continue;
       const { x, y } = hexCentro(c, r);
+      const pos = `transform="translate(${x.toFixed(1)} ${y.toFixed(1)})"`;
+      const h = (Math.imul(c + 1, 73856093) ^ Math.imul(r + 1, 19349663)) >>> 0;
       if (ch === '#') {
-        tiles += `<polygon class="hex-parede" points="${HEX_PONTOS}" transform="translate(${x} ${y})"/>
-          <text class="parede-ico" x="${x}" y="${y + 8}">${REINO.parede}</text>`;
+        chao += `<polygon class="hex-base v${h % 3}" points="${HEX_PONTOS}" ${pos}/>`;
+        objetos += `<g class="prop" ${pos}>${PROPS[T.parede]()}</g>`;
+      } else if (ch === '~') {
+        chao += `<polygon class="hex-liq liq-${T.liquido}" points="${HEX_PONTOS}" ${pos}/><g ${pos} class="liq-det">${LIQUIDOS[T.liquido]()}</g>`;
       } else {
-        tiles += `<polygon class="hex" data-a="hex" data-c="${c}" data-r="${r}" points="${HEX_PONTOS}" transform="translate(${x} ${y})"/>`;
+        chao += `<polygon class="hex v${h % 3}" data-a="hex" data-c="${c}" data-r="${r}" points="${HEX_PONTOS}" ${pos}/>`;
+        const det = decorChao(T.reinoId, c, r);
+        if (det) chao += `<g class="decor" ${pos}>${det}</g>`;
       }
     }
   }
   const sx = hexCentro(T.saida.c, T.saida.r);
-  app.innerHTML = `<div class="tela tatica reino-${REINO.id}">
+  app.innerHTML = `<div class="tela tatica reino-${T.reinoId}">
     <div class="tat-topo"><span>📍 <b>${esc(T.nomeSala)}</b></span><span id="rod"></span></div>
     <div class="tabuleiro">
-      <svg id="tab" viewBox="0 0 ${larg.toFixed(1)} ${alt.toFixed(1)}" role="img" aria-label="Mapa da batalha">
-        <g id="c-chao">${tiles}</g>
-        <text class="saida-ico" x="${sx.x + HEX * 0.5}" y="${sx.y - HEX * 0.35}">🚪</text>
-        <g id="c-unid"></g><g id="c-fx"></g>
-      </svg>
+      <div class="rolagem" id="rolagem">
+        <svg id="tab" viewBox="0 0 ${larg.toFixed(1)} ${alt.toFixed(1)}" style="width:${Math.round(larg * ZOOM)}px" role="img" aria-label="Mapa: ${esc(T.nomeSala)}">
+          <defs><radialGradient id="gcaos"><stop offset="0" stop-color="#2a0e55"/><stop offset=".7" stop-color="#4b1d96"/><stop offset="1" stop-color="#0d0618"/></radialGradient></defs>
+          <g id="c-chao">${chao}</g>
+          <text class="saida-ico" x="${(sx.x + HEX * 0.5).toFixed(1)}" y="${(sx.y - HEX * 0.35).toFixed(1)}">🚪</text>
+          <g id="c-obj">${objetos}</g>
+          <g id="c-unid"></g><g id="c-fx"></g>
+        </svg>
+      </div>
+      <div class="mapa-botoes">
+        <button class="btn-mapa" data-a="tat-zoom" aria-label="Alternar zoom">🔍</button>
+        <button class="btn-mapa" data-a="tat-centro" aria-label="Centralizar no herói">🎯</button>
+      </div>
     </div>
     <div id="hud"></div>
   </div>`;
   POLI = {};
   app.querySelectorAll('.hex').forEach(p => { POLI[chave(+p.dataset.c, +p.dataset.r)] = p; });
   atualizarTudo();
+  // enquadra no meio entre o herói e os inimigos, para ver os dois lados
+  const vs = vivos(T);
+  const mc = vs.reduce((a, e) => a + e.c, 0) / vs.length, mr = vs.reduce((a, e) => a + e.r, 0) / vs.length;
+  centralizar({ c: (T.heroi.c + mc) / 2, r: (T.heroi.r + mr) / 2 }, false);
+}
+
+/** Rola o mapa até o hexágono ficar no meio da tela. */
+function centralizar(pos, suave = true) {
+  const sc = document.getElementById('rolagem');
+  if (!sc) return;
+  const { x, y } = hexCentro(pos.c, pos.r);
+  sc.scrollTo({ left: x * ZOOM - sc.clientWidth / 2, top: y * ZOOM - sc.clientHeight / 2, behavior: suave ? 'smooth' : 'auto' });
+}
+
+/** Só rola se o hexágono estiver perto da borda da área visível. */
+function garantirVisivel(pos) {
+  const sc = document.getElementById('rolagem');
+  if (!sc) return;
+  const { x, y } = hexCentro(pos.c, pos.r);
+  const px = x * ZOOM, py = y * ZOOM, m = 70;
+  if (px < sc.scrollLeft + m || px > sc.scrollLeft + sc.clientWidth - m || py < sc.scrollTop + m || py > sc.scrollTop + sc.clientHeight - m) centralizar(pos);
 }
 
 function atualizarTudo() { atualizarTabuleiro(); atualizarHud(); }
 
-function noUnidade(id, cls, icone) {
+const HPW = 28; // largura da barra de vida sob cada miniatura
+function noUnidade(id, cls, miniId) {
   const g = document.createElementNS(NS, 'g');
   g.id = id; g.setAttribute('class', 'unid ' + cls);
-  g.innerHTML = `<circle class="anel" r="${HEX * 0.78}"/>
-    <text class="emoji" y="${HEX * 0.3}">${icone}</text>
-    <rect class="hp-bg" x="${-HEX * 0.62}" y="${HEX * 0.66}" width="${HEX * 1.24}" height="5" rx="2"/>
-    <rect class="hp-fg" x="${-HEX * 0.62}" y="${HEX * 0.66}" width="${HEX * 1.24}" height="5" rx="2"/>`;
+  g.innerHTML = `<ellipse class="base" cx="0" cy="12" rx="16" ry="6"/>
+    <g class="fig">${miniatura(miniId)}</g>
+    <rect class="hp-bg" x="${-HPW / 2}" y="19" width="${HPW}" height="4.5" rx="2"/>
+    <rect class="hp-fg" x="${-HPW / 2}" y="19" width="${HPW}" height="4.5" rx="2"/>`;
   document.getElementById('c-unid').appendChild(g);
   return g;
 }
 
 function posicionar(g, pos, hp, hpMax) {
   const { x, y } = hexCentro(pos.c, pos.r);
+  const antes = g._x;
   g.style.transform = `translate(${x}px, ${y}px)`;
-  g.querySelector('.hp-fg').setAttribute('width', (HEX * 1.24 * Math.max(0, hp) / hpMax).toFixed(1));
+  if (antes !== undefined && Math.abs(x - antes) > 1) g.querySelector('.fig').classList.toggle('volta', x < antes); // vira para onde anda
+  g._x = x;
+  g.querySelector('.hp-fg').setAttribute('width', (HPW * Math.max(0, hp) / hpMax).toFixed(1));
 }
 
 /** Alvos possíveis do modo atual (para destacar em vermelho). */
@@ -306,7 +347,7 @@ function atualizarTabuleiro() {
   }
   // herói
   let gh = document.getElementById('u-heroi');
-  if (!gh) gh = noUnidade('u-heroi', 'heroi', CLASSES[P.classe].icone);
+  if (!gh) gh = noUnidade('u-heroi', 'heroi', P.classe);
   const d = derivados(P);
   posicionar(gh, T.heroi, P.hp, d.hpMax);
   gh.classList.toggle('buff', !!T.buff);
@@ -316,7 +357,7 @@ function atualizarTabuleiro() {
     const id = 'u-' + e.uid;
     let g = document.getElementById(id);
     if (!e.vivo) { if (g) { g.classList.add('morto'); g.id = ''; setTimeout(() => g.remove(), 450); } continue; }
-    if (!g) g = noUnidade(id, 'inim' + (e.chefe ? ' chefe' : ''), e.icone);
+    if (!g) g = noUnidade(id, 'inim' + (e.chefe ? ' chefe' : ''), e.id);
     posicionar(g, e, e.hp, e.hpMax);
   }
 }
@@ -348,12 +389,12 @@ function hudHtml() {
     T.defendendo ? '<span class="tag">🛡️ defendendo</span>' : '',
   ].join('');
   const inimigos = T.inim.filter(e => e.vivo).map(e => `<div class="chip-inim ${e.chefe ? 'chefe' : ''}">
-      <b>${e.icone} ${esc(e.nome.split(',')[0])}</b>
+      <div class="chip-topo">${miniIcone(e.id, 26)}<b>${esc(e.nome.split(',')[0])}</b></div>
       <div class="barra hp inimigo mini"><i style="width:${pct(e.hp, e.hpMax)}%"></i><span>${e.hp}/${e.hpMax}</span></div>
       <small>👣${e.mov} 🎯${e.alc} ⚔️${e.atk}</small></div>`).join('');
   const log = T.log.slice(-3).map(l => `<p class="l-${l.cls}">${esc(l.msg)}</p>`).join('');
   return `<div class="hud-heroi">
-      <div class="hud-linha"><b>${CLASSES[P.classe].icone} ${esc(P.nome)} · Nv ${P.nivel}</b>${etiquetas}</div>
+      <div class="hud-linha">${miniIcone(P.classe, 30)}<b>${esc(P.nome)} · Nv ${P.nivel}</b>${etiquetas}</div>
       ${barra('hp', P.hp, d.hpMax, '❤️ ')}${barra('mp', P.mp, d.mpMax, '💧 ')}
       <div class="hud-linha pontos-turno">
         <span class="${T.movRest > 0 ? 'on' : ''}">👣 Mover ${T.movRest}/${d.mov}</span>
@@ -460,8 +501,9 @@ async function encerrarTurno() {
   while (T === t && t.fase === 'inimigos' && !t.fim) {
     await dormir(350);
     if (T !== t) return;
-    tProximoInimigo(t, P);
+    const ator = tProximoInimigo(t, P);
     atualizarTabuleiro();      // o inimigo desliza até o novo lugar
+    if (ator) garantirVisivel(ator);
     await dormir(320);
     if (T !== t) return;
     mostrarFxT(); atualizarHud();
@@ -622,7 +664,7 @@ const ACOES = {
       return;
     }
     if (MODO) { MODO = null; atualizarTudo(); return; }
-    if (tMover(T, P, c, r)) { salvar(); atualizarTudo(); conferirAutoFim(); }
+    if (tMover(T, P, c, r)) { salvar(); atualizarTudo(); garantirVisivel(T.heroi); conferirAutoFim(); }
   },
   'tat-atacar'() {
     if (!T || OCUPADO || T.acaoUsada) return;
@@ -644,6 +686,14 @@ const ACOES = {
   'tat-defender'() { if (T && !OCUPADO) executar({ tipo: 'defender' }); },
   'tat-fugir'() { if (T && !OCUPADO) depoisDaAcao(tFugir(T)); },
   'tat-fim'() { encerrarTurno(); },
+  'tat-zoom'() {
+    if (!T) return;
+    ZOOM = ZOOMS[(ZOOMS.indexOf(ZOOM) + 1) % ZOOMS.length];
+    const svg = document.getElementById('tab');
+    svg.style.width = Math.round(parseFloat(svg.getAttribute('viewBox').split(' ')[2]) * ZOOM) + 'px';
+    centralizar(T.heroi, false);
+  },
+  'tat-centro'() { if (T) centralizar(T.heroi); },
   'bat-fim'() { fimBatalha(); },
 
   // janelas

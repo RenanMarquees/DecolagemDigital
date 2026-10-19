@@ -27,7 +27,7 @@ const CLASSES = {
     habilidades: ['golpe_poderoso', 'grito_guerra', 'furia_tor', 'martelo_titas'],
   },
   cacador: {
-    nome: 'Caçador', icone: '🏹', mov: 3, alcanceBasico: 3, basico: 'DES', hpMult: 1.05, danoMult: 1, danoRecebido: 1, regenMp: 3,
+    nome: 'Caçador', icone: '🏹', mov: 3, alcanceBasico: 3, basico: 'DES', hpMult: 0.95, danoMult: 1, danoRecebido: 1, regenMp: 3,
     desc: 'Rápido e preciso. Acerta golpes críticos e desvia dos ataques.',
     attr: { FOR: 3, DES: 9, INT: 3, VIT: 6 },
     habilidades: ['tiro_certeiro', 'flecha_dupla', 'chuva_artemis', 'flecha_apolo'],
@@ -197,7 +197,7 @@ const INIMIGOS = {
 
   // --- Final ---
   caos: {
-    nome: 'Caos Primordial', icone: '🌌', mov: 3, alc: 5, chefe: true, hp: 1300, atk: 88, def: 30, xp: 0, gold: 0,
+    nome: 'Caos Primordial', icone: '🌌', mov: 4, alc: 5, chefe: true, hp: 1400, atk: 88, def: 30, xp: 0, gold: 0,
     especial: { nome: 'Colapso do Cosmos', mult: 2.2, cada: 3 },
     drops: [],
     falaAntes: [
@@ -217,35 +217,35 @@ const ADDS_CHEFE = 2;
 /* ---------- REINOS ---------- */
 const REINOS = [
   {
-    id: 'valhala', parede: '🪨', nome: 'Valhala', icone: '🛡️', tier: 1, nivelRec: '1–4',
+    id: 'valhala', salas: ['v_salao', 'v_floresta'], arena: 'v_covil', nome: 'Valhala', icone: '🛡️', tier: 1, nivelRec: '1–4',
     intro: 'O grande salão dos guerreiros mortos está coberto de neve e silêncio. Os einherjar, antes honrados, vagam como draugr. No fundo do salão, algo uiva.',
     inimigos: ['draugr', 'lobo_gelo', 'valquiria', 'troll_gelo'], chefe: 'fenrir',
     mercador: { nome: 'Brokkr, o Ferreiro Anão', icone: '🧔', fala: 'Aço é aço, em qualquer reino! O que vai ser?' },
     consumiveis: ['pocao', 'pocao_mana', 'hidromel'], descanso: 15,
   },
   {
-    id: 'olimpo', parede: '🏛️', nome: 'Olimpo', icone: '🏛️', tier: 2, nivelRec: '5–8',
+    id: 'olimpo', salas: ['o_jardins', 'o_escadaria'], arena: 'o_arena', nome: 'Olimpo', icone: '🏛️', tier: 2, nivelRec: '5–8',
     intro: 'Colunas de mármore flutuam entre as nuvens. As harpias dominam os jardins dos deuses e o trovão de Zeus ecoa, sem dono, pelos corredores vazios.',
     inimigos: ['harpia', 'satiro', 'ciclope', 'minotauro'], chefe: 'ares',
     mercador: { nome: 'Hefesto, o Ferreiro Divino', icone: '🔥', fala: 'Forjado no Etna! Escolha com sabedoria, mortal.' },
     consumiveis: ['pocao_mana', 'hidromel', 'ambrosia'], descanso: 30,
   },
   {
-    id: 'inferno', parede: '🌋', nome: 'Inferno', icone: '🔥', tier: 3, nivelRec: '9–12',
+    id: 'inferno', salas: ['i_flegetonte', 'i_dite'], arena: 'i_trono', nome: 'Inferno', icone: '🔥', tier: 3, nivelRec: '9–12',
     intro: 'Rios de fogo cortam um mundo sem céu. As almas condenadas gritam em coro e demônios patrulham as muralhas de Dite. Cada passo queima.',
     inimigos: ['alma_penada', 'diabrete', 'cerbero', 'demonio'], chefe: 'hades',
     mercador: { nome: 'Caronte, o Barqueiro', icone: '🛶', fala: 'Só aceito ouro. Ouro, e nunca perguntas.' },
     consumiveis: ['pocao_mana', 'ambrosia', 'nectar'], descanso: 60,
   },
   {
-    id: 'duat', parede: '🗿', nome: 'Duat', icone: '🏜️', tier: 4, nivelRec: '13–17',
+    id: 'duat', salas: ['d_osiris', 'd_dunas'], arena: 'd_piramide', nome: 'Duat', icone: '🏜️', tier: 4, nivelRec: '13–17',
     intro: 'O mundo dos mortos egípcio é um deserto infinito sob um sol negro. Pirâmides sussurram o nome de Set, e a Balança de Maat pende torta.',
     inimigos: ['escaravelho', 'mumia', 'chacal', 'serpente'], chefe: 'set',
     mercador: { nome: 'Khenti, o Embalsamador', icone: '🏺', fala: 'Tudo se conserva no Duat... menos a esperança.' },
     consumiveis: ['ambrosia', 'agua_nilo', 'nectar'], descanso: 100,
   },
   {
-    id: 'caos', parede: '🕳️', nome: 'Abismo do Caos', icone: '🌌', tier: 5, nivelRec: '17+', final: true,
+    id: 'caos', salas: [], arena: 'c_abismo', nome: 'Abismo do Caos', icone: '🌌', tier: 5, nivelRec: '17+', final: true,
     intro: 'Não há chão aqui. Os Fragmentos do Destino flutuam ao seu redor, formando uma escada de luz até a escuridão primordial.',
     inimigos: ['escaravelho', 'mumia', 'chacal', 'serpente'], // ecos do Duat que acompanham o Caos
     chefe: 'caos',

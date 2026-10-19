@@ -19,7 +19,7 @@ function celula(g, c, r) {
   return g.cel[r][c];
 }
 
-/** Hexágonos vizinhos que são chão (sem parede e sem vazio). */
+/** Hexágonos vizinhos onde dá para pisar (só chão: sem parede, sem lava/fenda, sem vazio). */
 function vizinhos(g, c, r) {
   const dirs = (r & 1) ? DIRS_IMPAR : DIRS_PAR;
   const out = [];
@@ -57,7 +57,8 @@ function linhaDeVisao(g, a, b) {
     // pequenos desvios evitam empates exatamente na borda entre dois hexágonos
     const p = arredondaCubo(A.x + (B.x - A.x) * t + 1e-6, A.y + (B.y - A.y) * t + 2e-6, A.z + (B.z - A.z) * t - 3e-6);
     const h = doCubo(p.x, p.z);
-    if (celula(g, h.c, h.r) !== '.') return false;
+    const tipo = celula(g, h.c, h.r);
+    if (tipo === '#' || tipo === ' ') return false; // '~' (lava, fenda...) não bloqueia a visão
   }
   return true;
 }
@@ -87,51 +88,6 @@ function caminhoAte(no) {
   return cam;
 }
 
-/* ---------- Salas ----------
-   . chão   # pedra   (espaço) vazio   H herói e saída   E onde os inimigos podem aparecer */
-const SALAS = [
-  { nome: 'Salão de Pedra', mapa: [
-    '..E..E..',
-    '.#....#.',
-    '..E..E..',
-    '...##...',
-    '........',
-    '.#....#.',
-    'H.......'] },
-  { nome: 'A Ponte Estreita', mapa: [
-    'E.E..E.E',
-    '........',
-    '###..###',
-    '###..###',
-    '........',
-    '........',
-    'H.......'] },
-  { nome: 'Pilares Quebrados', mapa: [
-    '..E..E..',
-    '.E....E.',
-    '.#.##.#.',
-    '........',
-    '.#.##.#.',
-    '........',
-    'H.......'] },
-  { nome: 'Cripta Antiga', mapa: [
-    '  E..E  ',
-    ' E....E ',
-    '..#..#..',
-    '........',
-    '..#..#..',
-    ' ...... ',
-    '  H...  '] },
-  { nome: 'O Anel', mapa: [
-    'E......E',
-    '.E....E.',
-    '..####..',
-    '..#..#..',
-    '..#..#..',
-    '........',
-    'H.......'] },
-];
-
 /* ---------- Criação da batalha ---------- */
 function embaralhar(arr) {
   const a = arr.slice();
@@ -154,7 +110,8 @@ function criarInimigoT(id, esc, uid, pos, ehChefe) {
 
 /** Monta uma batalha no reino. `chefeId` = id do chefe, ou null para um encontro comum. `p` = o herói. */
 function criarTatica(reino, chefeId, p) {
-  const sala = SALAS[Math.floor(Math.random() * SALAS.length)];
+  const idSala = chefeId ? reino.arena : reino.salas[Math.floor(Math.random() * reino.salas.length)];
+  const sala = MAPAS[idSala];
   const g = { cols: sala.mapa[0].length, rows: sala.mapa.length, cel: [] };
   let heroi = null;
   let spawns = [];
@@ -182,7 +139,7 @@ function criarTatica(reino, chefeId, p) {
   const inim = lista.map((e, i) => criarInimigoT(e.id, e.esc, i + 1, spawns[i], !!e.chefe));
 
   const T = {
-    g, nomeSala: sala.nome, reinoId: reino.id, chefeId: chefeId || null,
+    g, nomeSala: sala.nome, idSala, parede: sala.parede, liquido: sala.liquido, reinoId: reino.id, chefeId: chefeId || null,
     heroi, saida: { ...heroi }, inim, mortos: [],
     rodada: 1, fase: 'heroi', movRest: derivados(p).mov, acaoUsada: false, defendendo: false, buff: null,
     fila: [], fim: null, log: [], fx: [],

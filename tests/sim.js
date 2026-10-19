@@ -7,7 +7,7 @@ const path = require('path');
 const vm = require('vm');
 
 const ctx = vm.createContext({ Math, console, TRACE: !!process.env.TRACE, TRACELONG: !!process.env.TRACELONG });
-for (const f of ['data.js', 'logic.js', 'tatica.js']) {
+for (const f of ['data.js', 'logic.js', 'mapas.js', 'tatica.js']) {
   vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'js', f), 'utf8'), ctx, { filename: f });
 }
 
@@ -50,18 +50,31 @@ const robo = `(function () {
     return opcoes.find(o => o.tipo === 'atacar') || hab;
   }
 
+  // distância a pé até o inimigo mais próximo, contornando obstáculos (busca em largura a partir dos inimigos)
+  function campo(T) {
+    const d = new Map(); const fila = [];
+    for (const e of vivos(T)) { d.set(chave(e.c, e.r), 0); fila.push({ c: e.c, r: e.r }); }
+    while (fila.length) {
+      const cur = fila.shift(); const dc = d.get(chave(cur.c, cur.r));
+      for (const v of vizinhos(T.g, cur.c, cur.r)) { const k = chave(v.c, v.r); if (!d.has(k)) { d.set(k, dc + 1); fila.push(v); } }
+    }
+    return d;
+  }
+
   // para onde andar: melhor lugar de onde dá para atacar (ranged fica longe; melee fica perto)
   function melhorMovimento(T, p) {
     const alc = CLASSES[p.classe].alcanceBasico;
     const cand = [{ c: T.heroi.c, r: T.heroi.r, custo: 0 }, ...tAlcance(T)];
     let melhor = null;
+    const cp = campo(T);
     for (const h of cand) {
       const vs = vivos(T);
       const podeAtacar = vs.some(e => dist(h, e) <= alc && (alc <= 1 || linhaDeVisao(T.g, h, e)));
       const md = Math.min(...vs.map(e => dist(h, e)));
+      const pd = cp.get(chave(h.c, h.r)) ?? 99; // caminho a pé até o inimigo mais próximo
       let score;
       if (podeAtacar) score = 1000 + (alc > 1 ? md * 10 : 0) - h.custo; // ranged: mais longe é melhor
-      else score = -md * 10 - h.custo;
+      else score = -pd * 10 - h.custo;
       if (!melhor || score > melhor.score) melhor = { h, score };
     }
     return melhor && (melhor.h.c !== T.heroi.c || melhor.h.r !== T.heroi.r) ? melhor.h : null;
@@ -69,10 +82,11 @@ const robo = `(function () {
 
   function recuar(T, p) { // depois de atacar, o arqueiro/mago se afasta
     const cand = tAlcance(T);
-    const atual = menorDistInimigo(T, T.heroi);
+    const cp = campo(T);
+    const atual = cp.get(chave(T.heroi.c, T.heroi.r)) ?? 99;
     let melhor = null;
     for (const h of cand) {
-      const md = menorDistInimigo(T, h);
+      const md = cp.get(chave(h.c, h.r)) ?? 99;
       if (md > atual && (!melhor || md > melhor.md || (md === melhor.md && h.custo < melhor.h.custo))) melhor = { h, md };
     }
     return melhor ? melhor.h : null;
