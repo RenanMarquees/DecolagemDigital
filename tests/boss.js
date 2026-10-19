@@ -50,7 +50,7 @@ const ROBO = require('./robo');
       const info = await page.evaluate(() => ({ etapa: T.etapa, total: T.totalEtapas, chefe: T.inim.some(e => e.chefe), obj: T.objetivo, ultima: T.ultimaEtapa }));
       if (info.chefe !== (info.etapa === info.total && cen.objetivo === 'chefe')) throw new Error(`cenário ${cen.id}: o chefe deveria aparecer só na última etapa ${JSON.stringify(info)}`);
       const r = await page.evaluate(() => robo());
-      if (r !== 'vitoria' && r !== 'porta') {
+      if (r !== 'vitoria' && r !== 'porta' && r !== 'sem etapa') {   // 'sem etapa': a porta abriu e a tela de história já tomou o lugar da batalha
         const diag = await page.evaluate(() => T && ({ rodada: T.rodada, hp: P.hp, heroi: T.heroi, inim: T.inim.filter(e => e.vivo).map(e => [e.nome, e.hp, e.c, e.r]), log: T.log.slice(-8).map(l => l.msg) }));
         throw new Error(`cenário ${cen.id} etapa ${etapas}: terminou com "${r}" ${JSON.stringify(diag)}`);
       }
