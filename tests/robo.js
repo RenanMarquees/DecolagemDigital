@@ -45,6 +45,7 @@ module.exports = `window.robo = async function (maxIter = 400) {
       }
       if (melhor) { ACOES.hex({ dataset: { c: melhor.c, r: melhor.r } }); if (melhor.arm) ACOES.hex({ dataset: { c: melhor.c, r: melhor.r } }); continue; }
     }
+    if (!T.acaoUsada) { const na = tAlvos(T, P)[0]; if (na) { ACOES.hex({ dataset: { c: na.c, r: na.r } }); continue; } }   // caminho bloqueado por um inimigo: ataca em vez de ficar parado
     await fim();
   }
   return maxIter < 400 ? 'seguindo' : 'travou';
