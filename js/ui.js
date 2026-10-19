@@ -214,6 +214,7 @@ const RAIZ3 = Math.sqrt(3);
 const NS = 'http://www.w3.org/2000/svg';
 const dormir = ms => new Promise(r => setTimeout(r, ms));
 let POLI = {};                  // "c,r" -> polígono do hexágono
+let ARM_AVISO = null;           // hexágono perigoso já avisado (o 2º toque confirma)
 const ZOOMS = [0.75, 1, 0.6];   // o botão 🔍 passa de um para o próximo
 let ZOOM = ZOOMS[0];            // começa com uma visão aberta, para ver os inimigos
 
@@ -226,8 +227,8 @@ const HEX_PONTOS = [0, 1, 2, 3, 4, 5].map(i => {
 }).join(' ');
 
 function iniciarBatalha(chefeId) {
-  T = criarTatica(REINO, chefeId, P);
-  RES = null; SUB = 'main'; MODO = null; OCUPADO = false;
+  T = criarTatica(REINO, criarExpedicao(REINO, chefeId), P);
+  RES = null; ARM_AVISO = null; SUB = 'main'; MODO = null; OCUPADO = false;
   telaTatica();
 }
 
@@ -246,6 +247,9 @@ function telaTatica() {
       if (ch === '#') {
         chao += `<polygon class="hex-base v${h % 3}" points="${HEX_PONTOS}" ${pos}/>`;
         objetos += `<g class="prop" ${pos}>${PROPS[T.parede]()}</g>`;
+      } else if (ch === 'D') {
+        chao += `<polygon class="hex porta-hex v${h % 3}" data-a="hex" data-c="${c}" data-r="${r}" points="${HEX_PONTOS}" ${pos}/>`;
+        objetos += `<g class="porta fechada" id="porta" ${pos}>${portaSvg(T.reinoId, false)}</g>`;
       } else if (ch === '~') {
         chao += `<polygon class="hex-liq liq-${T.liquido}" points="${HEX_PONTOS}" ${pos}/><g ${pos} class="liq-det">${LIQUIDOS[T.liquido]()}</g>`;
       } else {
@@ -257,12 +261,13 @@ function telaTatica() {
   }
   const sx = hexCentro(T.saida.c, T.saida.r);
   app.innerHTML = `<div class="tela tatica reino-${T.reinoId}">
-    <div class="tat-topo"><span>📍 <b>${esc(T.nomeSala)}</b></span><span id="rod"></span></div>
+    <div class="tat-topo"><span class="tat-nome">📍 <b>${esc(T.nomeSala)}</b></span><span id="rod"></span></div>
     <div class="tabuleiro">
       <div class="rolagem" id="rolagem">
         <svg id="tab" viewBox="0 0 ${larg.toFixed(1)} ${alt.toFixed(1)}" style="width:${Math.round(larg * ZOOM)}px" role="img" aria-label="Mapa: ${esc(T.nomeSala)}">
           <defs><radialGradient id="gcaos"><stop offset="0" stop-color="#2a0e55"/><stop offset=".7" stop-color="#4b1d96"/><stop offset="1" stop-color="#0d0618"/></radialGradient></defs>
           <g id="c-chao">${chao}</g>
+          <g id="c-arm"></g>
           <text class="saida-ico" x="${(sx.x + HEX * 0.5).toFixed(1)}" y="${(sx.y - HEX * 0.35).toFixed(1)}">🚪</text>
           <g id="c-obj">${objetos}</g>
           <g id="c-unid"></g><g id="c-fx"></g>
@@ -332,11 +337,11 @@ function alvosDoModo() {
 
 function atualizarTabuleiro() {
   if (!T || !document.getElementById('c-unid')) return;
-  const alc = new Set(), alvos = new Set();
+  const alc = new Set(), alvos = new Set(), perigo = new Set();
   if (T.fase === 'heroi' && !T.fim && !OCUPADO) {
     if (MODO) alvosDoModo().forEach(e => alvos.add(chave(e.c, e.r)));
     else {
-      if (T.movRest > 0) tAlcance(T).forEach(h => alc.add(chave(h.c, h.r)));
+      if (T.movRest > 0) tAlcance(T).forEach(h => { alc.add(chave(h.c, h.r)); if (h.armadilhas > 0) perigo.add(chave(h.c, h.r)); });
       // sem ação pendente, os inimigos ao alcance do ataque básico também brilham
       if (!T.acaoUsada) tAlvos(T, P, { tipo: 'atacar' }).forEach(e => alvos.add(chave(e.c, e.r)));
     }
@@ -344,6 +349,30 @@ function atualizarTabuleiro() {
   for (const [k, p] of Object.entries(POLI)) {
     p.classList.toggle('alcancavel', alc.has(k));
     p.classList.toggle('alvo', alvos.has(k));
+    p.classList.toggle('perigo', perigo.has(k));
+  }
+  // armadilhas no chão: criam as novas e apagam as que dispararam
+  const camArm = document.getElementById('c-arm');
+  if (camArm) {
+    const vivas = new Set(T.armadilhas.keys());
+    camArm.querySelectorAll('.arm').forEach(n => { if (n.dataset.k && !vivas.has(n.dataset.k)) { n.classList.add('some'); n.dataset.k = ''; setTimeout(() => n.remove(), 450); } });
+    for (const k of vivas) {
+      if (camArm.querySelector(`[data-k="${k}"]`)) continue;
+      const [c, r] = k.split(',').map(Number), { x, y } = hexCentro(c, r), tipo = T.armadilhas.get(k).tipo;
+      const g = document.createElementNS(NS, 'g');
+      g.setAttribute('class', 'arm arm-' + tipo); g.dataset.k = k;
+      g.setAttribute('transform', `translate(${x.toFixed(1)} ${y.toFixed(1)})`);
+      g.innerHTML = ARM_SVG[tipo]();
+      camArm.appendChild(g);
+    }
+  }
+  // porta: trancada ou aberta
+  const pg = document.getElementById('porta');
+  if (pg && T.porta) {
+    const ab = T.porta.aberta;
+    if (pg.dataset.ab !== String(ab)) { pg.dataset.ab = String(ab); pg.innerHTML = portaSvg(T.reinoId, ab); pg.classList.toggle('aberta', ab); pg.classList.toggle('fechada', !ab); }
+    const ph = POLI[chave(T.porta.c, T.porta.r)];
+    if (ph) ph.classList.toggle('porta-aberta', ab);
   }
   // herói
   let gh = document.getElementById('u-heroi');
@@ -387,21 +416,25 @@ function hudHtml() {
   const etiquetas = [
     T.buff ? `<span class="tag ouro">📣 +dano (${T.buff.turnos})</span>` : '',
     T.defendendo ? '<span class="tag">🛡️ defendendo</span>' : '',
+    ...T.efeitos.map(ef => `<span class="tag efeito">${ef.tipo === 'gelo' ? '❄️ gelo' : '☠️ veneno'} (${ef.turnos})</span>`),
   ].join('');
   const inimigos = T.inim.filter(e => e.vivo).map(e => `<div class="chip-inim ${e.chefe ? 'chefe' : ''}">
       <div class="chip-topo">${miniIcone(e.id, 26)}<b>${esc(e.nome.split(',')[0])}</b></div>
       <div class="barra hp inimigo mini"><i style="width:${pct(e.hp, e.hpMax)}%"></i><span>${e.hp}/${e.hpMax}</span></div>
-      <small>👣${e.mov} 🎯${e.alc} ⚔️${e.atk}</small></div>`).join('');
+      <small>👣${movEfetivo(e.mov, e.efeitos)} 🎯${e.alc} ⚔️${e.atk} ${e.efeitos.map(ef => (ef.tipo === 'gelo' ? '❄️' : '☠️')).join('')}</small></div>`).join('');
+  const defArm = T.tipoArm && T.armadilhas.size ? ARMADILHAS[T.tipoArm] : null;
   const log = T.log.slice(-3).map(l => `<p class="l-${l.cls}">${esc(l.msg)}</p>`).join('');
   return `<div class="hud-heroi">
       <div class="hud-linha">${miniIcone(P.classe, 30)}<b>${esc(P.nome)} · Nv ${P.nivel}</b>${etiquetas}</div>
       ${barra('hp', P.hp, d.hpMax, '❤️ ')}${barra('mp', P.mp, d.mpMax, '💧 ')}
-      <div class="hud-linha pontos-turno">
-        <span class="${T.movRest > 0 ? 'on' : ''}">👣 Mover ${T.movRest}/${d.mov}</span>
-        <span class="${T.acaoUsada ? '' : 'on'}">${T.acaoUsada ? '⚔️ Ação usada' : '⚔️ Ação livre'}</span>
+      <div class="hud-linha pontos-turno">${T.livre
+        ? '<span class="on">🚪 Sala limpa: vá até a porta</span>'
+        : `<span class="${T.movRest > 0 ? 'on' : ''}">👣 Mover ${T.movRest}/${movEfetivo(d.mov, T.efeitos)}</span>
+        <span class="${T.acaoUsada ? '' : 'on'}">${T.acaoUsada ? '⚔️ Ação usada' : '⚔️ Ação livre'}</span>`}
       </div>
     </div>
-    <div class="inims">${inimigos}</div>
+    ${T.livre ? '' : `<div class="inims">${inimigos}</div>`}
+    ${defArm ? `<div class="dica-arm" style="--cor:${defArm.cor}">${defArm.icone} <b>${defArm.nome}</b> · ${defArm.desc} <small>(${T.armadilhas.size} no mapa)</small></div>` : ''}
     <div class="log" id="log">${log}</div>
     <div class="acoes" id="acoes">${acoesHtml(meuTurno)}</div>`;
 }
@@ -411,7 +444,7 @@ function atualizarHud() {
   if (!hud || !T) return;
   hud.innerHTML = hudHtml();
   const rod = document.getElementById('rod');
-  if (rod) rod.innerHTML = `Rodada ${T.rodada} · ${OCUPADO || T.fase === 'inimigos' ? '<b class="ini">Inimigos agindo…</b>' : '<b>Seu turno</b>'}`;
+  if (rod) rod.innerHTML = `Etapa ${T.etapa}/${T.totalEtapas} · ` + (T.livre ? '<b>Sala limpa</b>' : `Rodada ${T.rodada} · ${OCUPADO || T.fase === 'inimigos' ? '<b class="ini">Inimigos agindo…</b>' : '<b>Seu turno</b>'}`);
 }
 
 function acoesHtml(meuTurno) {
@@ -442,6 +475,13 @@ function acoesHtml(meuTurno) {
     }).join('') : '<p class="vazio">Sem consumíveis.</p>'}<button class="btn link" data-a="tat-voltar">← Voltar</button></div>`;
   }
   const naSaida = T.heroi.c === T.saida.c && T.heroi.r === T.saida.r;
+  if (T.livre) {
+    return `<div class="grade-acoes">
+      <button class="btn" data-a="tat-itens">🎒 Itens</button>
+      <button class="btn fim-turno" data-a="tat-porta">🚪 Ir até a porta</button>
+      <button class="btn sec span2" data-a="tat-fugir" ${naSaida ? '' : 'disabled'}>↩️ Sair da expedição <small>(só na entrada)</small></button>
+    </div>`;
+  }
   return `<div class="grade-acoes">
     <button class="btn" data-a="tat-atacar" ${T.acaoUsada ? 'disabled' : ''}>⚔️ Atacar <small>alc ${CLASSES[P.classe].alcanceBasico}</small></button>
     <button class="btn" data-a="tat-habs" ${T.acaoUsada ? 'disabled' : ''}>✨ Habilidades</button>
@@ -456,9 +496,11 @@ function painelVitoria() {
   const r = RES;
   const itens = r.itens.map(id => `<span class="drop" style="color:${RARIDADE_COR[ITENS[id].raridade]}">${ITENS[id].icone} ${esc(ITENS[id].nome)}</span>`).join('');
   const subidas = r.subidas.map(s => `<p class="nivelup">⭐ Nível ${s.nivel}! +${PONTOS_POR_NIVEL} pontos de atributo${s.novas.length ? ' · Nova habilidade: ' + s.novas.map(id => HABILIDADES[id].nome).join(', ') : ''}</p>`).join('');
-  return `<div class="fim"><h3>🏆 Vitória!</h3>
+  const ultima = T.ultimaEtapa;
+  return `<div class="fim"><h3>${ultima ? '🏆 Vitória!' : `✅ Sala limpa! Etapa ${T.etapa}/${T.totalEtapas}`}</h3>
     <p>+${r.xp} XP · +${r.gold} 🪙</p>${itens ? `<p class="drops">${itens}</p>` : ''}${subidas}
-    <button class="btn grande" data-a="bat-fim">Continuar</button></div>`;
+    ${ultima ? '<button class="btn grande" data-a="bat-fim">Continuar</button>'
+             : '<button class="btn grande" data-a="tat-seguir">🚪 Abrir a porta</button>'}</div>`;
 }
 
 /* Depois de qualquer ação: salva, mostra números flutuantes e confere se a luta acabou. */
@@ -471,6 +513,7 @@ function depoisDaAcao(ok) {
   salvar();
   mostrarFxT();
   atualizarTudo();
+  if (T.fim === 'porta') { entrarPorta(); return; }
   if (T.fim === 'fugiu') { toast('Você escapou! 🚪'); setTimeout(() => { if (T && T.fim === 'fugiu') { T = null; telaReino(); } }, 500); return; }
   conferirAutoFim();
 }
@@ -481,6 +524,41 @@ function conferirAutoFim() {
   if (t && t.fase === 'heroi' && !t.fim && !OCUPADO && t.acaoUsada && t.movRest === 0) {
     setTimeout(() => { if (T === t && t.fase === 'heroi' && !t.fim && !OCUPADO) encerrarTurno(); }, 600);
   }
+}
+
+/** Anda até o hexágono. Se o caminho pisa em armadilha, avisa primeiro (o 2º toque no mesmo lugar confirma). */
+function irPara(c, r) {
+  const info = tAlcance(T).find(h => h.c === c && h.r === r);
+  if (!info) return false;
+  const k = chave(c, r);
+  if (info.armadilhas > 0 && ARM_AVISO !== k) {
+    ARM_AVISO = k;
+    const def = ARMADILHAS[T.tipoArm];
+    toast(temArmadilha(T, c, r) ? `${def.icone} ${def.nome}: ${def.desc} Toque de novo para pisar.` : `⚠️ O caminho passa por uma armadilha (${def.nome.toLowerCase()}). Toque de novo para ir assim mesmo.`);
+    return true;
+  }
+  ARM_AVISO = null;
+  tMover(T, P, c, r);
+  salvar(); mostrarFxT(); atualizarTudo();
+  if (T.fim === 'porta') { entrarPorta(); return true; }
+  garantirVisivel(T.heroi);
+  if (T.fim) { depoisDaAcao(true); return true; }
+  conferirAutoFim();
+  return true;
+}
+
+/** O herói atravessou a porta: mostra a transição e começa a próxima etapa. */
+function entrarPorta() {
+  const t = document.getElementById('toast'); if (t) t.classList.remove('on');
+  const prox = tProximaEtapa(T, P);
+  salvar();
+  T = null; MODO = null; OCUPADO = false;
+  const rec = prox.recuperou;
+  const folego = rec.hp || rec.mp ? ` Você recupera o fôlego (${[rec.hp ? `+${rec.hp} vida` : '', rec.mp ? `+${rec.mp} mana` : ''].filter(Boolean).join(', ')}).` : '';
+  const texto = prox.chefeId
+    ? `A porta se abre para a arena final: ${prox.nomeSala}. ${INIMIGOS[prox.chefeId].nome} aguarda!${folego}`
+    : `Você atravessa a porta. Etapa ${prox.etapa} de ${prox.totalEtapas}: ${prox.nomeSala}. ${prox.inim.length} inimigos!${folego}`;
+  historia([{ icone: '🚪', texto }], () => { T = prox; RES = null; SUB = 'main'; ARM_AVISO = null; telaTatica(); });
 }
 
 function executar(acao, uid) {
@@ -664,8 +742,19 @@ const ACOES = {
       return;
     }
     if (MODO) { MODO = null; atualizarTudo(); return; }
-    if (tMover(T, P, c, r)) { salvar(); atualizarTudo(); garantirVisivel(T.heroi); conferirAutoFim(); }
+    if (irPara(c, r)) return;
+    if (T.porta && !T.porta.aberta && c === T.porta.c && r === T.porta.r) { toast('🚪 A porta está trancada. Derrote todos os inimigos da sala!'); return; }
+    if (temArmadilha(T, c, r)) { const def = ARMADILHAS[T.tipoArm]; toast(`${def.icone} ${def.nome}: ${def.desc}`); }
   },
+  'tat-seguir'() {
+    if (!T || T.fim !== 'vitoria' || T.ultimaEtapa) return;
+    tAbrirPorta(T);
+    RES = null; ARM_AVISO = null;
+    atualizarTudo();
+    centralizar(T.porta);
+    toast('🚪 A porta se abriu! Vá até ela.');
+  },
+  'tat-porta'() { if (T && T.livre && T.porta) { if (!irPara(T.porta.c, T.porta.r)) toast('Não dá para chegar até a porta daqui.'); } },
   'tat-atacar'() {
     if (!T || OCUPADO || T.acaoUsada) return;
     if (!tAlvos(T, P, { tipo: 'atacar' }).length) { toast(`Nenhum inimigo ao alcance (${CLASSES[P.classe].alcanceBasico}). Mova-se!`); return; }

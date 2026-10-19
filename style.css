@@ -135,7 +135,9 @@ b { font-weight: 700; }
 
 .tatica { padding: 6px 8px calc(10px + var(--safe-b)); gap: 6px; overflow-y: auto; -webkit-overflow-scrolling: touch; }
 .tatica > * { flex: none; }
-.tat-topo { display: flex; justify-content: space-between; align-items: center; padding: 4px 6px; font-size: .85rem; color: var(--suave); }
+.tat-topo { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 4px 6px; font-size: .82rem; color: var(--suave); }
+.tat-topo .tat-nome { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tat-topo #rod { flex: none; white-space: nowrap; font-size: .78rem; }
 .tat-topo b { color: var(--acento, var(--ouro)); }
 .tat-topo b.ini { color: var(--ruim); }
 .tabuleiro { position: relative; background: #0d0b14; border: 1px solid var(--borda); border-radius: 14px; overflow: hidden; }
@@ -185,6 +187,23 @@ b { font-weight: 700; }
 
 .mini-ico { flex: none; display: block; }
 .chip-topo { display: flex; align-items: center; gap: 4px; min-width: 0; }
+/* armadilhas, portas e avisos */
+.hex.perigo { stroke: #ffb02e; stroke-width: 2.4; stroke-dasharray: 5 3; }
+.hex.porta-hex { fill: #00000000; }
+.hex.porta-aberta { fill: #ffe08a66; stroke: #ffe08a; stroke-width: 2.6; animation: pulsoPorta 1s ease-in-out infinite alternate; }
+@keyframes pulsoPorta { to { fill: #ffe08a22; } }
+.arm, .porta { pointer-events: none; }
+.arm { animation: respira 1.6s ease-in-out infinite alternate; transition: opacity .4s; }
+.arm.some { opacity: 0; }
+.arm-gelo { filter: drop-shadow(0 0 4px #7fd4ff); } .arm-raio { filter: drop-shadow(0 0 4px #ffe14d); }
+.arm-fogo { filter: drop-shadow(0 0 5px #ff7a45); } .arm-veneno { filter: drop-shadow(0 0 4px #7ddc4a); } .arm-vazio { filter: drop-shadow(0 0 4px #c58bff); }
+@keyframes respira { from { opacity: .82; } to { opacity: 1; } }
+.porta { filter: drop-shadow(0 3px 2px #0009); }
+.porta.aberta { filter: drop-shadow(0 0 6px #ffe08a); }
+.dica-arm { font-size: .78rem; color: var(--suave); background: #0d0b14aa; border: 1px solid var(--cor, var(--borda)); border-left-width: 4px; border-radius: 10px; padding: 5px 10px; line-height: 1.35; }
+.dica-arm b { color: var(--cor, var(--texto)); }
+.tag.efeito { color: #ffd1a8; border-color: #ffb02e; }
+
 #hud { display: flex; flex-direction: column; gap: 6px; }
 .hud-heroi { background: #0d0b14aa; border: 1px solid var(--borda); border-radius: 12px; padding: 8px 10px; display: flex; flex-direction: column; gap: 5px; }
 .hud-linha { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }

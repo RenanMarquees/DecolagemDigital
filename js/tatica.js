@@ -58,25 +58,29 @@ function linhaDeVisao(g, a, b) {
     const p = arredondaCubo(A.x + (B.x - A.x) * t + 1e-6, A.y + (B.y - A.y) * t + 2e-6, A.z + (B.z - A.z) * t - 3e-6);
     const h = doCubo(p.x, p.z);
     const tipo = celula(g, h.c, h.r);
-    if (tipo === '#' || tipo === ' ') return false; // '~' (lava, fenda...) não bloqueia a visão
+    if (tipo === '#' || tipo === ' ' || tipo === 'D') return false; // '~' (lava, fenda...) não bloqueia a visão; porta fechada bloqueia
   }
   return true;
 }
 
-/** Busca em largura: acha tudo que dá para alcançar andando. `bloqueia(c, r)` impede de entrar. */
-function bfs(g, origem, maxDist, bloqueia) {
+/** Busca em largura: acha tudo que dá para alcançar andando. `bloqueia(c, r)` impede de entrar.
+ *  `ehArm(c, r)` (opcional) diz onde há armadilha: entre caminhos do mesmo tamanho, escolhemos o que pisa em menos delas.
+ *  Cada nó guarda: d = passos, tr = armadilhas no caminho, de = nó anterior. */
+function bfs(g, origem, maxDist, bloqueia, ehArm) {
   const nos = new Map();
-  nos.set(chave(origem.c, origem.r), { c: origem.c, r: origem.r, d: 0, de: null });
+  nos.set(chave(origem.c, origem.r), { c: origem.c, r: origem.r, d: 0, tr: 0, de: null });
   const fila = [origem];
   while (fila.length) {
     const cur = fila.shift();
     const no = nos.get(chave(cur.c, cur.r));
     if (no.d >= maxDist) continue;
     for (const v of vizinhos(g, cur.c, cur.r)) {
+      if (bloqueia(v.c, v.r)) continue;
       const k = chave(v.c, v.r);
-      if (nos.has(k) || bloqueia(v.c, v.r)) continue;
-      nos.set(k, { c: v.c, r: v.r, d: no.d + 1, de: no });
-      fila.push(v);
+      const tr = no.tr + (ehArm && ehArm(v.c, v.r) ? 1 : 0);
+      const ja = nos.get(k);
+      if (!ja) { nos.set(k, { c: v.c, r: v.r, d: no.d + 1, tr, de: no }); fila.push(v); }
+      else if (ja.d === no.d + 1 && tr < ja.tr) { ja.tr = tr; ja.de = no; } // mesmo tamanho, menos armadilhas
     }
   }
   return nos;
@@ -104,22 +108,39 @@ function criarInimigoT(id, esc, uid, pos, ehChefe) {
     mov: b.mov || 2, alc: b.alc || 1,
     xp: Math.round(b.xp * esc.xp), gold: Math.round(b.gold * esc.xp),
     drops: b.drops || [], especial: b.especial, reliquia: b.reliquia, fragmento: b.fragmento,
-    c: pos.c, r: pos.r, vivo: true,
+    c: pos.c, r: pos.r, vivo: true, efeitos: [],
   };
 }
 
-/** Monta uma batalha no reino. `chefeId` = id do chefe, ou null para um encontro comum. `p` = o herói. */
-function criarTatica(reino, chefeId, p) {
-  const idSala = chefeId ? reino.arena : reino.salas[Math.floor(Math.random() * reino.salas.length)];
-  const sala = MAPAS[idSala];
+/** Uma expedição = o cenário dividido em etapas por portas. Cada etapa é uma sala com mais inimigos que a anterior.
+ *  Com `chefeId`, a última etapa é a arena do chefe (o chefe SEMPRE fica na última). */
+function criarExpedicao(reino, chefeId) {
+  const salas = embaralhar(reino.salas);
+  const etapas = [];
+  for (let i = 0; i < (reino.salas.length ? 2 : 0); i++) {
+    etapas.push({ mapa: salas[i % salas.length], n: Math.min(4, 2 + i + (reino.tier >= 3 ? 1 : 0)) });
+  }
+  if (chefeId) etapas.push({ mapa: reino.arena, chefe: true });
+  return { reinoId: reino.id, chefeId: chefeId || null, etapas, idx: 0 };
+}
+
+/** Monta a etapa atual da expedição `exp`. `p` = o herói. */
+function criarTatica(reino, exp, p) {
+  const etapa = exp.etapas[exp.idx];
+  const ehChefe = !!etapa.chefe;
+  const temProxima = exp.idx < exp.etapas.length - 1;
+  const sala = MAPAS[etapa.mapa];
   const g = { cols: sala.mapa[0].length, rows: sala.mapa.length, cel: [] };
-  let heroi = null;
+  let heroi = null, porta = null;
   let spawns = [];
+  const armadilhas = new Map();
   sala.mapa.forEach((linha, r) => {
     g.cel.push([]);
     [...linha].forEach((ch, c) => {
       if (ch === 'H') { heroi = { c, r }; ch = '.'; }
       else if (ch === 'E') { spawns.push({ c, r }); ch = '.'; }
+      else if (ch === 'A') { if (reino.armadilha) armadilhas.set(chave(c, r), { tipo: reino.armadilha }); ch = '.'; }
+      else if (ch === 'D') { if (temProxima) porta = { c, r, aberta: false }; else ch = '.'; } // a última etapa não tem porta
       g.cel[r].push(ch);
     });
   });
@@ -127,25 +148,29 @@ function criarTatica(reino, chefeId, p) {
   const pool = reino.inimigos;
   const sorteio = () => pool[Math.floor(Math.random() * pool.length)];
   const lista = [];
-  if (chefeId) {
-    lista.push({ id: chefeId, esc: { stat: 1, xp: 1 }, chefe: true });
+  if (ehChefe) {
+    lista.push({ id: exp.chefeId, esc: { stat: 1, xp: 1 }, chefe: true });
     for (let i = 0; i < ADDS_CHEFE; i++) lista.push({ id: sorteio(), esc: ESCALA_ADD });
     spawns.sort((a, b) => dist(b, heroi) - dist(a, heroi)); // o chefe aparece no ponto mais distante
   } else {
-    const n = 2 + (reino.tier >= 2 && Math.random() < 0.5 ? 1 : 0);
+    const n = etapa.n;
     for (let i = 0; i < n; i++) lista.push({ id: sorteio(), esc: ESCALA_GRUPO[n] });
     spawns = embaralhar(spawns);
   }
   const inim = lista.map((e, i) => criarInimigoT(e.id, e.esc, i + 1, spawns[i], !!e.chefe));
 
   const T = {
-    g, nomeSala: sala.nome, idSala, parede: sala.parede, liquido: sala.liquido, reinoId: reino.id, chefeId: chefeId || null,
+    g, nomeSala: sala.nome, idSala: etapa.mapa, parede: sala.parede, liquido: sala.liquido, reinoId: reino.id,
+    exp, etapa: exp.idx + 1, totalEtapas: exp.etapas.length, ultimaEtapa: !temProxima,
+    chefeId: ehChefe ? exp.chefeId : null,
+    tipoArm: reino.armadilha || null, armadilhas, porta, livre: false,
     heroi, saida: { ...heroi }, inim, mortos: [],
-    rodada: 1, fase: 'heroi', movRest: derivados(p).mov, acaoUsada: false, defendendo: false, buff: null,
+    rodada: 1, fase: 'heroi', movRest: derivados(p).mov, acaoUsada: false, defendendo: false, buff: null, efeitos: [],
     fila: [], fim: null, log: [], fx: [],
   };
   const chefe = inim.find(e => e.chefe);
   logar(T, chefe ? `${chefe.icone} ${chefe.nome} bloqueia o caminho!` : `${inim.map(e => e.icone).join(' ')} cercam você!`, 'info');
+  if (armadilhas.size) { const def = ARMADILHAS[reino.armadilha]; logar(T, `${def.icone} Cuidado: ${armadilhas.size} armadilhas no chão (${def.nome.toLowerCase()}). ${def.desc}`, 'aviso'); }
   avisarEspecial(T);
   return T;
 }
@@ -165,11 +190,14 @@ function inimigoEm(T, c, r) { return T.inim.find(e => e.vivo && e.c === c && e.r
 function vivos(T) { return T.inim.filter(e => e.vivo); }
 function adjacentes(T, pos) { return vivos(T).filter(e => dist(pos, e) === 1); }
 
-/** Hexágonos aonde o herói pode andar agora (não atravessa inimigos). */
+const temArmadilha = (T, c, r) => T.armadilhas.has(chave(c, r));
+
+/** Hexágonos aonde o herói pode andar agora (não atravessa inimigos).
+ *  `armadilhas` = quantas armadilhas o caminho mais seguro até lá pisa. */
 function tAlcance(T) {
   if (T.fase !== 'heroi' || T.fim) return [];
-  const nos = bfs(T.g, T.heroi, T.movRest, (c, r) => !!inimigoEm(T, c, r));
-  return [...nos.values()].filter(n => n.d > 0).map(n => ({ c: n.c, r: n.r, custo: n.d }));
+  const nos = bfs(T.g, T.heroi, T.movRest, (c, r) => !!inimigoEm(T, c, r), (c, r) => temArmadilha(T, c, r));
+  return [...nos.values()].filter(n => n.d > 0).map(n => ({ c: n.c, r: n.r, custo: n.d, armadilhas: n.tr }));
 }
 
 function alvosEm(T, origem, alcance) {
@@ -182,13 +210,105 @@ function alcanceDa(p, acao) {
 function tAlvos(T, p, acao) { return alvosEm(T, T.heroi, alcanceDa(p, acao)); }
 
 /* ---------- Ações do herói ---------- */
+/** Anda pelo caminho mais curto (e mais seguro) até o hexágono. Armadilhas pelo caminho disparam; a porta aberta leva à próxima etapa. */
 function tMover(T, p, c, r) {
   if (T.fase !== 'heroi' || T.fim) return false;
-  const alvo = tAlcance(T).find(h => h.c === c && h.r === r);
-  if (!alvo) return false;
-  T.movRest -= alvo.custo;
-  T.heroi = { c, r };
+  const nos = bfs(T.g, T.heroi, T.movRest, (cc, rr) => !!inimigoEm(T, cc, rr), (cc, rr) => temArmadilha(T, cc, rr));
+  const alvo = nos.get(chave(c, r));
+  if (!alvo || alvo.d === 0) return false;
+  for (const passo of caminhoAte(alvo)) {
+    T.heroi = { c: passo.c, r: passo.r };
+    T.movRest -= 1;
+    if (T.porta && T.porta.aberta && passo.c === T.porta.c && passo.r === T.porta.r) { T.fim = 'porta'; return true; }
+    const res = dispararArmadilha(T, p, 'heroi', passo.c, passo.r);
+    if (T.fim) return true;       // morreu na armadilha
+    if (res && res.parou) break;  // paralisado: o movimento acaba aqui
+  }
   return true;
+}
+
+/* ---------- Armadilhas e efeitos ---------- */
+const temEfeito = (lista, tipo) => lista.some(x => x.tipo === tipo);
+/** Movimento que uma unidade realmente tem (gelo tira 1, mas nunca fica abaixo de 1). */
+function movEfetivo(base, efeitos) { return Math.max(1, base - (temEfeito(efeitos, 'gelo') ? 1 : 0)); }
+
+/** Quem pisa (`quem` = 'heroi' ou um inimigo) dispara a armadilha do hexágono. Ela some depois de usada. */
+function dispararArmadilha(T, p, quem, c, r) {
+  const k = chave(c, r);
+  const arm = T.armadilhas.get(k);
+  if (!arm) return null;
+  T.armadilhas.delete(k);
+  const def = ARMADILHAS[arm.tipo];
+  const heroi = quem === 'heroi';
+  const nome = heroi ? 'Você pisa' : `${quem.nome} pisa`;
+  const hpMax = heroi ? derivados(p).hpMax : quem.hpMax;
+  const fator = !heroi && quem.chefe ? CHEFE_FATOR_ARM : 1;
+  const fxAlvo = heroi ? 'heroi' : quem.uid;
+  const efeitos = heroi ? T.efeitos : quem.efeitos;
+  const dano = def.pct ? Math.max(1, Math.round(hpMax * def.pct * fator)) : 0;
+  let parou = false;
+  const feri = (v) => {
+    if (heroi) p.hp = Math.max(0, p.hp - v); else quem.hp = Math.max(0, quem.hp - v);
+    T.fx.push({ alvo: fxAlvo, v, forte: true });
+  };
+
+  switch (arm.tipo) {
+    case 'gelo':
+      efeitos.push({ tipo: 'gelo', turnos: heroi ? def.turnos : def.turnos + 1 }); // inimigos agem depois, então ganham 1 a mais
+      if (heroi) T.movRest = Math.max(0, T.movRest - 1);
+      T.fx.push({ alvo: fxAlvo, v: 0, texto: '❄️ -1 👣', forte: true });
+      logar(T, `${def.icone} ${nome} na ${def.nome}! Movimento -1 por ${def.turnos} rodadas.`, 'aviso');
+      break;
+    case 'raio':
+      feri(dano); parou = true;
+      if (heroi) T.movRest = 0;
+      logar(T, `${def.icone} ${nome} na ${def.nome}! ${dano} de dano e fica paralisado.`, 'aviso');
+      break;
+    case 'fogo':
+      feri(dano);
+      logar(T, `${def.icone} ${nome} na ${def.nome}! ${dano} de dano.`, 'aviso');
+      break;
+    case 'veneno':
+      efeitos.push({ tipo: 'veneno', turnos: def.turnos, dano });
+      T.fx.push({ alvo: fxAlvo, v: 0, texto: '☠️', forte: true });
+      logar(T, `${def.icone} ${nome} na ${def.nome}! Envenenado: ${dano} de dano por ${def.turnos} rodadas.`, 'aviso');
+      break;
+    case 'vazio': {
+      feri(dano);
+      let drenou = 0;
+      if (heroi) { drenou = Math.min(p.mp, Math.round(derivados(p).mpMax * def.mana)); p.mp -= drenou; }
+      logar(T, `${def.icone} ${nome} na ${def.nome}! ${dano} de dano${drenou ? ` e perde ${drenou} de mana` : ''}.`, 'aviso');
+      break;
+    }
+  }
+  if (heroi) { if (p.hp <= 0) { T.fim = 'derrota'; logar(T, 'Sua visão escurece...', 'erro'); } }
+  else verificarMortes(T);
+  return { parou };
+}
+
+/** No fim de cada rodada: veneno causa dano e os efeitos perdem uma rodada. */
+function passarEfeitos(T, p) {
+  const tick = (efeitos, aplicar, nome) => {
+    for (const ef of efeitos) {
+      if (ef.tipo === 'veneno') aplicar(ef.dano, nome);
+      ef.turnos--;
+    }
+    return efeitos.filter(ef => ef.turnos > 0);
+  };
+  T.efeitos = tick(T.efeitos, (v) => {
+    p.hp = Math.max(0, p.hp - v);
+    T.fx.push({ alvo: 'heroi', v, forte: true });
+    logar(T, `☠️ O veneno causa ${v} de dano em você.`, 'inimigo');
+  });
+  if (p.hp <= 0) { T.fim = 'derrota'; logar(T, 'Sua visão escurece...', 'erro'); return; }
+  for (const e of vivos(T)) {
+    e.efeitos = tick(e.efeitos, (v) => {
+      e.hp = Math.max(0, e.hp - v);
+      T.fx.push({ alvo: e.uid, v, forte: true });
+      logar(T, `☠️ O veneno causa ${v} de dano em ${e.nome}.`, 'dano');
+    });
+  }
+  verificarMortes(T);
 }
 
 function golpeT(T, d, alvo, ataque, bonusCrit = 0) {
@@ -283,7 +403,7 @@ function tUsarItem(T, p, id) {
   if (!msg) { logar(T, 'Isso não teria efeito agora.', 'erro'); return false; }
   logar(T, msg, 'cura');
   T.fx.push({ alvo: 'heroi', v: 0, cura: true, texto: '✚' });
-  T.acaoUsada = true;
+  T.acaoUsada = !T.livre; // na sala limpa, usar item não gasta nada
   return true;
 }
 
@@ -309,7 +429,7 @@ function tFugir(T) {
 
 /* ---------- Turno dos inimigos ---------- */
 function tEncerrarTurno(T) {
-  if (T.fase !== 'heroi' || T.fim) return false;
+  if (T.fase !== 'heroi' || T.fim || T.livre) return false;
   T.fase = 'inimigos';
   // quem está mais perto age primeiro, para não se atrapalharem
   T.fila = vivos(T).sort((a, b) => dist(a, T.heroi) - dist(b, T.heroi) || a.uid - b.uid).map(e => e.uid);
@@ -320,32 +440,47 @@ function podeAtacarHeroi(T, e, pos) {
   return dist(pos, T.heroi) <= e.alc && (e.alc <= 1 || linhaDeVisao(T.g, pos, T.heroi));
 }
 
-function moverInimigo(T, e) {
+/** O inimigo anda até um lugar de onde possa atacar. Devolve {parou, morreu} se pisou numa armadilha. */
+function moverInimigo(T, p, e) {
   const ocupado = (c, r) => T.inim.some(x => x.vivo && x !== e && x.c === c && x.r === r);
   const ehHeroi = (c, r) => c === T.heroi.c && r === T.heroi.r;
-  // inimigos atravessam uns aos outros, mas ninguém atravessa o herói
-  const nos = bfs(T.g, e, 80, ehHeroi);
+  const mov = movEfetivo(e.mov, e.efeitos);
+  // inimigos atravessam uns aos outros, mas ninguém atravessa o herói; caminhos sem armadilha são preferidos
+  const nos = bfs(T.g, e, 80, ehHeroi, (c, r) => temArmadilha(T, c, r));
+  const lista = [...nos.values()]; // ordem de inserção = do mais perto para o mais longe
   let meta = null;
-  for (const n of nos.values()) { // ordem de inserção = do mais perto para o mais longe
-    if (n.d === 0 || ocupado(n.c, n.r)) continue;
-    if (podeAtacarHeroi(T, e, n)) { meta = n; break; }
+  for (const evitar of [true, false]) { // 1º: lugares sem armadilha; se não houver, aceita pisar numa
+    for (const n of lista) {
+      if (n.d === 0 || ocupado(n.c, n.r) || (evitar && temArmadilha(T, n.c, n.r))) continue;
+      if (podeAtacarHeroi(T, e, n)) { meta = n; break; }
+    }
+    if (meta) break;
   }
-  let destino = null;
+  let cam = [];
   if (meta) {
-    const cam = caminhoAte(meta);
-    let passos = Math.min(e.mov, cam.length);
-    while (passos > 0 && ocupado(cam[passos - 1].c, cam[passos - 1].r)) passos--;
-    destino = passos > 0 ? cam[passos - 1] : null;
+    cam = caminhoAte(meta).slice(0, mov);
   } else { // sem lugar livre para atacar: chega o mais perto possível
     let melhor = null;
-    for (const n of nos.values()) {
-      if (n.d === 0 || n.d > e.mov || ocupado(n.c, n.r)) continue;
-      const s = dist(n, T.heroi);
+    for (const n of lista) {
+      if (n.d === 0 || n.d > mov || ocupado(n.c, n.r)) continue;
+      const s = dist(n, T.heroi) + (temArmadilha(T, n.c, n.r) ? 0.5 : 0);
       if (!melhor || s < melhor.s || (s === melhor.s && n.d < melhor.n.d)) melhor = { n, s };
     }
-    destino = melhor ? melhor.n : null;
+    if (melhor) cam = caminhoAte(melhor.n);
   }
-  if (destino) { e.c = destino.c; e.r = destino.r; }
+  // anda passo a passo (pode pisar em armadilhas pelo caminho)
+  let res = { parou: false, morreu: false };
+  let ultimoLivre = { c: e.c, r: e.r };
+  for (const passo of cam) {
+    e.c = passo.c; e.r = passo.r;
+    if (!ocupado(e.c, e.r)) ultimoLivre = { c: e.c, r: e.r };
+    const a = dispararArmadilha(T, p, e, e.c, e.r);
+    if (!e.vivo) { res.morreu = true; return res; }
+    if (a && a.parou) { res.parou = true; break; }
+  }
+  // não pode terminar em cima de outro inimigo
+  if (ocupado(e.c, e.r)) { e.c = ultimoLivre.c; e.r = ultimoLivre.r; }
+  return res;
 }
 
 function atacarHeroi(T, p, d, e) {
@@ -366,12 +501,14 @@ function atacarHeroi(T, p, d, e) {
 
 function finalizarRodada(T, p) {
   const d = derivados(p);
+  passarEfeitos(T, p);          // veneno e duração dos efeitos
+  if (T.fim) return;            // morreu de veneno, ou o veneno matou o último inimigo
   if (T.buff && --T.buff.turnos <= 0) T.buff = null;
   p.mp = Math.min(d.mpMax, p.mp + d.regenMp);
   T.rodada++;
   T.defendendo = false;
   T.fase = 'heroi';
-  T.movRest = d.mov;
+  T.movRest = movEfetivo(d.mov, T.efeitos);
   T.acaoUsada = false;
   avisarEspecial(T);
 }
@@ -387,12 +524,40 @@ function tProximoInimigo(T, p) {
     const e = T.inim.find(x => x.uid === uid);
     if (!e || !e.vivo) continue;
     ator = e;
-    if (!podeAtacarHeroi(T, e, e)) moverInimigo(T, e);
-    if (podeAtacarHeroi(T, e, e)) atacarHeroi(T, p, d, e);
+    let paralisado = false;
+    if (!podeAtacarHeroi(T, e, e)) paralisado = moverInimigo(T, p, e).parou;
+    if (e.vivo && !paralisado && !T.fim && podeAtacarHeroi(T, e, e)) atacarHeroi(T, p, d, e);
     if (p.hp <= 0) { T.fim = 'derrota'; logar(T, 'Sua visão escurece...', 'erro'); }
   }
   if (!T.fim && !T.fila.length) finalizarRodada(T, p);
   return ator;
+}
+
+/* ---------- Portas e etapas ---------- */
+/** Sala limpa: a porta se abre e o herói anda livremente (sem turnos) até ela. */
+function tAbrirPorta(T) {
+  if (!T.porta || T.porta.aberta) return false;
+  T.porta.aberta = true;
+  T.g.cel[T.porta.r][T.porta.c] = '.';
+  T.fim = null; T.livre = true; T.fase = 'heroi';
+  T.movRest = 99; T.acaoUsada = false; T.defendendo = false; T.buff = null;
+  logar(T, '🚪 A porta se abriu! Vá até ela. Cuidado com as armadilhas no caminho.', 'info');
+  return true;
+}
+
+/** O herói atravessou a porta: monta a próxima etapa. Ele recupera um pouco de vida e mana. */
+function tProximaEtapa(T, p) {
+  const exp = T.exp;
+  exp.idx++;
+  const d = derivados(p);
+  const hp0 = p.hp, mp0 = p.mp;
+  p.hp = Math.min(d.hpMax, p.hp + Math.round(d.hpMax * RECUPERA_PORTA));
+  p.mp = Math.min(d.mpMax, p.mp + Math.round(d.mpMax * RECUPERA_PORTA));
+  const reino = REINOS.find(r => r.id === exp.reinoId);
+  const N = criarTatica(reino, exp, p);
+  N.recuperou = { hp: p.hp - hp0, mp: p.mp - mp0 };
+  if (N.recuperou.hp || N.recuperou.mp) logar(N, `Você recupera o fôlego: +${N.recuperou.hp} vida, +${N.recuperou.mp} mana.`, 'cura');
+  return N;
 }
 
 /* ---------- Fim da batalha ---------- */

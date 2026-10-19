@@ -6,7 +6,7 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 
-const ctx = vm.createContext({ Math, console, TRACE: !!process.env.TRACE, TRACELONG: !!process.env.TRACELONG });
+const ctx = vm.createContext({ Math, console });
 for (const f of ['data.js', 'logic.js', 'mapas.js', 'tatica.js']) {
   vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'js', f), 'utf8'), ctx, { filename: f });
 }
@@ -75,6 +75,7 @@ const robo = `(function () {
       let score;
       if (podeAtacar) score = 1000 + (alc > 1 ? md * 10 : 0) - h.custo; // ranged: mais longe é melhor
       else score = -pd * 10 - h.custo;
+      score -= (h.armadilhas || 0) * 60 + (temArmadilha(T, h.c, h.r) ? 60 : 0); // desvia de armadilhas
       if (!melhor || score > melhor.score) melhor = { h, score };
     }
     return melhor && (melhor.h.c !== T.heroi.c || melhor.h.r !== T.heroi.r) ? melhor.h : null;
@@ -86,6 +87,7 @@ const robo = `(function () {
     const atual = cp.get(chave(T.heroi.c, T.heroi.r)) ?? 99;
     let melhor = null;
     for (const h of cand) {
+      if (h.armadilhas > 0) continue;                       // nunca recua por cima de armadilha
       const md = cp.get(chave(h.c, h.r)) ?? 99;
       if (md > atual && (!melhor || md > melhor.md || (md === melhor.md && h.custo < melhor.h.custo))) melhor = { h, md };
     }
@@ -141,25 +143,36 @@ const robo = `(function () {
     while (T.fase === 'inimigos' && !T.fim) tProximoInimigo(T, p);
   }
 
+  function curarComItens(T, p) { // sala limpa: itens são livres
+    const d = derivados(p);
+    let g = 0;
+    while (p.hp < d.hpMax * 0.6 && g++ < 6) {
+      const pot = ['nectar', 'agua_nilo', 'ambrosia', 'hidromel', 'pocao'].find(x => qtd(p, x) > 0);
+      if (!pot || !tUsarItem(T, p, pot)) break;
+    }
+  }
+
+  /** Uma expedição inteira: sala 1, porta, sala 2 (, porta, arena do chefe). */
   function lutar(p, reino, chefeId, stats) {
-    const T = criarTatica(reino, chefeId, p);
-    let guard = 0;
-    while (!T.fim && guard++ < 120) turnoRobo(T, p);
-    if (T.fim !== 'vitoria' && typeof TRACE !== 'undefined' && TRACE && !globalThis.__traced) {
-      globalThis.__traced = true;
-      console.log('--- TRACE derrota: ' + p.classe + ' nv' + p.nivel + ' hp/mp ' + p.hp + '/' + p.mp + ' | ' + T.inim.map(e => e.nome + ' ' + e.hp + '/' + e.hpMax + ' atk' + e.atk + ' mov' + e.mov + ' alc' + e.alc).join(' ; '));
-      T.log.slice(-28).forEach(l => console.log('   ' + l.msg));
+    const exp = criarExpedicao(reino, chefeId);
+    let T = criarTatica(reino, exp, p);
+    for (;;) {
+      let guard = 0;
+      while (!T.fim && guard++ < 150) turnoRobo(T, p);
+      stats.rodadas += T.rodada;
+      if (T.fim === 'vitoria') {
+        aplicarVitoriaT(T, p);
+        if (T.ultimaEtapa) return 'vitoria';
+        tAbrirPorta(T);
+        curarComItens(T, p);
+        tMover(T, p, T.porta.c, T.porta.r);       // caminho mais seguro até a porta
+        if (T.fim !== 'porta') { penalidadeDerrota(p); return 'derrota'; } // morreu numa armadilha
+        T = tProximaEtapa(T, p);
+        continue;
+      }
+      penalidadeDerrota(p);                       // derrota (ou travou: conta como derrota)
+      return 'derrota';
     }
-    if (typeof TRACELONG !== 'undefined' && TRACELONG && T.rodada > 40 && !globalThis.__tl) {
-      globalThis.__tl = true;
-      console.log('--- TRACE luta longa: ' + p.classe + ' nv' + p.nivel + ' rodadas ' + T.rodada + ' fim=' + T.fim + ' | ' + T.inim.map(e => e.nome + ' ' + e.hp + '/' + e.hpMax + (e.vivo ? '' : ' (morto)')).join(' ; '));
-      T.log.slice(-14).forEach(l => console.log('   ' + l.msg));
-    }
-    if (T.fim === 'vitoria') aplicarVitoriaT(T, p);
-    else if (T.fim === 'derrota') penalidadeDerrota(p);
-    else if (!T.fim) { penalidadeDerrota(p); T.fim = 'derrota'; } // empate: conta como derrota
-    stats.rodadas += T.rodada;
-    return T.fim;
   }
 
   /* ---- jogo completo ---- */

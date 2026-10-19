@@ -300,3 +300,51 @@ function decorChao(reinoId, c, r) {
       return h % 3 === 0 ? `<circle cx="${a}" cy="${b}" r="${1 + (h % 3) * 0.3}" fill="#e0c8ff" fill-opacity=".6"/>` : '';
   }
 }
+
+/* ---------- Armadilhas (uma por cenário) ---------- */
+const PLACA = (cor) => `<ellipse cx="0" cy="3" rx="17" ry="12" fill="#0d0b14" fill-opacity=".55" stroke="none"/>
+  <ellipse cx="0" cy="1" rx="16" ry="11" fill="#1a1626" stroke="${cor}" stroke-width="2"/>`;
+const ARM_SVG = {
+  gelo: () => `<g ${TRACO}>${PLACA('#7fd4ff')}
+    <path d="M-11 4 L-8 -8 L-5 4Z M-3 6 L1 -13 L5 6Z M7 4 L10 -7 L13 4Z" fill="#bfe8ff"/>
+    <path d="M1 -13 L3 0 L0 1Z" fill="#fff" stroke="none"/>
+    <path d="M-9 -2 l-3 -3 M-9 -2 l3 -3 M-9 -2 v-5" stroke="#fff" stroke-width="1" transform="translate(0 -8) scale(.7)"/></g>`,
+  raio: () => `<g ${TRACO}>${PLACA('#ffe14d')}
+    <path d="M3 -12 L-6 2 L-1 2 L-4 13 L7 -2 L1 -2 Z" fill="#ffe14d"/>
+    <path d="M-13 3 l4 -2 M13 3 l-4 -2" stroke="#fff6a8" stroke-width="1.6"/></g>`,
+  fogo: () => `<g ${TRACO}>${PLACA('#ff7a45')}
+    <path d="M0 -14 Q9 -5 6 3 Q10 1 9 -3 Q15 5 8 10 Q0 14 -8 10 Q-14 3 -6 -4 Q-6 0 -3 1 Q-6 -7 0 -14Z" fill="#ff7a45"/>
+    <path d="M0 -4 Q5 1 3 6 Q0 9 -3 6 Q-5 2 0 -4Z" fill="#ffd34d" stroke="none"/></g>`,
+  veneno: () => `<g ${TRACO}>${PLACA('#7ddc4a')}
+    <ellipse cx="0" cy="3" rx="11" ry="7" fill="#4fae2a"/>
+    <circle cx="-5" cy="0" r="2.6" fill="#a8f06a" stroke="none"/><circle cx="4" cy="-2" r="3.2" fill="#a8f06a" stroke="none"/><circle cx="6" cy="6" r="1.8" fill="#a8f06a" stroke="none"/>
+    <path d="M-4 -3 Q-4 -9 0 -9 Q4 -9 4 -3 L3 -1 L-3 -1Z" fill="#e8f4d8"/><circle cx="-1.6" cy="-5.5" r="1" fill="#15121c" stroke="none"/><circle cx="1.6" cy="-5.5" r="1" fill="#15121c" stroke="none"/></g>`,
+  vazio: () => `<g ${TRACO}>${PLACA('#c58bff')}
+    <circle cx="0" cy="1" r="9" fill="#2a0e55"/>
+    <path d="M0 -8 Q9 -6 7 1 Q5 7 -1 6 Q-6 5 -5 0 Q-4 -3 0 -3" fill="none" stroke="#c58bff" stroke-width="2"/>
+    <circle cx="0" cy="1" r="2" fill="#fff" stroke="none"/><circle cx="-10" cy="-7" r="1" fill="#fff" stroke="none"/><circle cx="11" cy="7" r="1" fill="#fff" stroke="none"/></g>`,
+};
+
+/* ---------- Portas (estilo de cada cenário; aberta mostra a passagem) ---------- */
+const PORTA_CORES = {
+  valhala: ['#5d6b82', '#8794ab', '#7fd4ff'],
+  olimpo:  ['#c9ad55', '#ecdc95', '#fff6c8'],
+  inferno: ['#33232a', '#5a3a42', '#ff7a45'],
+  duat:    ['#a58545', '#cfb06d', '#e8b84a'],
+  caos:    ['#34205a', '#5c3fa6', '#c58bff'],
+};
+function portaSvg(reinoId, aberta) {
+  const [moldura, madeira, brilho] = PORTA_CORES[reinoId] || PORTA_CORES.valhala;
+  const arco = 'M-14 14 L-14 -8 Q-14 -22 0 -22 Q14 -22 14 -8 L14 14 Z';
+  const miolo = 'M-10 14 L-10 -7 Q-10 -17 0 -17 Q10 -17 10 -7 L10 14 Z';
+  if (aberta) {
+    return `<g ${TRACO}><path d="${arco}" fill="${moldura}"/><path d="${miolo}" fill="#05030a"/>
+      <path d="${miolo}" fill="none" stroke="${brilho}" stroke-width="2.4" stroke-opacity=".9"/>
+      <path d="M-6 14 L-4 6 L4 6 L6 14 M-3 6 L-2 0 L2 0 L3 6" fill="${brilho}" fill-opacity=".35" stroke="none"/>
+      <circle cx="0" cy="-4" r="5" fill="${brilho}" fill-opacity=".5" stroke="none"/></g>`;
+  }
+  return `<g ${TRACO}><path d="${arco}" fill="${moldura}"/><path d="${miolo}" fill="${madeira}"/>
+    <path d="M-5 -16 V14 M0 -17 V14 M5 -16 V14" stroke="#00000055" stroke-width="1"/>
+    <path d="M-10 -2 H10 M-10 8 H10" stroke="#00000066" stroke-width="2"/>
+    <circle cx="0" cy="3" r="3.6" fill="#e8b84a"/><rect x="-1" y="3" width="2" height="5" fill="#8a6a1a" stroke="none"/></g>`;
+}

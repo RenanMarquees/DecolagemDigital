@@ -129,7 +129,7 @@ const INIMIGOS = {
   valquiria:   { nome: 'Valquíria Caída',     icone: '🧝‍♀️', mov: 2, alc: 3, hp: 58,  atk: 18, def: 5,  xp: 26, gold: 13, drops: [{ id: 'pocao_mana', chance: 0.25 }] },
   troll_gelo:  { nome: 'Troll de Gelo',       icone: '🧌', mov: 2, alc: 1, hp: 82,  atk: 20, def: 6,  xp: 32, gold: 17, drops: [{ id: 'hidromel', chance: 0.12 }, { id: 'pocao', chance: 0.3 }] },
   fenrir: {
-    nome: 'Fenrir, o Lobo Devorador', icone: '🐺', mov: 4, alc: 1, chefe: true, hp: 240, atk: 23, def: 6, xp: 170, gold: 140,
+    nome: 'Fenrir, o Lobo Devorador', icone: '🐺', mov: 4, alc: 1, chefe: true, hp: 290, atk: 27, def: 6, xp: 170, gold: 140,
     especial: { nome: 'Mordida do Ragnarök', mult: 1.9, cada: 3 },
     reliquia: 'presa_fenrir', fragmento: 'Fragmento do Destino: Gelo',
     drops: [{ id: 'hidromel', chance: 1 }],
@@ -147,7 +147,7 @@ const INIMIGOS = {
   ciclope:     { nome: 'Ciclope',             icone: '👁️', mov: 2, alc: 4, hp: 160, atk: 33, def: 10, xp: 82,  gold: 34, drops: [{ id: 'ambrosia', chance: 0.1 }, { id: 'hidromel', chance: 0.25 }] },
   minotauro:   { nome: 'Minotauro',           icone: '🐂', mov: 3, alc: 1, hp: 180, atk: 36, def: 12, xp: 96,  gold: 40, drops: [{ id: 'ambrosia', chance: 0.12 }] },
   ares: {
-    nome: 'Ares, Deus da Guerra', icone: '🔱', mov: 3, alc: 1, chefe: true, hp: 440, atk: 44, def: 14, xp: 520, gold: 320,
+    nome: 'Ares, Deus da Guerra', icone: '🔱', mov: 3, alc: 1, chefe: true, hp: 540, atk: 52, def: 14, xp: 520, gold: 320,
     especial: { nome: 'Fúria de Ares', mult: 2.0, cada: 3 },
     reliquia: 'elmo_ares', fragmento: 'Fragmento do Destino: Guerra',
     drops: [{ id: 'ambrosia', chance: 1 }],
@@ -165,7 +165,7 @@ const INIMIGOS = {
   cerbero:     { nome: 'Cérbero',             icone: '🐕‍🦺', mov: 4, alc: 1, hp: 250, atk: 54, def: 15, xp: 175, gold: 70, drops: [{ id: 'ambrosia', chance: 0.2 }, { id: 'nectar', chance: 0.05 }] },
   demonio:     { nome: 'Demônio Alado',       icone: '🦇', mov: 4, alc: 1, hp: 280, atk: 57, def: 17, xp: 195, gold: 80, drops: [{ id: 'ambrosia', chance: 0.2 }, { id: 'nectar', chance: 0.06 }] },
   hades: {
-    nome: 'Hades, Senhor do Inferno', icone: '👑', mov: 2, alc: 3, chefe: true, hp: 700, atk: 60, def: 20, xp: 1100, gold: 650,
+    nome: 'Hades, Senhor do Inferno', icone: '👑', mov: 2, alc: 3, chefe: true, hp: 860, atk: 72, def: 20, xp: 1100, gold: 650,
     especial: { nome: 'Toque da Morte', mult: 2.0, cada: 3 },
     reliquia: 'coroa_hades', fragmento: 'Fragmento do Destino: Morte',
     drops: [{ id: 'nectar', chance: 1 }],
@@ -183,7 +183,7 @@ const INIMIGOS = {
   chacal:      { nome: 'Guardião Chacal',     icone: '🦊', mov: 4, alc: 1, hp: 380, atk: 72, def: 22, xp: 280, gold: 115, drops: [{ id: 'agua_nilo', chance: 0.25 }, { id: 'nectar', chance: 0.08 }] },
   serpente:    { nome: 'Serpente de Apófis',  icone: '🐍', mov: 3, alc: 3, hp: 430, atk: 77, def: 24, xp: 320, gold: 130, drops: [{ id: 'nectar', chance: 0.1 }] },
   set: {
-    nome: 'Set, Deus do Caos', icone: '🦂', mov: 3, alc: 2, chefe: true, hp: 1000, atk: 80, def: 28, xp: 2200, gold: 1200,
+    nome: 'Set, Deus do Caos', icone: '🦂', mov: 3, alc: 2, chefe: true, hp: 1240, atk: 96, def: 28, xp: 2200, gold: 1200,
     especial: { nome: 'Tempestade de Areia', mult: 2.0, cada: 3 },
     reliquia: 'olho_set', fragmento: 'Fragmento do Destino: Caos',
     drops: [{ id: 'nectar', chance: 1 }],
@@ -197,7 +197,7 @@ const INIMIGOS = {
 
   // --- Final ---
   caos: {
-    nome: 'Caos Primordial', icone: '🌌', mov: 4, alc: 5, chefe: true, hp: 1400, atk: 88, def: 30, xp: 0, gold: 0,
+    nome: 'Caos Primordial', icone: '🌌', mov: 4, alc: 5, chefe: true, hp: 1650, atk: 100, def: 30, xp: 0, gold: 0,
     especial: { nome: 'Colapso do Cosmos', mult: 2.2, cada: 3 },
     drops: [],
     falaAntes: [
@@ -210,42 +210,56 @@ const INIMIGOS = {
 /* ---------- GRUPOS EM BATALHA ----------
    Como agora há vários inimigos no mapa, cada um é mais fraco que o "solo" da lista acima.
    stat = multiplicador de vida e ataque; xp = multiplicador de XP e ouro. */
-const ESCALA_GRUPO = { 2: { stat: 0.62, xp: 0.6 }, 3: { stat: 0.5, xp: 0.42 } };
-const ESCALA_ADD = { stat: 0.4, xp: 0.15 }; // capangas que acompanham um chefe
+const ESCALA_GRUPO = { 2: { stat: 0.72, xp: 0.6 }, 3: { stat: 0.6, xp: 0.42 }, 4: { stat: 0.5, xp: 0.32 } };
+const ESCALA_ADD = { stat: 0.5, xp: 0.15 }; // capangas que acompanham um chefe
 const ADDS_CHEFE = 2;
+
+/* ---------- ARMADILHAS ----------
+   Cada cenário tem a sua. Quem pisa nela (herói ou inimigo) dispara o efeito, e a armadilha some.
+   pct   = parte da vida máxima de quem pisou (chefes sofrem só metade)
+   turnos= quantas rodadas o efeito dura */
+const ARMADILHAS = {
+  gelo:   { nome: 'Armadilha de gelo',   icone: '❄️', cor: '#7fd4ff', turnos: 2, desc: 'Reduz 1 de movimento por 2 rodadas.' },
+  raio:   { nome: 'Armadilha de raio',   icone: '⚡', cor: '#ffe14d', pct: 0.10, desc: 'Dá dano e paralisa: o movimento acaba aqui.' },
+  fogo:   { nome: 'Armadilha de fogo',   icone: '🔥', cor: '#ff7a45', pct: 0.15, desc: 'Causa dano.' },
+  veneno: { nome: 'Armadilha venenosa',  icone: '☠️', cor: '#7ddc4a', turnos: 3, pct: 0.05, desc: 'Causa dano por 3 rodadas.' },
+  vazio:  { nome: 'Armadilha do vazio',  icone: '🌀', cor: '#c58bff', pct: 0.06, mana: 0.3, desc: 'Dá dano e drena 30% da mana.' },
+};
+const CHEFE_FATOR_ARM = 0.5;   // chefes sofrem metade do efeito das armadilhas
+const RECUPERA_PORTA = 0.15;   // ao atravessar uma porta, você recupera esta parte da vida e da mana
 
 /* ---------- REINOS ---------- */
 const REINOS = [
   {
-    id: 'valhala', salas: ['v_salao', 'v_floresta'], arena: 'v_covil', nome: 'Valhala', icone: '🛡️', tier: 1, nivelRec: '1–4',
+    id: 'valhala', armadilha: 'gelo', salas: ['v_salao', 'v_floresta'], arena: 'v_covil', nome: 'Valhala', icone: '🛡️', tier: 1, nivelRec: '1–4',
     intro: 'O grande salão dos guerreiros mortos está coberto de neve e silêncio. Os einherjar, antes honrados, vagam como draugr. No fundo do salão, algo uiva.',
     inimigos: ['draugr', 'lobo_gelo', 'valquiria', 'troll_gelo'], chefe: 'fenrir',
     mercador: { nome: 'Brokkr, o Ferreiro Anão', icone: '🧔', fala: 'Aço é aço, em qualquer reino! O que vai ser?' },
     consumiveis: ['pocao', 'pocao_mana', 'hidromel'], descanso: 15,
   },
   {
-    id: 'olimpo', salas: ['o_jardins', 'o_escadaria'], arena: 'o_arena', nome: 'Olimpo', icone: '🏛️', tier: 2, nivelRec: '5–8',
+    id: 'olimpo', armadilha: 'raio', salas: ['o_jardins', 'o_escadaria'], arena: 'o_arena', nome: 'Olimpo', icone: '🏛️', tier: 2, nivelRec: '5–8',
     intro: 'Colunas de mármore flutuam entre as nuvens. As harpias dominam os jardins dos deuses e o trovão de Zeus ecoa, sem dono, pelos corredores vazios.',
     inimigos: ['harpia', 'satiro', 'ciclope', 'minotauro'], chefe: 'ares',
     mercador: { nome: 'Hefesto, o Ferreiro Divino', icone: '🔥', fala: 'Forjado no Etna! Escolha com sabedoria, mortal.' },
     consumiveis: ['pocao_mana', 'hidromel', 'ambrosia'], descanso: 30,
   },
   {
-    id: 'inferno', salas: ['i_flegetonte', 'i_dite'], arena: 'i_trono', nome: 'Inferno', icone: '🔥', tier: 3, nivelRec: '9–12',
+    id: 'inferno', armadilha: 'fogo', salas: ['i_flegetonte', 'i_dite'], arena: 'i_trono', nome: 'Inferno', icone: '🔥', tier: 3, nivelRec: '9–12',
     intro: 'Rios de fogo cortam um mundo sem céu. As almas condenadas gritam em coro e demônios patrulham as muralhas de Dite. Cada passo queima.',
     inimigos: ['alma_penada', 'diabrete', 'cerbero', 'demonio'], chefe: 'hades',
     mercador: { nome: 'Caronte, o Barqueiro', icone: '🛶', fala: 'Só aceito ouro. Ouro, e nunca perguntas.' },
     consumiveis: ['pocao_mana', 'ambrosia', 'nectar'], descanso: 60,
   },
   {
-    id: 'duat', salas: ['d_osiris', 'd_dunas'], arena: 'd_piramide', nome: 'Duat', icone: '🏜️', tier: 4, nivelRec: '13–17',
+    id: 'duat', armadilha: 'veneno', salas: ['d_osiris', 'd_dunas'], arena: 'd_piramide', nome: 'Duat', icone: '🏜️', tier: 4, nivelRec: '13–17',
     intro: 'O mundo dos mortos egípcio é um deserto infinito sob um sol negro. Pirâmides sussurram o nome de Set, e a Balança de Maat pende torta.',
     inimigos: ['escaravelho', 'mumia', 'chacal', 'serpente'], chefe: 'set',
     mercador: { nome: 'Khenti, o Embalsamador', icone: '🏺', fala: 'Tudo se conserva no Duat... menos a esperança.' },
     consumiveis: ['ambrosia', 'agua_nilo', 'nectar'], descanso: 100,
   },
   {
-    id: 'caos', salas: [], arena: 'c_abismo', nome: 'Abismo do Caos', icone: '🌌', tier: 5, nivelRec: '17+', final: true,
+    id: 'caos', armadilha: 'vazio', salas: [], arena: 'c_abismo', nome: 'Abismo do Caos', icone: '🌌', tier: 5, nivelRec: '17+', final: true,
     intro: 'Não há chão aqui. Os Fragmentos do Destino flutuam ao seu redor, formando uma escada de luz até a escuridão primordial.',
     inimigos: ['escaravelho', 'mumia', 'chacal', 'serpente'], // ecos do Duat que acompanham o Caos
     chefe: 'caos',
