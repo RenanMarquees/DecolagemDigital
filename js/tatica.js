@@ -132,11 +132,13 @@ function embaralhar(arr) {
 function criarInimigoT(id, esc, uid, pos, ehChefe, exp) {
   const b = INIMIGOS[id], f = esc.stat * exp.stat;
   const hp = Math.max(1, Math.round(b.hp * f));
+  const atk = Math.max(1, Math.round(b.atk * (1 + (f - 1) * 0.6)));   // o ataque cresce mais devagar que a vida (números pequenos)
+  const ganho = v => (v > 0 ? Math.max(1, Math.round(v * esc.xp * exp.rec * BALANCO.xp)) : 0);
   return {
     uid, id, tipo: id, nome: b.nome, icone: b.icone, chefe: ehChefe, estrutura: false,
-    hp, hpMax: hp, atk: Math.max(1, Math.round(b.atk * f)), def: b.def,
+    hp, hpMax: hp, atk, def: b.def,
     mov: b.mov || 2, alc: b.alc || 1,
-    xp: Math.round(b.xp * esc.xp * exp.rec * BALANCO.xp), gold: Math.round(b.gold * esc.xp * exp.rec),
+    xp: ganho(b.xp), gold: ganho(b.gold),
     drops: b.drops || [], reliquia: b.reliquia, fragmento: b.fragmento,
     c: pos.c, r: pos.r, vivo: true, efeitos: [], bonusAtq: 0, escudo: 0,
   };
@@ -148,7 +150,7 @@ function criarEstrutura(reinoId, uid, pos, exp) {
   return {
     uid, id: e.mini, tipo: e.mini, nome: e.nome, icone: '🏗️', chefe: false, estrutura: true,
     hp, hpMax: hp, atk: 0, def: e.def, mov: 0, alc: 0,
-    xp: Math.round(40 * exp.rec * BALANCO.xp), gold: 0, drops: [],
+    xp: Math.max(1, Math.round(2 * exp.rec * BALANCO.xp)), gold: 0, drops: [],
     c: pos.c, r: pos.r, vivo: true, efeitos: [], bonusAtq: 0, escudo: 0,
   };
 }
@@ -223,9 +225,13 @@ function criarTatica(exp, p) {
     tipoArm: reino.armadilha || null, armadilhas, porta, livre: false,
     moedas: new Map(), bau: null, objetivoCumprido: false,
     heroi, saida: { ...heroi }, inim, mortos: [],
-    rodada: 1, fase: 'heroi', movRest: derivados(p).mov, acaoUsada: false, defendendo: false, buff: null, efeitos: [],
+    rodada: 1, fase: 'escolha', movRest: 0, acaoUsada: false, bonusItem: { atq: 0 }, efeitos: [],
     baralhos: {}, cartas: {}, fila: [], fim: null, log: [], fx: [],
+    mao: null, descarte: null, cartaHeroi: null, escudoHeroi: 0, heroiJogou: false,
   };
+  // as cartas do herói acompanham o cenário inteiro (a mão e o descarte passam de uma etapa para a outra)
+  if (!exp.cartasHeroi) exp.cartasHeroi = { mao: maoDoHeroi(p.classe), descarte: [] };
+  T.mao = exp.cartasHeroi.mao; T.descarte = exp.cartasHeroi.descarte;
 
   // estruturas a destruir (só na última etapa)
   if (!temProxima && exp.cenario.objetivo === 'destruir') {
@@ -289,11 +295,21 @@ function tAlcance(T) {
 function alvosEm(T, origem, alcance) {
   return vivos(T).filter(e => dist(origem, e) <= alcance && (alcance <= 1 || linhaDeVisao(T.g, origem, e)));
 }
-function alcanceDa(p, acao) {
-  return acao.tipo === 'atacar' ? CLASSES[p.classe].alcanceBasico : HABILIDADES[acao.id].alcance;
+function cartaAtual(T) { return (T && !T.livre && T.cartaHeroi) || {}; }
+/** Alcance do ataque da carta (1 = corpo a corpo). Armas de longo alcance somam quando a carta já é à distância. */
+function alcanceDa(p, T) {
+  const c = cartaAtual(T), base = c.alc || 1;
+  return base > 1 ? base + derivados(p).alc : base;
 }
 /** Inimigos que o herói pode escolher como alvo da ação, a partir de onde está. */
-function tAlvos(T, p, acao) { return alvosEm(T, T.heroi, alcanceDa(p, acao)); }
+function tAlvos(T, p) {
+  const c = cartaAtual(T);
+  if (!c.atq) return [];
+  if (c.alvo === 'ao-redor') return adjacentes(T, T.heroi);
+  return alvosEm(T, T.heroi, alcanceDa(p, T));
+}
+/** Dano que o ataque da carta causa: dano da carta + atributo + armas (+ pedra de amolar). */
+function danoDoHeroi(T, p) { const c = cartaAtual(T); return (c.atq || 0) + derivados(p).dano + ((T.bonusItem && T.bonusItem.atq) || 0); }
 
 /* ---------- Moedas e baú ---------- */
 /** Quando um inimigo cai, deixa uma moeda no hexágono (o herói precisa PARAR lá para pegar). */
@@ -306,7 +322,7 @@ function soltarMoeda(T, e) {
 
 function sortearEquipamento(reino, p) {
   const t = Math.min(reino.tier, 4);
-  const pool = [`${p.classe}_${t}`, `armadura_${t}`, ...ATRIBUTOS.map(a => `amuleto_${a}_${t}`)].filter(id => ITENS[id]);
+  const pool = [`${p.classe}_${t}`, `cabeca_${t}`, `peito_${t}`, `pes_${t}`, `escudo_${t}`].filter(id => ITENS[id]);
   return pool[Math.floor(Math.random() * pool.length)];
 }
 
@@ -326,7 +342,7 @@ function lootarAqui(T, p) {
 function abrirBau(T, p) {
   const reino = REINOS.find(r => r.id === T.reinoId);
   const rec = T.exp.rec;
-  const gold = Math.round((50 + 40 * reino.tier) * rec);
+  const gold = Math.max(2, Math.round((4 + 3 * reino.tier) * rec));
   const itens = [reino.consumiveis[Math.floor(Math.random() * reino.consumiveis.length)]];
   if (Math.random() < 0.35) itens.push(sortearEquipamento(reino, p));
   p.gold += gold;
@@ -418,16 +434,12 @@ function tMover(T, p, c, r) {
   return true;
 }
 
-function golpeT(T, d, alvo, ataque, bonusCrit = 0) {
-  const mult = T.buff ? T.buff.mult : 1;
-  let dano = ataque * mult * d.danoMult * rand(0.9, 1.1) * reducaoDefesa(alvo.def);
-  if (alvo.escudo) dano *= 1 - Math.min(0.6, 0.2 * alvo.escudo);            // escudo da carta do inimigo
-  const crit = Math.random() < d.crit + bonusCrit;
-  if (crit) dano *= 1.75;
-  dano = Math.max(1, Math.round(dano));
+/** Um golpe do herói: dano fixo menos a defesa e o escudo do alvo (sempre causa pelo menos 1). */
+function golpeT(T, alvo, ataque) {
+  const dano = Math.max(1, ataque - alvo.def - (alvo.escudo || 0));
   alvo.hp = Math.max(0, alvo.hp - dano);
-  T.fx.push({ alvo: alvo.uid, v: dano, crit });
-  return { dano, crit };
+  T.fx.push({ alvo: alvo.uid, v: dano });
+  return dano;
 }
 
 function podeAgir(T) {
@@ -436,97 +448,65 @@ function podeAgir(T) {
   return true;
 }
 
+/** Ataca com a carta da rodada. `uid` = alvo escolhido (não precisa nas cartas "ao redor"). */
 function tAtacar(T, p, uid) {
   if (!podeAgir(T)) return false;
-  const d = derivados(p);
-  const alvo = tAlvos(T, p, { tipo: 'atacar' }).find(e => e.uid === uid);
-  if (!alvo) { logar(T, 'Esse inimigo está fora de alcance.', 'erro'); return false; }
-  const r = golpeT(T, d, alvo, d[CLASSES[p.classe].basico] * 1.5 + d.atk);
-  logar(T, `Você ataca ${alvo.nome}: ${r.dano} de dano${r.crit ? ' (CRÍTICO!)' : ''}.`, r.crit ? 'crit' : 'dano');
+  const c = cartaAtual(T);
+  if (!c.atq) { logar(T, 'A carta desta rodada não ataca.', 'erro'); return false; }
+  const possiveis = tAlvos(T, p);
+  let alvos;
+  if (c.alvo === 'ao-redor') {
+    alvos = possiveis;
+    if (!alvos.length) { logar(T, 'Nenhum inimigo ao seu lado.', 'erro'); return false; }
+  } else {
+    const principal = possiveis.find(e => e.uid === uid);
+    if (!principal) { logar(T, 'Esse inimigo está fora de alcance.', 'erro'); return false; }
+    alvos = c.alvo === 'vizinhos' ? vivos(T).filter(e => e === principal || dist(e, principal) === 1) : [principal];
+  }
+  const ataque = danoDoHeroi(T, p);
+  let total = 0;
+  for (const alvo of alvos) total += golpeT(T, alvo, ataque);
+  logar(T, `⚔️ ${c.nome}: ${total} de dano${alvos.length > 1 ? ` em ${alvos.length} inimigos` : ` em ${alvos[0].nome}`}.`, 'dano');
   T.acaoUsada = true;
-  verificarMortes(T);
-  return true;
-}
-
-function tHabilidade(T, p, id, uid) {
-  if (!podeAgir(T)) return false;
-  const h = HABILIDADES[id];
-  if (!h || h.nivel > p.nivel) return false;
-  if (p.mp < h.custo) { logar(T, 'Mana insuficiente!', 'erro'); return false; }
-  const d = derivados(p);
-
-  if (h.tipo === 'buff') {
-    p.mp -= h.custo;
-    T.buff = { mult: h.mult, turnos: h.turnos };
-    logar(T, `${h.icone} ${h.nome}! Seu dano aumenta por ${h.turnos} rodadas.`, 'cura');
-  } else if (h.tipo === 'cura') {
-    p.mp -= h.custo;
-    const cura = Math.min(d.hpMax - p.hp, Math.round(d.hpMax * 0.15 + d[h.stat] * h.mult * 0.7));
-    p.hp += cura;
-    logar(T, `${h.icone} ${h.nome}: você recupera ${cura} de vida.`, 'cura');
-    T.fx.push({ alvo: 'heroi', v: cura, cura: true });
-  } else { // dano ou dreno
-    let alvos;
-    if (h.area === 'ao-redor') {
-      alvos = adjacentes(T, T.heroi);
-      if (!alvos.length) { logar(T, 'Nenhum inimigo ao seu lado.', 'erro'); return false; }
-    } else {
-      const principal = tAlvos(T, p, { tipo: 'habilidade', id }).find(e => e.uid === uid);
-      if (!principal) { logar(T, 'Esse inimigo está fora de alcance.', 'erro'); return false; }
-      alvos = h.area === 'alvo+vizinhos' ? vivos(T).filter(e => e === principal || dist(e, principal) === 1) : [principal];
-    }
-    p.mp -= h.custo;
-    let total = 0, algumCrit = false;
-    for (const alvo of alvos) {
-      for (let i = 0; i < (h.golpes || 1); i++) {
-        const r = golpeT(T, d, alvo, d[h.stat] * h.mult + d.atk, h.critBonus || 0);
-        total += r.dano; algumCrit = algumCrit || r.crit;
-      }
-    }
-    logar(T, `${h.icone} ${h.nome}: ${total} de dano${alvos.length > 1 ? ` em ${alvos.length} inimigos` : ''}${algumCrit ? ' (CRÍTICO!)' : ''}.`, algumCrit ? 'crit' : 'dano');
-    if (h.tipo === 'dreno') {
-      const cura = Math.min(d.hpMax - p.hp, Math.round(total / 2));
-      p.hp += cura;
-      if (cura > 0) { logar(T, `Você drena ${cura} de vida.`, 'cura'); T.fx.push({ alvo: 'heroi', v: cura, cura: true }); }
-    }
-    // empurrar / puxar quem sobreviveu (do mais perto para o mais longe, para um não bloquear o outro)
-    if (h.empurrar || h.puxar) {
-      const sobreviventes = alvos.filter(e => e.hp > 0).sort((a, b) => dist(a, T.heroi) - dist(b, T.heroi));
-      for (const alvo of sobreviventes) {
-        if (!alvo.vivo || T.fim) continue;
-        if (h.empurrar) forcarMovimento(T, p, alvo, T.heroi, h.empurrar, 'empurrar');
-        if (h.puxar) forcarMovimento(T, p, alvo, T.heroi, h.puxar, 'puxar');
-      }
+  if (c.dreno && total > 0) {
+    const cura = Math.min(derivados(p).hpMax - p.hp, Math.max(1, Math.floor(total / 2)));
+    if (cura > 0) { p.hp += cura; logar(T, `🩸 Você rouba ${cura} de vida.`, 'cura'); T.fx.push({ alvo: 'heroi', v: cura, cura: true }); }
+  }
+  // empurrar / puxar quem sobreviveu (do mais perto para o mais longe, para um não bloquear o outro)
+  if (c.empurrar || c.puxar) {
+    const sobreviventes = alvos.filter(e => e.hp > 0).sort((a, b) => dist(a, T.heroi) - dist(b, T.heroi));
+    for (const alvo of sobreviventes) {
+      if (!alvo.vivo || T.fim) continue;
+      if (c.empurrar) forcarMovimento(T, p, alvo, T.heroi, c.empurrar, 'empurrar');
+      if (c.puxar) forcarMovimento(T, p, alvo, T.heroi, c.puxar, 'puxar');
     }
   }
-  T.acaoUsada = !T.livre; // na sala limpa, curar-se não gasta a ação
   verificarMortes(T);
   return true;
 }
 
-function tUsarItem(T, p, id) {
-  if (!podeAgir(T)) return false;
-  const msg = usarConsumivel(p, id);
-  if (!msg) { logar(T, 'Isso não teria efeito agora.', 'erro'); return false; }
-  logar(T, msg, 'cura');
+
+
+/** Usa o item do lugar `i` da mochila. NÃO gasta a sua jogada (dá para usar vários, antes ou depois de agir). */
+function tUsarItem(T, p, i) {
+  if (T.fim || (T.fase !== 'heroi' && T.fase !== 'escolha' && !T.livre)) return false;
+  const ef = usarMochila(p, i, T);
+  if (!ef) { logar(T, 'Isso não teria efeito agora.', 'erro'); return false; }
+  logar(T, ef.msg, 'cura');
   T.fx.push({ alvo: 'heroi', v: 0, cura: true, texto: '✚' });
-  T.acaoUsada = !T.livre; // na sala limpa, usar item não gasta nada
+  if (ef.buff) {
+    if (ef.buff.atq) T.bonusItem.atq += ef.buff.atq;
+    if (ef.buff.mov) T.movRest += ef.buff.mov;
+    if (ef.buff.escudo) T.escudoHeroi += ef.buff.escudo;
+  }
   return true;
 }
 
-function tDefender(T, p) {
-  if (!podeAgir(T)) return false;
-  const d = derivados(p);
-  T.defendendo = true;
-  p.mp = Math.min(d.mpMax, p.mp + Math.round(d.mpMax * 0.1));
-  logar(T, '🛡️ Você se protege (dano pela metade até o fim da rodada) e recupera o fôlego (+mana).', 'info');
-  T.acaoUsada = true;
-  return true;
-}
+
 
 /** Fugir só é possível em cima da saída 🚪 (onde você começou). Não vale na arena do chefe. */
 function tFugir(T) {
-  if (T.fase !== 'heroi' || T.fim) return false;
+  if ((T.fase !== 'heroi' && T.fase !== 'escolha') || T.fim) return false;
   if (T.chefeId) { logar(T, 'Não há como fugir de um deus!', 'erro'); return false; }
   if (T.heroi.c !== T.saida.c || T.heroi.r !== T.saida.r) { logar(T, 'Chegue até a saída 🚪 para fugir.', 'erro'); return false; }
   logar(T, 'Você escapou pela saída!', 'info');
@@ -536,8 +516,11 @@ function tFugir(T) {
 
 /* ---------- Armadilhas e efeitos ---------- */
 const temEfeito = (lista, tipo) => lista.some(x => x.tipo === tipo);
-/** Movimento que o herói realmente tem (gelo tira 1, mas nunca fica abaixo de 1). */
-function movEfetivo(base, efeitos) { return Math.max(1, base - (temEfeito(efeitos, 'gelo') ? 1 : 0)); }
+/** Movimento do turno: movimento da carta + bônus (botas, destreza); o gelo tira 1, mas nunca fica abaixo de 1 se a carta anda. */
+function movEfetivo(movCarta, bonus, efeitos) {
+  if (!(movCarta > 0)) return 0;
+  return Math.max(1, movCarta + bonus - (temEfeito(efeitos, 'gelo') ? 1 : 0));
+}
 
 /** Quem pisa (`quem` = 'heroi' ou um inimigo) dispara a armadilha do hexágono. Ela some depois de usada. */
 function dispararArmadilha(T, p, quem, c, r) {
@@ -548,11 +531,10 @@ function dispararArmadilha(T, p, quem, c, r) {
   const def = ARMADILHAS[arm.tipo];
   const heroi = quem === 'heroi';
   const nome = heroi ? 'Você pisa' : `${quem.nome} pisa`;
-  const hpMax = heroi ? derivados(p).hpMax : quem.hpMax;
   const fator = (!heroi && quem.chefe ? CHEFE_FATOR_ARM : 1) * T.exp.dif.armadilha;
   const fxAlvo = heroi ? 'heroi' : quem.uid;
   const efeitos = heroi ? T.efeitos : quem.efeitos;
-  const dano = def.pct ? Math.max(1, Math.round(hpMax * def.pct * fator)) : 0;
+  const dano = def.dano ? Math.max(1, Math.round(def.dano * fator)) : 0;   // pontos de vida
   let parou = false;
   const feri = (v) => {
     if (heroi) p.hp = Math.max(0, p.hp - v); else quem.hp = Math.max(0, quem.hp - v);
@@ -582,9 +564,9 @@ function dispararArmadilha(T, p, quem, c, r) {
       break;
     case 'vazio': {
       feri(dano);
-      let drenou = 0;
-      if (heroi) { drenou = Math.min(p.mp, Math.round(derivados(p).mpMax * def.mana)); p.mp -= drenou; }
-      logar(T, `${def.icone} ${nome} na ${def.nome}! ${dano} de dano${drenou ? ` e perde ${drenou} de mana` : ''}.`, 'aviso');
+      let perdeu = 0;
+      if (heroi && T.mao) for (let n = 0; n < (def.descarta || 0) && T.mao.length; n++) { T.descarte.push(T.mao.splice(Math.floor(Math.random() * T.mao.length), 1)[0]); perdeu++; }
+      logar(T, `${def.icone} ${nome} na ${def.nome}! ${dano} de dano${perdeu ? ` e perde ${perdeu} carta da mão (vai para o descarte)` : ''}.`, 'aviso');
       break;
     }
   }
@@ -619,7 +601,72 @@ function passarEfeitos(T, p) {
 }
 
 /* ---------- Turno dos inimigos ---------- */
-/** Encerra o turno do herói. Se ele estiver parado em cima do baú, abre. Depois os inimigos agem, na ordem da iniciativa. */
+/* ---------- Cartas de iniciativa e ordem da rodada ---------- */
+/** A ordem da rodada: inimigos (pela carta deles) e o herói (pela carta dele), do menor número para o maior.
+ *  Em empate o herói age primeiro. Antes de escolher a carta, `ini` do herói é null. */
+function ordemDaRodada(T, iniPrevia = null) {   // iniPrevia: mostra onde o herói ficaria com uma carta ainda não jogada
+  const itens = combatentes(T).filter(e => !e.parado && T.cartas[e.tipo]).map(e => ({ tipo: 'inimigo', uid: e.uid, ini: T.cartas[e.tipo].ini, dist: dist(e, T.heroi), e }));
+  itens.sort((a, b) => (a.ini - b.ini) || (a.dist - b.dist) || a.uid - b.uid);
+  const iniH = T.cartaHeroi ? T.cartaHeroi.ini : iniPrevia;
+  if (iniH !== null && iniH !== undefined) {                   // o herói entra antes do primeiro inimigo com número igual ou MAIOR
+    const pos = itens.findIndex(x => x.ini >= iniH);
+    itens.splice(pos < 0 ? itens.length : pos, 0, { tipo: 'heroi', ini: iniH });
+  }
+  return itens;
+}
+
+/** O herói escolhe a carta da rodada (índice/ id da carta na mão, ou 'descanso'). Monta a fila e começa a rodada. */
+function tEscolherCarta(T, p, id) {
+  if (T.fase !== 'escolha' || T.fim || T.livre) return false;
+  let carta;
+  if (id === 'descanso') carta = { ...CARTA_DESCANSO, id: 'descanso' };
+  else {
+    const i = T.mao.findIndex(c => c.id === id);
+    if (i < 0) { logar(T, 'Essa carta não está na sua mão.', 'erro'); return false; }
+    carta = T.mao.splice(i, 1)[0];
+    T.descarte.push(carta);
+  }
+  T.cartaHeroi = carta;
+  T.escudoHeroi = (carta.escudo || 0) + (carta.descanso ? 0 : derivados(p).esc);
+  logar(T, carta.descanso ? '💤 Você decide descansar (iniciativa 99).' : `🃏 Você joga "${carta.nome}" (iniciativa ${carta.ini}).`, 'info');
+  T.fila = ordemDaRodada(T).map(x => (x.tipo === 'heroi' ? 'heroi' : x.uid));
+  continuarRodada(T, p);
+  return true;
+}
+
+/** Segue a fila: se o próximo for o herói, começa o turno dele; senão, os inimigos agem. */
+function continuarRodada(T, p) {
+  if (T.fila[0] === 'heroi') { T.fila.shift(); iniciarTurnoHeroi(T, p); }
+  else T.fase = 'inimigos';
+}
+
+/** Começa o turno do herói: aplica o que a carta manda (andar, curar, descansar). */
+function iniciarTurnoHeroi(T, p) {
+  const d = derivados(p), c = T.cartaHeroi || {};
+  T.fase = 'heroi';
+  T.acaoUsada = !c.atq && !c.descanso ? true : false;      // carta sem ataque: não há ação para usar
+  T.bonusItem = { atq: 0 };
+  T.movRest = movEfetivo(c.mov, d.mov, T.efeitos);
+  if (c.descanso) {
+    const hp0 = p.hp;
+    p.hp = Math.min(d.hpMax, p.hp + Math.max(2, Math.round(d.hpMax * 0.3)));
+    T.mao.push(...T.descarte.splice(0));                  // pega todas as cartas de volta
+    T.movRest = 0; T.acaoUsada = true;
+    logar(T, `💤 Você descansa: +${p.hp - hp0} vida e todas as cartas voltam para a mão.`, 'cura');
+    T.fx.push({ alvo: 'heroi', v: p.hp - hp0, cura: true });
+    return;
+  }
+  if (c.cura) {
+    const v = Math.min(d.hpMax - p.hp, c.cura + d.cura);
+    if (v > 0) { p.hp += v; logar(T, `✚ A carta cura ${v} de vida.`, 'cura'); T.fx.push({ alvo: 'heroi', v, cura: true }); }
+  }
+}
+
+/** A mão acabou? Então o herói só pode descansar. */
+const maoVazia = T => !T.mao || T.mao.length === 0;
+
+/* ---------- Turno dos inimigos ---------- */
+/** Encerra o turno do herói. Se ele estiver parado em cima do baú, abre. Depois os inimigos que faltam agem, na ordem da iniciativa. */
 function tEncerrarTurno(T, p) {
   if (T.fase !== 'heroi' || T.fim || T.livre) return false;
   if (T.bau && !T.bau.aberto && T.bau.c === T.heroi.c && T.bau.r === T.heroi.r) {
@@ -627,10 +674,8 @@ function tEncerrarTurno(T, p) {
     if (T.fim) return true;
   }
   T.fase = 'inimigos';
-  T.fila = combatentes(T)
-    .filter(e => !e.parado)       // (`parado` só é usado nos testes, para deixar um inimigo imóvel)
-    .sort((a, b) => (T.cartas[a.tipo].ini - T.cartas[b.tipo].ini) || (dist(a, T.heroi) - dist(b, T.heroi)) || a.uid - b.uid)
-    .map(e => e.uid);
+  T.heroiJogou = true;
+  T.fila = T.fila.filter(x => x === 'heroi' || (T.inim.find(e => e.uid === x) || {}).vivo);   // quem morreu no meio sai da fila
   return true;
 }
 
@@ -682,16 +727,14 @@ function moverInimigo(T, p, e, mov, alc) {
 
 function atacarHeroi(T, p, d, e, carta) {
   const mod = carta.atq + e.bonusAtq;
-  if (Math.random() < d.esquiva) {
-    logar(T, `Você esquiva do ataque de ${e.nome}!`, 'info');
-    T.fx.push({ alvo: 'heroi', v: 0, esquiva: true });
+  const dano = Math.max(0, e.atk + mod - T.escudoHeroi);        // o escudo (carta + equipamento) tira pontos de cada golpe
+  p.hp = Math.max(0, p.hp - dano);
+  const forte = mod >= 2;
+  if (dano === 0) {
+    logar(T, `🛡️ Seu escudo bloqueia o ataque de ${e.nome}!`, 'info');
+    T.fx.push({ alvo: 'heroi', v: 0, texto: '🛡️ 0', esquiva: false });
     return;
   }
-  let dano = e.atk * Math.max(0.3, 1 + 0.15 * mod) * rand(0.9, 1.1) * reducaoDefesa(d.def);
-  if (T.defendendo) dano *= 0.5;
-  dano = Math.max(1, Math.round(dano * d.danoRecebido));
-  p.hp = Math.max(0, p.hp - dano);
-  const forte = mod >= 3;
   T.fx.push({ alvo: 'heroi', v: dano, forte, de: e.uid });
   logar(T, forte ? `💢 ${e.nome} usa ${carta.nome}: ${dano} de dano!` : `${e.nome} ataca (${carta.nome}): ${dano} de dano.`, forte ? 'forte' : 'inimigo');
   if (p.hp <= 0) return;
@@ -704,7 +747,7 @@ function apoioDaCarta(T, e, carta) {
   const grupo = [e, ...combatentes(T).filter(x => x !== e && dist(x, e) === 1)];
   if (carta.curar) {
     for (const a of grupo) {
-      const cura = Math.min(a.hpMax - a.hp, carta.curar * Math.max(1, Math.round(a.hpMax * 0.06)));
+      const cura = Math.min(a.hpMax - a.hp, carta.curar);   // pontos de vida
       if (cura > 0) { a.hp += cura; T.fx.push({ alvo: a.uid, v: cura, cura: true }); }
     }
     logar(T, `✚ ${e.nome} usa ${carta.nome}: cura ${grupo.length > 1 ? 'o grupo' : 'a si mesmo'}.`, 'inimigo');
@@ -733,17 +776,13 @@ function agirInimigo(T, p, d, e) {
 }
 
 function finalizarRodada(T, p) {
-  const d = derivados(p);
   passarEfeitos(T, p);          // veneno e duração dos efeitos
   if (T.fim) return;            // morreu de veneno, ou o veneno cumpriu o objetivo
-  if (T.buff && --T.buff.turnos <= 0) T.buff = null;
-  p.mp = Math.min(d.mpMax, p.mp + d.regenMp);
   T.rodada++;
-  T.defendendo = false;
-  T.fase = 'heroi';
-  T.movRest = movEfetivo(d.mov, T.efeitos);
-  T.acaoUsada = false;
-  revelarCartas(T);             // novas cartas dos inimigos: aparecem na tela antes do seu turno
+  T.fase = 'escolha';           // nova rodada: primeiro você escolhe a sua carta de iniciativa
+  T.cartaHeroi = null; T.escudoHeroi = 0; T.fila = []; T.heroiJogou = false; T.bonusItem = { atq: 0 };
+  T.movRest = 0; T.acaoUsada = false;
+  revelarCartas(T);             // novas cartas dos inimigos: aparecem na tela antes de você escolher a sua
 }
 
 /** Faz UM inimigo agir. Quando o último termina, começa a próxima rodada. */
@@ -753,22 +792,23 @@ function tProximoInimigo(T, p) {
   const d = derivados(p);
   let ator = null;
   while (T.fila.length && !ator) {
+    if (T.fila[0] === 'heroi') { T.fila.shift(); iniciarTurnoHeroi(T, p); return null; }   // chegou a vez do herói
     const uid = T.fila.shift();
     const e = T.inim.find(x => x.uid === uid);
     if (!e || !e.vivo) continue;
     ator = e;
     agirInimigo(T, p, d, e);
     if (p.hp <= 0) { T.fim = 'derrota'; logar(T, 'Sua visão escurece...', 'erro'); }
+    if (!T.fim && T.fila[0] === 'heroi') { T.fila.shift(); iniciarTurnoHeroi(T, p); }   // o próximo da fila é o herói: começa a vez dele já
   }
-  if (!T.fim && !T.fila.length) finalizarRodada(T, p);
+  if (!T.fim && T.fase === 'inimigos' && !T.fila.length) finalizarRodada(T, p);
   return ator;
 }
 
 /* ---------- Portas, etapas e sala livre ---------- */
-/** Entra no modo "sala livre": sem turnos nem inimigos, o herói anda à vontade (e saqueia). */
 function tModoLivre(T) {
   T.fim = null; T.livre = true; T.fase = 'heroi';
-  T.movRest = 99; T.acaoUsada = false; T.defendendo = false; T.buff = null;
+  T.movRest = 99; T.acaoUsada = false; T.bonusItem = { atq: 0 }; T.escudoHeroi = 0;
   for (const e of T.inim) if (e.vivo) e.vivo = false;
 }
 
@@ -790,17 +830,15 @@ function tSaquear(T) {
   return true;
 }
 
-/** O herói atravessou a porta: monta a próxima etapa. Ele recupera um pouco de vida e mana. */
 function tProximaEtapa(T, p) {
   const exp = T.exp;
   exp.idx++;
   const d = derivados(p);
-  const hp0 = p.hp, mp0 = p.mp;
-  p.hp = Math.min(d.hpMax, p.hp + Math.round(d.hpMax * exp.dif.porta));
-  p.mp = Math.min(d.mpMax, p.mp + Math.round(d.mpMax * exp.dif.porta));
+  const hp0 = p.hp;
+  p.hp = Math.min(d.hpMax, p.hp + Math.max(1, Math.round(d.hpMax * exp.dif.porta)));
   const N = criarTatica(exp, p);
-  N.recuperou = { hp: p.hp - hp0, mp: p.mp - mp0 };
-  if (N.recuperou.hp || N.recuperou.mp) logar(N, `Você recupera o fôlego: +${N.recuperou.hp} vida, +${N.recuperou.mp} mana.`, 'cura');
+  N.recuperou = { hp: p.hp - hp0 };
+  if (N.recuperou.hp) logar(N, `Você recupera o fôlego: +${N.recuperou.hp} vida.`, 'cura');
   return N;
 }
 
@@ -838,7 +876,7 @@ function concluirCenario(T, p) {
   const sorte = Math.random();
   let r;
   if (sorte < 0.4) {
-    const gold = Math.round((80 + 60 * reino.tier) * exp.rec);
+    const gold = Math.max(3, Math.round((8 + 4 * reino.tier) * exp.rec));
     p.gold += gold; r = { tipo: 'gold', gold };
   } else if (sorte < 0.75) {
     const xp = Math.max(1, Math.round(xpParaProximo(p.nivel) * 0.4 * exp.rec * BALANCO.xp));

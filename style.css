@@ -133,7 +133,7 @@ b { font-weight: 700; }
 .reino-duat    { --chao: #7a6232; --chao-b: #85693a; --chao-c: #705a2c; --chao2: #96793f; }
 .reino-caos    { --chao: #2c1752; --chao-b: #351c62; --chao-c: #25133f; --chao2: #4a2a82; }
 
-.tatica { padding: 6px 8px calc(10px + var(--safe-b)); gap: 6px; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+.tatica { padding: 0; gap: 0; overflow: hidden; }
 .tatica > * { flex: none; }
 .tat-topo { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 4px 6px; font-size: .82rem; color: var(--suave); }
 .tat-topo .tat-nome { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -141,7 +141,7 @@ b { font-weight: 700; }
 .tat-topo b { color: var(--acento, var(--ouro)); }
 .tat-topo b.ini { color: var(--ruim); }
 .tabuleiro { position: relative; background: #0d0b14; border: 1px solid var(--borda); border-radius: 14px; overflow: hidden; }
-.mapa-botoes { position: absolute; right: 8px; top: 8px; display: flex; flex-direction: column; gap: 6px; z-index: 2; }
+.mapa-botoes { position: absolute; right: 6px; top: 6px; display: flex; flex-direction: column; gap: 6px; z-index: 5; }
 .btn-mapa { width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--borda); background: #0d0b14d9; font-size: 1.1rem; }
 .btn-mapa:active { background: var(--painel2); }
 
@@ -216,7 +216,7 @@ b { font-weight: 700; }
 .conf-bts .btn { flex: 1; }
 
 /* ---------- mapa 3D ---------- */
-.cena3d { width: 100%; height: clamp(250px, calc(100vh - 470px), 460px); height: clamp(250px, calc(100dvh - 470px), 460px); touch-action: none; user-select: none; -webkit-user-select: none; position: relative; }
+.cena3d { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; user-select: none; -webkit-user-select: none; position: relative; }
 .cena3d canvas { display: block; width: 100%; height: 100%; touch-action: none; }
 .fx3d { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
 .fx3d-num { position: absolute; transform: translate(-50%, -50%); font-weight: 800; font-size: 1.15rem; color: #fff; text-shadow: 0 2px 3px #000, 0 0 6px #000; animation: sobe 1s ease-out forwards; white-space: nowrap; pointer-events: none; }
@@ -277,3 +277,82 @@ b { font-weight: 700; }
 .tut-espera { color: var(--ouro); font-weight: 700; font-size: .8rem; }
 .tut-alvo { outline: 3px solid var(--ouro) !important; outline-offset: 2px; animation: tutpisca 1s ease-in-out infinite alternate; border-radius: 10px; position: relative; z-index: 3; }
 @keyframes tutpisca { from { box-shadow: 0 0 0 0 #ffd16600; } to { box-shadow: 0 0 14px 4px #ffd166aa; } }
+
+/* ---------- batalha: mapa em tela cheia com painéis por cima ---------- */
+.tat-topo { padding: 3px 8px; background: #0d0b14; border-bottom: 1px solid var(--borda); }
+.palco { position: relative; flex: 1 1 auto; min-height: 0; overflow: hidden; background: #0d0b14; }
+.sobre-topo { position: absolute; top: 0; left: 0; right: 0; z-index: 3; display: flex; flex-direction: column; gap: 4px; padding: 5px 54px 0 6px; pointer-events: none; }
+.sobre-topo > * { pointer-events: auto; }
+.sobre-topo .obj { align-self: flex-start; max-width: 100%; padding: 3px 9px; font-size: .74rem; }
+.sobre-topo .obj small { display: inline; margin-left: 6px; }
+.ini-faixa { display: flex; gap: 5px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; }
+.ini-faixa::-webkit-scrollbar { display: none; }
+.ini-chip { flex: none; position: relative; display: flex; align-items: center; gap: 4px; min-height: 34px; padding: 2px 8px 2px 4px; border-radius: 10px; background: #0d0b14e6; border: 2px solid var(--cor, var(--ouro)); font-size: .72rem; color: var(--texto); }
+.ini-chip .n { font-style: normal; font-weight: 800; width: 20px; height: 20px; border-radius: 50%; background: var(--cor, var(--ouro)); color: #fff; display: grid; place-items: center; font-size: .72rem; flex: none; }
+.ini-chip.heroi { --cor: var(--ouro); }
+.ini-chip.heroi .n { color: #1a1626; }
+.ini-chip .ef { color: var(--suave); white-space: nowrap; }
+.ini-chip em { font-style: normal; font-weight: 800; color: var(--ouro); }
+.ini-chip.feito { opacity: .4; }
+.ini-chip.ativo { box-shadow: 0 0 0 2px #fff, 0 0 12px var(--cor, var(--ouro)); transform: translateY(1px); }
+.ini-chip.pendente .n { background: #555; color: #fff; }
+.ini-chip.chefe { border-color: var(--ouro); }
+
+.dock { position: absolute; left: 0; right: 0; bottom: 0; z-index: 4; display: flex; flex-direction: column; gap: 5px; padding: 18px 8px calc(6px + var(--safe-b)); background: linear-gradient(180deg, #0d0b1400, #0d0b14dd 22%, #0d0b14f2); max-height: 62%; overflow-y: auto; }
+.tick { font-size: .78rem; color: var(--suave); text-align: center; line-height: 1.25; }
+.tick.l-dano { color: #ffd1a8; } .tick.l-inimigo { color: #ff9c9c; } .tick.l-cura { color: var(--ok); } .tick.l-aviso { color: #ffb02e; }
+.hud-heroi { padding: 4px 8px; gap: 3px; border-radius: 10px; }
+.hh-barras { display: flex; align-items: center; gap: 8px; }
+.hh-barras .barra { flex: 1; }
+.ouro-mini { font-size: .8rem; color: var(--ouro); white-space: nowrap; }
+.pips { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; font-size: .74rem; }
+.pips span { background: #00000055; border-radius: 8px; padding: 1px 7px; color: var(--suave); }
+.pips span.on { color: var(--texto); background: #3f7be055; }
+.pips .carta-atual { color: var(--ouro); }
+.aguarde { text-align: center; color: var(--suave); font-size: .85rem; padding: 6px; }
+
+.mao-topo { display: flex; justify-content: space-between; align-items: center; gap: 6px; font-size: .74rem; color: var(--suave); }
+.mao-bts { display: flex; gap: 6px; align-items: center; }
+.mao-bts .btn.link { width: auto; min-height: 32px; padding: 4px 8px; }
+.btn.jogar { white-space: nowrap; min-height: 38px; padding: 6px 14px; background: linear-gradient(180deg, #3f9b4a, #2a6f34); border-color: #5fd068; }
+.mao { display: flex; gap: 6px; overflow-x: auto; padding: 4px 2px 6px; -webkit-overflow-scrolling: touch; }
+.cartaH { flex: 0 0 104px; position: relative; display: flex; flex-direction: column; gap: 3px; text-align: left; padding: 6px 6px 6px 8px; border-radius: 10px; background: linear-gradient(180deg, #2a2150, #181328); border: 2px solid var(--borda); font-size: .72rem; line-height: 1.2; }
+.cartaH .ini { position: absolute; top: -6px; right: -4px; width: 24px; height: 24px; border-radius: 50%; background: var(--ouro); color: #1a1626; font-style: normal; font-weight: 800; display: grid; place-items: center; font-size: .78rem; }
+.cartaH b { padding-right: 18px; color: var(--ouro); font-size: .76rem; }
+.cartaH .efs { display: flex; flex-direction: column; gap: 1px; color: var(--texto); }
+.cartaH.sel { border-color: #fff; transform: translateY(-4px); box-shadow: 0 0 12px #fff6; }
+.cartaH.desc { background: linear-gradient(180deg, #1d3a2a, #12231a); }
+.cartaH.desc .ini { background: #8a8a99; }
+
+.acoes-linha { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 6px; }
+.ac { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; min-height: 52px; border-radius: 12px; background: var(--painel2); border: 1px solid var(--borda); font-size: .74rem; }
+.ac b { font-size: 1.25rem; line-height: 1; }
+.ac.fim-turno { background: linear-gradient(180deg, #6a4bb3, #4b3585); border-color: #8a6bd6; }
+.submenu { display: flex; flex-direction: column; gap: 6px; max-height: 200px; overflow-y: auto; }
+.dica-sub { font-size: .76rem; color: var(--suave); }
+.alvo-msg { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 6px 10px; background: #a02a30cc; border-radius: 12px; font-size: .85rem; }
+
+.gaveta { display: none; position: absolute; inset: 6px; z-index: 8; overflow-y: auto; padding: 10px; border-radius: 14px; background: #130f20f5; border: 2px solid var(--ouro); flex-direction: column; gap: 8px; }
+.gaveta.aberta { display: flex; }
+.gaveta-cab { display: flex; justify-content: space-between; align-items: center; }
+.btn-x { width: 36px; height: 36px; border-radius: 50%; background: var(--painel2); border: 1px solid var(--borda); }
+.gaveta .log { max-height: 130px; }
+.centro { display: none; position: absolute; inset: 0; z-index: 9; align-items: center; justify-content: center; padding: 14px; background: #000000a0; }
+.centro.on { display: flex; }
+.centro .fim { width: 100%; max-width: 360px; max-height: 100%; overflow-y: auto; background: var(--painel); border: 2px solid var(--ouro); border-radius: 16px; padding: 14px; }
+
+/* celular deitado: mapa à esquerda, painel à direita */
+@media (orientation: landscape) and (max-height: 520px) {
+  .tela.tatica { padding-top: 0; }
+  .tat-topo { padding: 1px 8px; font-size: .72rem; }
+  #app { max-width: none; }
+  .dock { left: auto; top: 0; width: min(330px, 42%); max-height: none; padding: 6px 8px; background: #0d0b14f2; border-left: 1px solid var(--borda); justify-content: flex-end; }
+  .sobre-topo { right: min(330px, 42%); padding-right: 6px; }
+  .mapa-botoes { right: calc(min(330px, 42%) + 6px); flex-direction: column; }
+  .btn-mapa { width: 36px; height: 36px; }
+  .mao { flex-wrap: wrap; overflow-x: visible; overflow-y: auto; max-height: 150px; }
+  .cartaH { flex: 0 0 calc(50% - 3px); }
+  .hh-barras .barra { min-width: 80px; }
+}
+.palco > .tut { position: absolute; top: 44px; left: 8px; right: 8px; margin: 0; z-index: 12; max-height: 55%; }
+@media (orientation: landscape) and (max-height: 520px) { .palco > .tut { right: calc(min(330px, 42%) + 8px); top: 40px; max-height: 80%; } }

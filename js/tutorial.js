@@ -175,7 +175,7 @@ const Tutorial = (() => {
     }
     if (mudou) guardar();
     if (!passo) { limpar(); return; }
-    const tela$ = document.querySelector('#app .tela');
+    const tela$ = document.querySelector('#app .palco') || document.querySelector('#app .tela');
     if (!tela$) return;
     let cartao = document.getElementById('tut');
     const novo = atual !== passo.id || !cartao || !tela$.contains(cartao);

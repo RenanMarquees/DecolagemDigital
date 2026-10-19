@@ -241,6 +241,8 @@ const Cena3D = (() => {
     cena.fog = new THREE.Fog(tema.fundo, 20, 52);
     cena.add(new THREE.HemisphereLight(tema.ceu, tema.solo, 0.95));
     const sol = new THREE.DirectionalLight(0xffffff, 0.8); sol.position.set(-5, 11, 7); cena.add(sol);
+    const rim = new THREE.DirectionalLight(tema.ceu, 0.45); rim.position.set(6, 5, -8); cena.add(rim);   // luz de contorno: separa o monstro do fundo
+    Modelos3D.ambiente(renderer, cena);                                                                     // reflexos suaves nos metais e olhos
     const camera = new THREE.PerspectiveCamera(42, w / h, 0.1, 90);
 
     const g = T.g;
@@ -252,7 +254,7 @@ const Cena3D = (() => {
       cam: { x: 0, z: 0, dist: 15, yaw: 0, elev: 0.95, alvoX: 0, alvoZ: 0, alvoDist: 15, alvoYaw: 0 },
       limites: { x0: 0, x1: 0, z0: 0, z1: 0 },
       mats: { alc: null, alvo: null, perigo: null, porta: null }, fxCamada: null, ro: null, ponteiros: new Map(),
-      toque: null, ultimoSync: null,
+      toque: null, ultimoSync: null, mg: { t: 70, b: 130, r: 0 },
     };
 
     // overlay para os números flutuantes
@@ -322,18 +324,7 @@ const Cena3D = (() => {
       E.cores.set(e.tipo, e.chefe ? COR_CHEFE : CORES_BASE[i++ % CORES_BASE.length]);
     }
 
-    const vs = T.inim.filter(e => e.vivo);
-    // câmera inicial: mais perto do herói; afasta até o herói e os inimigos caberem na tela (fora dos botões da direita)
-    const pts = [T.heroi, ...vs].map(u => pos3d(u.c, u.r));
-    const cxm = pts.slice(1).reduce((a, p) => a + p.x, 0) / Math.max(1, pts.length - 1), czm = pts.slice(1).reduce((a, p) => a + p.z, 0) / Math.max(1, pts.length - 1);
-    const ph0 = pts[0], ini = { x: ph0.x * 0.55 + cxm * 0.45, z: ph0.z * 0.55 + czm * 0.45 };
-    Object.assign(E.cam, { x: ini.x, z: ini.z, alvoX: ini.x, alvoZ: ini.z });
-    for (let d = 11; d <= 28; d += 1) {
-      E.cam.dist = E.cam.alvoDist = d; posicionarCamera(); E.camera.updateMatrixWorld();
-      const cabe = pts.every(p => [0, 1.9].every(y => { const v = new THREE.Vector3(p.x, y, p.z).project(E.camera); return v.x > -0.86 && v.x < 0.68 && v.y > -0.8 && v.y < 0.82; }));
-      if (cabe) break;
-    }
-    ajustarLimites(); posicionarCamera();
+    enquadrar();
 
     ligarControles();
     E.ro = new ResizeObserver(() => redimensionar());
@@ -342,11 +333,56 @@ const Cena3D = (() => {
     return true;
   }
 
+  /** Enquadra a câmera: perto do herói, mas afastando até o herói e os inimigos caberem na parte livre da tela
+   *  (fora da faixa do topo, dos atalhos de baixo/lateral e dos botões de zoom). */
+  function enquadrar() {
+    if (!E) return;
+    const T = E.T, vs = T.inim.filter(e => e.vivo);
+    const pts = [T.heroi, ...vs].map(u => pos3d(u.c, u.r));
+    const cxm = pts.slice(1).reduce((a, p) => a + p.x, 0) / Math.max(1, pts.length - 1), czm = pts.slice(1).reduce((a, p) => a + p.z, 0) / Math.max(1, pts.length - 1);
+    const ph0 = pts[0], ini = pts.length > 1 ? { x: ph0.x * 0.55 + cxm * 0.45, z: ph0.z * 0.55 + czm * 0.45 } : ph0;
+    const L = livre();
+    Object.assign(E.cam, { x: ini.x, z: ini.z, alvoX: ini.x, alvoZ: ini.z });
+    aplicarOffset();
+    const cabeEm = (d, lista) => { E.cam.dist = E.cam.alvoDist = d; posicionarCamera(); E.camera.updateMatrixWorld();
+      return lista.every(p => [0, 1.9].every(y => { const v = new THREE.Vector3(p.x, y, p.z).project(E.camera); return Math.abs(v.x) < L.hw && Math.abs(v.y) < L.hh; })); };
+    let achou = false;
+    for (let d = 7; d <= 30 && !achou; d += 1) achou = cabeEm(d, pts);
+    if (!achou) {
+      // tela estreita demais para todo mundo: garante o herói (e o inimigo mais perto) e deixa o resto para arrastar
+      const perto = pts.slice(1).sort((a, b) => Math.hypot(a.x - ph0.x, a.z - ph0.z) - Math.hypot(b.x - ph0.x, b.z - ph0.z))[0];
+      const grupo = perto ? [ph0, perto] : [ph0];
+      const m = grupo.length > 1 ? { x: (ph0.x + perto.x) / 2, z: (ph0.z + perto.z) / 2 } : ph0;
+      Object.assign(E.cam, { x: m.x, z: m.z, alvoX: m.x, alvoZ: m.z });
+      for (let d = 7; d <= 22 && !(achou = cabeEm(d, grupo)); d += 1);
+      if (!achou) { Object.assign(E.cam, { x: ph0.x, z: ph0.z, alvoX: ph0.x, alvoZ: ph0.z }); cabeEm(21, [ph0]); }
+    }
+    ajustarLimites(); posicionarCamera();
+  }
+  /** Parte da tela que não está coberta por painéis nem pelos botões de zoom (em pixels e em fração da tela). */
+  function livre() {
+    const W = Math.max(100, E.cont.clientWidth), H = Math.max(100, E.cont.clientHeight), mg = E.mg;
+    const x0 = 8, x1 = W - mg.r - 64, y0 = mg.t + 12, y1 = H - mg.b - 12;
+    return { cx: (x0 + x1) / 2, cy: (y0 + y1) / 2, hw: Math.max(0.2, (x1 - x0) / W), hh: Math.max(0.2, (y1 - y0) / H), W, H };
+  }
+  /** Desloca a imagem para o centro da área livre (assim o herói não fica escondido atrás do painel). */
+  function aplicarOffset() {
+    const L = livre();
+    E.camera.setViewOffset(L.W, L.H, Math.round(L.W / 2 - L.cx), Math.round(L.H / 2 - L.cy), L.W, L.H);
+  }
+  /** Quanto da tela está coberto por painéis (px): topo, base e lado direito. Reenquadra se pedido. */
+  function margens(t, b, r, reenquadrar) {
+    if (!E) return;
+    const antes = E.mg; E.mg = { t, b, r };
+    if (reenquadrar && (Math.abs(antes.t - t) > 4 || Math.abs(antes.b - b) > 4 || Math.abs(antes.r - r) > 4 || reenquadrar === true)) enquadrar();
+    else if (reenquadrar) aplicarOffset();
+  }
+
   function redimensionar() {
     if (!E) return;
     const w = Math.max(100, E.cont.clientWidth), h = Math.max(100, E.cont.clientHeight);
     E.renderer.setSize(w, h, false);
-    E.camera.aspect = w / h; E.camera.updateProjectionMatrix();
+    E.camera.aspect = w / h; aplicarOffset(); E.camera.updateProjectionMatrix();
   }
 
   /* ---------- Câmera ---------- */
@@ -388,8 +424,8 @@ const Cena3D = (() => {
   /** Só mexe a câmera se o hexágono estiver perto da borda da tela. */
   function garantirVisivel(c, r) {
     if (!E) return;
-    const t = telaDe(c, r), rect = E.cv.getBoundingClientRect(), m = 70;
-    if (!t || t.x < rect.left + m || t.x > rect.right - m || t.y < rect.top + m || t.y > rect.bottom - m) centralizar(c, r);
+    const t = telaDe(c, r), rect = E.cv.getBoundingClientRect(), mg = E.mg;
+    if (!t || t.x < rect.left + 40 || t.x > rect.right - 64 - mg.r || t.y < rect.top + mg.t + 20 || t.y > rect.bottom - mg.b - 20) centralizar(c, r);
   }
 
   /* ---------- Toques: arrastar, pinça, girar e tocar ---------- */
@@ -696,7 +732,7 @@ const Cena3D = (() => {
   }
 
   return {
-    montar, sincronizar, fx, investir, centralizar, garantirVisivel, destruir, telaDe, hexEm,
+    montar, sincronizar, fx, investir, centralizar, garantirVisivel, destruir, telaDe, hexEm, margens, enquadrar,
     zoom: f => { if (E) zoomPor(f); },
     girar: graus => { if (E) E.cam.alvoYaw += (graus * Math.PI) / 180; },
     corDoTipo: tipo => (E && E.cores.get(tipo)) || '#888',

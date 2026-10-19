@@ -63,7 +63,6 @@ function statusTopo() {
   return `<header class="topo">
     <div class="topo-nome"><b>${esc(P.nome)}</b> <span>${CLASSES[P.classe].icone} Nv ${P.nivel}</span><span class="ouro">🪙 ${P.gold}</span></div>
     ${barra('hp', P.hp, d.hpMax, '❤️ ')}
-    ${barra('mp', P.mp, d.mpMax, '💧 ')}
     ${P.nivel < NIVEL_MAX ? `<div class="barra xp"><i style="width:${pct(P.xp, xpParaProximo(P.nivel))}%"></i><span>XP ${P.xp}/${xpParaProximo(P.nivel)}</span></div>` : ''}
   </header>`;
 }
@@ -240,6 +239,22 @@ function telaBriefing() {
 }
 
 /* ---------- loja ---------- */
+/** Compara um item da loja com o que o herói usa no mesmo lugar: "▲ +1 vida, +2 dano" ou "▼ ...". */
+function compararItem(id) {
+  const it = ITENS[id];
+  if (it.tipo === 'mochila') return '';
+  const chaves = ['hp', 'atq', 'esc', 'mov', 'alc', 'cura'], nomes = { hp: 'vida', atq: 'dano', esc: 'escudo', mov: 'movimento', alc: 'alcance', cura: 'cura' };
+  let atual = null;
+  if (it.tipo === 'maos') {
+    const maos = P.equip.maos.map(m => (m ? ITENS[m] : null)), soma = x => (x ? chaves.reduce((a, k) => a + (x[k] || 0), 0) : -1);
+    atual = soma(maos[0]) <= soma(maos[1]) ? maos[0] : maos[1];
+  } else atual = P.equip[it.tipo] ? ITENS[P.equip[it.tipo]] : null;
+  const partes = chaves.map(k => [k, (it[k] || 0) - (atual ? atual[k] || 0 : 0)]).filter(([, v]) => v !== 0);
+  if (!partes.length) return '<small>= igual ao que você usa</small>';
+  const melhor = partes.reduce((a, [, v]) => a + v, 0) > 0;
+  return `<small class="${melhor ? 'melhor' : 'pior'}">${melhor ? '▲' : '▼'} ${partes.map(([k, v]) => `${v > 0 ? '+' : ''}${v} ${nomes[k]}`).join(', ')} vs. ${atual ? 'equipado' : 'vazio'}</small>`;
+}
+
 function telaLoja() {
   Cena3D.destruir();
   const r = REINO;
@@ -248,17 +263,11 @@ function telaLoja() {
     : Object.keys(P.inv).filter(id => ITENS[id].preco > 0);
   const linhas = lista.map(id => {
     const it = ITENS[id];
-    let comp = '';
-    if (it.tipo === 'arma' || it.tipo === 'armadura') {
-      const atual = ITENS[P.equip[it.tipo]];
-      const v = it.atk || it.def, vAtual = atual ? (atual.atk || atual.def) : 0;
-      const dif = v - vAtual;
-      comp = `<small class="${dif > 0 ? 'melhor' : 'pior'}">${dif > 0 ? '▲' : dif < 0 ? '▼' : '='} ${Math.abs(dif)} vs. equipado</small>`;
-    }
+    const etiqueta = `<small class="slot-etq">${SLOTS[it.tipo]}</small>`;
     if (LOJA_ABA === 'comprar') {
-      return linhaItem(id, comp, `<button class="btn peq" data-a="comprar" data-id="${id}" ${P.gold < it.preco ? 'disabled' : ''}>🪙 ${it.preco}</button>`);
+      return linhaItem(id, etiqueta + compararItem(id), `<button class="btn peq" data-a="comprar" data-id="${id}" ${P.gold < it.preco ? 'disabled' : ''}>🪙 ${it.preco}</button>`);
     }
-    return linhaItem(id, `<small>Você tem: ${qtd(P, id)}</small>`, `<button class="btn peq sec" data-a="vender" data-id="${id}">🪙 ${precoVenda(id)}</button>`);
+    return linhaItem(id, etiqueta + `<small>Você tem: ${qtd(P, id)}</small>`, `<button class="btn peq sec" data-a="vender" data-id="${id}">🪙 ${precoVenda(id)}</button>`);
   }).join('') || '<p class="vazio">Nada por aqui.</p>';
   app.innerHTML = `<div class="tela loja reino-${r.id}">
     ${statusTopo()}
@@ -268,6 +277,7 @@ function telaLoja() {
         <button class="${LOJA_ABA === 'comprar' ? 'on' : ''}" data-a="aba-loja" data-id="comprar">Comprar</button>
         <button class="${LOJA_ABA === 'vender' ? 'on' : ''}" data-a="aba-loja" data-id="vender">Vender</button>
       </div>
+      <p class="dica">Você leva: 1 na cabeça, 1 no peito, 1 nos pés, 2 nas mãos e ${tamanhoMochila(P.nivel)} na mochila. Compras de mochila entram sozinhas, se houver lugar.</p>
       <div class="lista">${linhas}</div>
       <button class="btn link" data-a="voltar-reino">← Sair da loja</button>
     </div>
@@ -283,32 +293,46 @@ function iniciarBatalha() {
   telaTatica();
 }
 
+let CARTA_SEL = null;   // carta de iniciativa tocada na mão (ainda não jogada)
+let GAVETA = false;     // painel de detalhes aberto?
+
 function telaTatica() {
+  CARTA_SEL = null; GAVETA = false;
   app.innerHTML = `<div class="tela tatica reino-${T.reinoId}">
     <div class="tat-topo"><span class="tat-nome">📍 <b>${esc(T.nomeSala)}</b></span><span id="rod"></span></div>
-    <div id="obj" class="obj"></div>
-    <div class="tabuleiro">
+    <div class="palco">
       <div class="cena3d" id="cena3d"></div>
+      <div class="sobre-topo"><div id="iniciativa" class="ini-faixa"></div><div id="obj" class="obj"></div></div>
       <div class="mapa-botoes">
         <button class="btn-mapa" data-a="tat-zoom-mais" aria-label="Aproximar">＋</button>
         <button class="btn-mapa" data-a="tat-zoom-menos" aria-label="Afastar">－</button>
         <button class="btn-mapa" data-a="tat-girar" aria-label="Girar o mapa">↻</button>
         <button class="btn-mapa" data-a="tat-centro" aria-label="Centralizar no herói">🎯</button>
+        <button class="btn-mapa" data-a="tat-gaveta" aria-label="Detalhes">📋</button>
       </div>
+      <div id="dock" class="dock"></div>
+      <div id="gaveta" class="gaveta"></div>
+      <div id="centro" class="centro"></div>
     </div>
-    <div id="hud"></div>
   </div>`;
   Cena3D.montar(document.getElementById('cena3d'), T, { onHex: (c, r) => ACOES.hex({ dataset: { c, r } }) });
   atualizarTudo();
+  ajustarMargens(true);
 }
 
 function atualizarTudo() { atualizarTabuleiro(); atualizarHud(); }
 
-/** Alvos possíveis do modo atual (para destacar em vermelho). */
-function alvosDoModo() {
-  if (!MODO) return [];
-  return tAlvos(T, P, MODO.tipo === 'atacar' ? { tipo: 'atacar' } : { tipo: 'habilidade', id: MODO.id });
+/** Diz ao mapa 3D quanto da tela está coberto pelos painéis (para o herói e os inimigos nunca ficarem escondidos). */
+function ajustarMargens(reenquadrar) {
+  const palco = document.querySelector('.palco'), dock = document.getElementById('dock'), topo = document.querySelector('.sobre-topo');
+  if (!palco || !dock || !Cena3D.ativa()) return;
+  const pr = palco.getBoundingClientRect(), dr = dock.getBoundingClientRect(), tr = topo.getBoundingClientRect();
+  const lateral = dr.left > pr.left + pr.width * 0.4;                // paisagem: o painel fica na direita
+  Cena3D.margens(Math.max(0, tr.bottom - pr.top), lateral ? 0 : Math.max(0, pr.bottom - dr.top), lateral ? Math.max(0, pr.right - dr.left) : 0, reenquadrar);
 }
+window.addEventListener('resize', () => { clearTimeout(ajustarMargens.t); ajustarMargens.t = setTimeout(() => { if (T && Cena3D.ativa()) ajustarMargens(true); }, 250); });
+
+function alvosDoModo() { return MODO ? tAlvos(T, P) : []; }
 
 function atualizarTabuleiro() {
   if (!T) return;
@@ -318,7 +342,7 @@ function atualizarTabuleiro() {
     else {
       if (T.movRest > 0) tAlcance(T).forEach(h => { alc.add(chave(h.c, h.r)); if (h.armadilhas > 0) perigo.add(chave(h.c, h.r)); });
       // sem ação pendente, os inimigos ao alcance do ataque básico também brilham
-      if (!T.acaoUsada) tAlvos(T, P, { tipo: 'atacar' }).forEach(e => alvos.add(chave(e.c, e.r)));
+      if (!T.acaoUsada) tAlvos(T, P).forEach(e => alvos.add(chave(e.c, e.r)));
     }
   }
   Cena3D.sincronizar(T, P, { alc, alvos, perigo });
@@ -338,17 +362,59 @@ function objetivoHtml() {
   const total = T.inim.filter(e => e.estrutura).length;
   const moedas = [...T.moedas.values()].reduce((a, m) => a + m.valor, 0);
   let txt;
-  if (T.objetivoCumprido && T.ultimaEtapa) txt = '✅ <b>Objetivo cumprido!</b> Saqueie o que sobrou e conclua o cenário.';
+  if (T.objetivoCumprido && T.ultimaEtapa) txt = '✅ <b>Objetivo cumprido!</b> Saqueie o que sobrou e conclua.';
   else if (!T.ultimaEtapa) txt = T.livre ? '🚪 <b>Sala limpa:</b> vá até a porta.' : `🚪 <b>Limpe a sala</b> para abrir a porta · inimigos: ${comb}`;
   else if (T.objetivo === 'matar_todos') txt = `☠️ <b>Derrote todos os inimigos</b> · restam ${comb}`;
   else if (T.objetivo === 'bau') txt = T.bau && T.bau.aberto ? '🧰 <b>Baú aberto!</b>' : '🧰 <b>Abra o baú:</b> termine o turno parado em cima dele';
   else if (T.objetivo === 'destruir') txt = `🏗️ <b>Destrua as estruturas</b> · ${total - estr}/${total}`;
   else { const b = T.inim.find(e => e.chefe); txt = `👑 <b>Derrote ${esc(b ? b.nome.split(',')[0] : 'o chefe')}</b>${b && b.vivo ? ` · ❤️ ${Math.round(pct(b.hp, b.hpMax))}%` : ''}`; }
   const extras = [moedas ? `🪙 no chão: ${moedas}` : '', T.bau && !T.bau.aberto && T.objetivo !== 'bau' ? '🧰 baú no mapa' : ''].filter(Boolean).join(' · ');
-  return `${txt}${extras ? `<small>${extras}</small>` : ''}`;
+  return `${txt}${extras ? ` <small>· ${extras}</small>` : ''}`;
 }
 
-/** Cartas dos inimigos: uma por TIPO, mostrando o que ele vai fazer nesta rodada. */
+const sinalN = n => (n > 0 ? '+' + n : String(n));
+/** Resumo em ícones de uma carta de inimigo (para a faixa de iniciativa). */
+function resumoCarta(c, ref) {
+  const mov = Math.max(1, ref.mov + (c.mov || 0)), atq = Math.max(0, ref.atk + (c.atq || 0) + (ref.bonusAtq || 0));
+  const o = [c.mov === undefined ? '👣✕' : `👣${mov}`, c.atq === undefined ? '⚔️✕' : `⚔️${atq}`];
+  if (c.atq !== undefined) o.push('🎯' + Math.max(1, ref.alc + (c.alc || 0)));
+  if (c.curar) o.push('✚' + c.curar); if (c.fortalecer) o.push('💪'); if (c.escudo) o.push('🛡️');
+  if (c.empurrarHeroi) o.push('💨'); if (c.puxarHeroi) o.push('🧲');
+  return o.join(' ');
+}
+
+/** Faixa de iniciativa (estilo Gloomhaven): quem joga primeiro, da esquerda para a direita. Cada inimigo mostra a carta da rodada. */
+function iniciativaHtml() {
+  if (T.livre) return '';
+  const cartaSel = CARTA_SEL && CARTA_SEL !== 'descanso' ? T.mao.find(c => c.id === CARTA_SEL) : (CARTA_SEL === 'descanso' ? CARTA_DESCANSO : null);
+  const ordem = ordemDaRodada(T, T.cartaHeroi ? null : (cartaSel ? cartaSel.ini : null));
+  const grupos = [], vistos = new Map();
+  for (const it of ordem) {
+    if (it.tipo === 'heroi') { grupos.push({ heroi: true, ini: it.ini }); continue; }
+    const e = it.e;
+    if (vistos.has(e.tipo)) { vistos.get(e.tipo).n++; continue; }
+    const g = { heroi: false, tipo: e.tipo, ref: e, ini: it.ini, n: 1 }; vistos.set(e.tipo, g); grupos.push(g);
+  }
+  if (!grupos.some(g => g.heroi)) grupos.push({ heroi: true, ini: null, pendente: true });   // ainda não escolheu: "?" no fim
+  const emFila = new Set(T.fila.filter(x => x !== 'heroi'));
+  const chips = grupos.map(g => {
+    if (g.heroi) {
+      const ativo = T.fase === 'heroi' && !T.fim, feito = T.heroiJogou;
+      return `<div class="ini-chip heroi ${ativo ? 'ativo' : ''} ${feito ? 'feito' : ''} ${g.pendente ? 'pendente' : ''}" title="Você"><i class="n">${g.ini === null ? '?' : g.ini}</i>${miniIcone(P.classe, 22)}<span class="ef">Você</span></div>`;
+    }
+    const restam = T.inim.some(e => e.vivo && e.tipo === g.tipo && emFila.has(e.uid));
+    const feito = T.fase !== 'escolha' && !restam, ativo = OCUPADO && ATOR_TIPO === g.tipo;
+    return `<button class="ini-chip ${feito ? 'feito' : ''} ${ativo ? 'ativo' : ''} ${g.ref.chefe ? 'chefe' : ''}" data-a="tat-gaveta" data-tipo="${g.tipo}" style="--cor:${Cena3D.corDoTipo(g.tipo)}" title="${esc(T.cartas[g.tipo].nome)}">
+      <i class="n">${g.ini}</i>${miniIcone(g.ref.id, 22)}<span class="ef">${resumoCarta(T.cartas[g.tipo], g.ref)}</span>${g.n > 1 ? `<em>×${g.n}</em>` : ''}</button>`;
+  });
+  const arm = T.tipoArm && T.armadilhas.size ? ARMADILHAS[T.tipoArm] : null;
+  if (arm) chips.push(`<button class="ini-chip chip-arm" data-a="tat-gaveta" style="--cor:${arm.cor}" title="${esc(arm.nome)}"><span class="ef">${arm.icone} ×${T.armadilhas.size}</span></button>`);
+  const estr = T.inim.filter(e => e.vivo && e.estrutura);
+  if (estr.length) chips.push(`<button class="ini-chip" data-a="tat-gaveta" style="--cor:#8a8a99">${miniIcone(estr[0].id, 22)}<span class="ef">×${estr.length}</span></button>`);
+  return chips.join('');
+}
+
+/** Cartas completas dos inimigos (com vida de cada um), para o painel de detalhes. */
 function cartasHtml() {
   const tipos = [];
   for (const e of combatentes(T)) if (!tipos.includes(e.tipo)) tipos.push(e.tipo);
@@ -356,8 +422,8 @@ function cartasHtml() {
     const grupo = combatentes(T).filter(e => e.tipo === tipo), ref = grupo[0], c = T.cartas[tipo];
     if (!c) return '';
     const movEf = c.mov === undefined ? 0 : Math.max(1, ref.mov + c.mov), alcEf = Math.max(1, ref.alc + (c.alc || 0));
-    const atqEf = c.atq === undefined ? null : Math.round(ref.atk * Math.max(0.3, 1 + 0.15 * c.atq));
-    const numeros = [c.mov !== undefined ? `👣 ${movEf}` : '', atqEf !== null ? `⚔️ ${atqEf}` : '', atqEf !== null ? `🎯 ${alcEf}` : ''].filter(Boolean).join('  ');
+    const atqEf = c.atq === undefined ? null : Math.max(0, ref.atk + c.atq + (ref.bonusAtq || 0));   // dano exato desta rodada
+    const numeros = [c.mov !== undefined ? `👣 ${movEf}` : '', atqEf !== null ? `⚔️ ${atqEf} de dano` : '', atqEf !== null ? `🎯 alcance ${alcEf}` : ''].filter(Boolean).join('  ');
     return `<div class="carta-inim ${ref.chefe ? 'chefe' : ''} ${ATOR_TIPO === tipo ? 'agindo' : ''}" style="--cor:${Cena3D.corDoTipo(tipo)}">
       <div class="carta-topo"><span class="ini" title="Iniciativa: quem tem número menor age primeiro">${c.ini}</span>${miniIcone(ref.id, 28)}<b>${esc(ref.nome.split(',')[0])}</b>${grupo.length > 1 ? `<em>×${grupo.length}</em>` : ''}</div>
       <div class="carta-nome">🃏 ${esc(c.nome)}</div>
@@ -375,92 +441,103 @@ function cartasHtml() {
   return cartas + estrHtml;
 }
 
-function hudHtml() {
-  const d = derivados(P);
-  const meuTurno = T.fase === 'heroi' && !T.fim && !OCUPADO;
+/** Painel de detalhes (abre pelo botão 📋 ou tocando numa carta da faixa): cartas dos inimigos, armadilhas e histórico. */
+function gavetaHtml() {
+  const defArm = T.tipoArm && T.armadilhas.size ? ARMADILHAS[T.tipoArm] : null;
+  const log = T.log.slice(-8).map(l => `<p class="l-${l.cls}">${esc(l.msg)}</p>`).join('');
+  const naSaida = T.heroi.c === T.saida.c && T.heroi.r === T.saida.r;
+  return `<div class="gaveta-cab"><b>📋 Detalhes da batalha</b><button class="btn-x" data-a="tat-gaveta" aria-label="Fechar">✕</button></div>
+    ${T.livre ? '' : `<div class="cartas-titulo">🃏 Cartas dos inimigos nesta rodada</div><div class="cartas">${cartasHtml()}</div>`}
+    ${defArm ? `<div class="dica-arm" style="--cor:${defArm.cor}">${defArm.icone} <b>${defArm.nome}</b> · ${defArm.desc} <small>(${T.armadilhas.size} no mapa)</small></div>` : ''}
+    <div class="cartas-titulo">Histórico</div><div class="log">${log}</div>
+    ${!T.livre && !T.chefeId ? `<button class="btn sec" data-a="tat-fugir" ${naSaida && (T.fase === 'heroi' || T.fase === 'escolha') && !OCUPADO ? '' : 'disabled'}>🚪 Fugir do cenário <small>${naSaida ? '' : '(só na entrada)'}</small></button>` : ''}`;
+}
+
+/** Uma carta da mão do herói. */
+function cartaMaoHtml(c, sel) {
+  return `<button class="cartaH ${sel ? 'sel' : ''} ${c.descanso ? 'desc' : ''}" data-a="tat-carta" data-id="${c.id}">
+    <i class="ini">${c.ini}</i><b>${esc(c.nome)}</b>
+    <span class="efs">${descreverCartaHeroi(c, derivados(P)).map(d => `<span>${d.icone} ${d.texto}</span>`).join('')}</span></button>`;
+}
+function maoHtml() {
+  const ordenada = [...T.mao].sort((a, b) => a.ini - b.ini);
+  const sel = CARTA_SEL === 'descanso' ? CARTA_DESCANSO : T.mao.find(c => c.id === CARTA_SEL);
+  const naSaida = T.heroi.c === T.saida.c && T.heroi.r === T.saida.r;
+  return `<div class="mao-topo"><span>🃏 Escolha sua carta · ${T.mao.length} na mão · ${T.descarte.length} usadas</span>
+      <span class="mao-bts"><button class="btn link peq" data-a="tat-itens">🎒 Mochila ${P.equip.mochila.length}</button>${sel ? `<button class="btn jogar" data-a="tat-jogar">▶ Jogar (ini ${sel.ini})</button>` : (naSaida && !T.chefeId ? '<button class="btn link peq" data-a="tat-fugir">🚪 Fugir</button>' : '')}</span></div>
+    <div class="mao">${ordenada.map(c => cartaMaoHtml(c, c.id === CARTA_SEL)).join('')}${cartaMaoHtml({ ...CARTA_DESCANSO, id: 'descanso' }, CARTA_SEL === 'descanso')}</div>`;
+}
+
+/** Barra de baixo: vida e, conforme a fase, a mão de cartas ou os atalhos de ação. */
+function dockHtml() {
+  const d = derivados(P), c = cartaAtual(T);
   const etiquetas = [
-    T.buff ? `<span class="tag ouro">📣 +dano (${T.buff.turnos})</span>` : '',
-    T.defendendo ? '<span class="tag">🛡️ defendendo</span>' : '',
+    T.bonusItem && T.bonusItem.atq ? `<span class="tag ouro">🪨 +${T.bonusItem.atq} dano</span>` : '',
+    T.escudoHeroi ? `<span class="tag">🛡️ escudo ${T.escudoHeroi}</span>` : '',
     ...T.efeitos.map(ef => `<span class="tag efeito">${ef.tipo === 'gelo' ? '❄️ gelo' : '☠️ veneno'} (${ef.turnos})</span>`),
   ].join('');
-  const cartas = T.livre ? '' : cartasHtml();
-  const defArm = T.tipoArm && T.armadilhas.size ? ARMADILHAS[T.tipoArm] : null;
-  const log = T.log.slice(-3).map(l => `<p class="l-${l.cls}">${esc(l.msg)}</p>`).join('');
-  return `<div class="hud-heroi">
-      <div class="hud-linha">${miniIcone(P.classe, 30)}<b>${esc(P.nome)} · Nv ${P.nivel}</b>${etiquetas}<span class="cen-tag">${DIFICULDADES[T.exp.difId].icone} Nv do cenário ${T.exp.nivelCen}</span></div>
-      ${barra('hp', P.hp, d.hpMax, '❤️ ')}${barra('mp', P.mp, d.mpMax, '💧 ')}
-      <div class="hud-linha pontos-turno">${T.livre
-        ? `<span class="on">${T.ultimaEtapa ? '🪙 Saqueie e conclua o cenário' : '🚪 Sala limpa: vá até a porta'}</span><span class="on">🪙 ${P.gold}</span>`
-        : `<span class="${T.movRest > 0 ? 'on' : ''}">👣 Mover ${T.movRest}/${movEfetivo(d.mov, T.efeitos)}</span>
-        <span class="${T.acaoUsada ? '' : 'on'}">${T.acaoUsada ? '⚔️ Ação usada' : '⚔️ Ação livre'}</span><span class="on">🪙 ${P.gold}</span>`}
-      </div>
-    </div>
-    ${cartas ? `<div class="cartas-titulo">🃏 Cartas dos inimigos nesta rodada</div><div class="cartas">${cartas}</div>` : ''}
-    ${defArm ? `<div class="dica-arm" style="--cor:${defArm.cor}">${defArm.icone} <b>${defArm.nome}</b> · ${defArm.desc} <small>(${T.armadilhas.size} no mapa)</small></div>` : ''}
-    <div class="log" id="log">${log}</div>
-    <div class="acoes" id="acoes">${acoesHtml(meuTurno)}</div>`;
+  const ult = T.log[T.log.length - 1];
+  const barras = `<div class="hud-heroi">
+      <div class="hh-barras">${miniIcone(P.classe, 26)}${barra('hp', P.hp, d.hpMax, '❤️ ')}<span class="ouro-mini">🪙 ${P.gold}</span></div>
+      <div class="pips">${T.livre ? '<span class="on">Sala limpa: ande livre</span>' : (T.fase === 'heroi' ? `<span class="${T.movRest > 0 ? 'on' : ''}">👣 ${T.movRest}</span><span class="${T.acaoUsada || !c.atq ? '' : 'on'}">${!c.atq ? '⚔️ sem ataque' : T.acaoUsada ? '⚔️ ataque usado' : `⚔️ dano ${danoDoHeroi(T, P)}`}</span>` : '')}${T.cartaHeroi && !T.livre ? `<span class="on carta-atual">🃏 ${esc(T.cartaHeroi.nome)}</span>` : ''}${etiquetas}
+        <span class="cen-tag">${DIFICULDADES[T.exp.difId].icone} Nv ${T.exp.nivelCen}</span></div>
+    </div>`;
+  const tick = ult ? `<div class="tick l-${ult.cls}">${esc(ult.msg)}</div>` : '';
+  if (T.fim === 'vitoria') return tick + barras;
+  if (T.fim === 'derrota') return tick + barras;
+  if (OCUPADO || T.fase === 'inimigos') return tick + barras + '<div class="aguarde">⏳ Os inimigos estão agindo…</div>';
+  if (T.fase === 'escolha') return tick + barras + (SUB === 'itens' ? acoesHtml() : maoHtml());
+  return tick + barras + acoesHtml();
 }
 
-function atualizarHud() {
-  const hud = document.getElementById('hud');
-  if (!hud || !T) return;
-  hud.innerHTML = hudHtml();
-  const obj = document.getElementById('obj');
-  if (obj) obj.innerHTML = objetivoHtml();
-  Tutorial.checar('batalha');
-  const rod = document.getElementById('rod');
-  if (rod) rod.innerHTML = `Etapa ${T.etapa}/${T.totalEtapas} · ` + (T.livre ? '<b>Sala limpa</b>' : `Rodada ${T.rodada} · ${OCUPADO || T.fase === 'inimigos' ? '<b class="ini">Inimigos agindo…</b>' : '<b>Seu turno</b>'}`);
-}
-
-function acoesHtml(meuTurno) {
-  if (T.fim === 'vitoria') return RES ? painelVitoria() : '';
-  if (T.fim === 'derrota') {
-    return `<div class="fim"><h3>💀 Você caiu</h3><p>Os deuses te trazem de volta, mas perdem 20% do seu ouro.</p>
-      <button class="btn grande" data-a="bat-fim">Despertar</button></div>`;
-  }
-  if (!meuTurno) return '<p class="vazio">Os inimigos estão se movendo…</p>';
+function acoesHtml() {
   if (MODO) {
-    return `<div class="fim"><p>🎯 Toque no inimigo destacado em vermelho.</p>
-      <button class="btn" data-a="tat-cancelar">Cancelar</button></div>`;
+    return `<div class="alvo-msg"><span>🎯 Toque no inimigo destacado em vermelho</span><button class="btn peq" data-a="tat-cancelar">Cancelar</button></div>`;
   }
-  if (SUB === 'habs') {
-    const habs = CLASSES[P.classe].habilidades.map(id => ({ id, ...HABILIDADES[id] }));
-    return `<div class="sub-menu">${habs.map(h => {
-      const bloq = h.nivel > P.nivel, semMp = P.mp < h.custo;
-      const alc = h.area === 'ao-redor' ? 'ao redor' : h.alcance === 0 ? 'você' : `alcance ${h.alcance}`;
-      return `<button class="btn hab" data-a="tat-hab" data-id="${h.id}" ${bloq || semMp || T.acaoUsada ? 'disabled' : ''}>
-        <span>${h.icone} ${h.nome}</span><small>${bloq ? `🔒 Nível ${h.nivel}` : `💧 ${h.custo} · ${alc} · ${h.desc}`}</small></button>`;
-    }).join('')}<button class="btn link" data-a="tat-voltar">← Voltar</button></div>`;
-  }
+  const bt = (a, ic, txt, extra = '', cls = '') => `<button class="ac ${cls}" data-a="${a}" ${extra}><b>${ic}</b><span>${txt}</span></button>`;
   if (SUB === 'itens') {
-    const cons = Object.keys(P.inv).filter(id => ITENS[id].tipo === 'consumivel');
-    return `<div class="sub-menu">${cons.length ? cons.map(id => {
-      const it = ITENS[id];
-      return `<button class="btn hab" data-a="tat-item" data-id="${id}" ${T.acaoUsada ? 'disabled' : ''}><span>${it.icone} ${it.nome} ×${qtd(P, id)}</span><small>${it.desc}</small></button>`;
-    }).join('') : '<p class="vazio">Sem consumíveis.</p>'}<button class="btn link" data-a="tat-voltar">← Voltar</button></div>`;
+    const m = P.equip.mochila;
+    return `<div class="submenu"><p class="dica-sub">🎒 Mochila (${m.length}/${tamanhoMochila(P.nivel)}) · usar um item <b>não gasta</b> a sua jogada</p>${m.length ? m.map((id, i) => {
+      const it = ITENS[id], vazio = !!(it.heal && !it.limpa && P.hp >= derivados(P).hpMax);
+      return `<button class="btn hab" data-a="tat-item" data-i="${i}" ${vazio ? 'disabled' : ''}><span>${it.icone} ${it.nome}</span><small>${it.desc}</small></button>`;
+    }).join('') : '<p class="vazio">Mochila vazia.</p>'}<button class="btn link peq" data-a="tat-voltar">← Voltar</button></div>`;
   }
   const naSaida = T.heroi.c === T.saida.c && T.heroi.r === T.saida.r;
   if (T.livre) {
-    return `<div class="grade-acoes">
-      <button class="btn" data-a="tat-itens">🎒 Itens</button>
-      ${T.ultimaEtapa ? '<button class="btn fim-turno" data-a="bat-fim">✅ Concluir cenário</button>' : '<button class="btn fim-turno" data-a="tat-porta">🚪 Ir até a porta</button>'}
-      <button class="btn sec span2" data-a="tat-fugir" ${naSaida ? '' : 'disabled'}>↩️ Sair do cenário <small>(só na entrada)</small></button>
-    </div>`;
+    return `<div class="acoes-linha livre">${bt('tat-itens', '🎒', 'Mochila')}${T.ultimaEtapa ? bt('bat-fim', '✅', 'Concluir', '', 'fim-turno') : bt('tat-porta', '🚪', 'Ir à porta', '', 'fim-turno')}${bt('tat-fugir', '↩️', 'Sair', naSaida ? '' : 'disabled')}</div>`;
   }
-  return `<div class="grade-acoes">
-    <button class="btn" data-a="tat-atacar" ${T.acaoUsada ? 'disabled' : ''}>⚔️ Atacar <small>alc ${CLASSES[P.classe].alcanceBasico}</small></button>
-    <button class="btn" data-a="tat-habs" ${T.acaoUsada ? 'disabled' : ''}>✨ Habilidades</button>
-    <button class="btn" data-a="tat-itens" ${T.acaoUsada ? 'disabled' : ''}>🎒 Itens</button>
-    <button class="btn" data-a="tat-defender" ${T.acaoUsada ? 'disabled' : ''}>🛡️ Defender</button>
-    <button class="btn fim-turno" data-a="tat-fim">⏭️ Encerrar turno</button>
-    <button class="btn sec" data-a="tat-fugir" ${T.chefeId || !naSaida ? 'disabled' : ''}>🚪 Fugir ${T.chefeId ? '' : naSaida ? '' : '<small>(na saída)</small>'}</button>
-  </div>`;
+  const c = cartaAtual(T);
+  const podeAtacar = !!c.atq && !T.acaoUsada;
+  return `<div class="acoes-linha">${bt('tat-atacar', '⚔️', c.atq ? `Atacar ${danoDoHeroi(T, P)}` : 'Sem ataque', podeAtacar ? '' : 'disabled')}${bt('tat-itens', '🎒', `Mochila ${P.equip.mochila.length}`)}${bt('tat-fim', '⏭️', 'Encerrar', '', 'fim-turno')}</div>`;
+}
+
+function atualizarHud() {
+  const dock = document.getElementById('dock');
+  if (!dock || !T) return;
+  dock.innerHTML = dockHtml();
+  const ini = document.getElementById('iniciativa'); if (ini) ini.innerHTML = iniciativaHtml();
+  const obj = document.getElementById('obj'); if (obj) obj.innerHTML = objetivoHtml();
+  const gv = document.getElementById('gaveta'); if (gv) { gv.innerHTML = GAVETA ? gavetaHtml() : ''; gv.classList.toggle('aberta', GAVETA); }
+  const centro = document.getElementById('centro');
+  if (centro) {
+    const painel = T.fim === 'vitoria' && RES ? painelVitoria() : (T.fim === 'derrota' ? derrotaHtml() : '');
+    centro.innerHTML = painel; centro.classList.toggle('on', !!painel);
+  }
+  const rod = document.getElementById('rod');
+  if (rod) rod.innerHTML = `Etapa ${T.etapa}/${T.totalEtapas} · ` + (T.livre ? '<b>Sala limpa</b>' : `Rodada ${T.rodada} · ${OCUPADO || T.fase === 'inimigos' ? '<b class="ini">Inimigos agindo</b>' : T.fase === 'escolha' ? '<b>Escolha a carta</b>' : '<b>Seu turno</b>'}`);
+  ajustarMargens(false);
+  Tutorial.checar('batalha');
+}
+
+function derrotaHtml() {
+  return `<div class="fim"><h3>💀 Você caiu</h3><p>Os deuses te trazem de volta, mas perdem 20% do seu ouro.</p>
+    <button class="btn grande" data-a="bat-fim">Despertar</button></div>`;
 }
 
 function painelVitoria() {
   const r = RES;
   const itens = r.itens.map(id => `<span class="drop" style="color:${RARIDADE_COR[ITENS[id].raridade]}">${ITENS[id].icone} ${esc(ITENS[id].nome)}</span>`).join('');
-  const subidas = r.subidas.map(s => `<p class="nivelup">⭐ Nível ${s.nivel}! +${PONTOS_POR_NIVEL} pontos de atributo${s.novas.length ? ' · Nova habilidade: ' + s.novas.map(id => HABILIDADES[id].nome).join(', ') : ''}</p>`).join('');
+  const subidas = r.subidas.map(s => `<p class="nivelup">⭐ Nível ${s.nivel}! +${PONTOS_POR_NIVEL} ponto de atributo${s.ganhouMochila ? ` · A mochila agora tem ${s.mochila} lugares!` : ''}</p>`).join('');
   const ultima = T.ultimaEtapa;
   const sobras = [r.moedasNoChao ? `🪙 ${r.moedasNoChao} moedas no chão` : '', r.bauFechado ? '🧰 o baú ainda está fechado' : ''].filter(Boolean).join(' · ');
   const botoes = ultima
@@ -524,7 +601,7 @@ function entrarPorta() {
   salvar();
   T = null; MODO = null; OCUPADO = false;
   const rec = prox.recuperou;
-  const folego = rec.hp || rec.mp ? ` Você recupera o fôlego (${[rec.hp ? `+${rec.hp} vida` : '', rec.mp ? `+${rec.mp} mana` : ''].filter(Boolean).join(', ')}).` : '';
+  const folego = rec.hp ? ` Você recupera o fôlego (+${rec.hp} vida).` : '';
   const paginas = [];
   if (prox.chefeId) {
     const b = INIMIGOS[prox.chefeId];
@@ -539,22 +616,20 @@ function entrarPorta() {
 
 function executar(acao, uid) {
   let ok = false;
-  const alvo = uid !== undefined ? T.inim.find(e => e.uid === uid) : null;
-  if (acao.tipo === 'atacar') ok = tAtacar(T, P, uid);
-  else if (acao.tipo === 'hab') { ok = tHabilidade(T, P, acao.id, uid); if (ok) Tutorial.evento('habilidade'); }
-  else if (acao.tipo === 'item') ok = tUsarItem(T, P, acao.id);
-  else if (acao.tipo === 'defender') ok = tDefender(T, P);
-  if (ok && alvo && (acao.tipo === 'atacar' || acao.tipo === 'hab')) Cena3D.investir('heroi', alvo.c, alvo.r);
-  MODO = null; SUB = 'main';
+  if (acao.tipo === 'atacar') {
+    const alvo = uid !== undefined ? T.inim.find(e => e.uid === uid) : tAlvos(T, P)[0];
+    ok = tAtacar(T, P, uid);
+    if (ok && alvo) Cena3D.investir('heroi', alvo.c, alvo.r);
+  } else if (acao.tipo === 'item') { ok = tUsarItem(T, P, acao.i); if (ok) Tutorial.evento('item'); }
+  MODO = null; if (acao.tipo !== 'item') SUB = 'main';
   depoisDaAcao(ok);
 }
 
-async function encerrarTurno() {
+/** Os inimigos jogam, um por vez, até chegar a vez do herói (ou acabar a rodada). */
+async function rodarInimigos() {
   const t = T;
-  if (!t || OCUPADO || !tEncerrarTurno(t, P)) return;
-  MODO = null; SUB = 'main'; OCUPADO = true;
+  OCUPADO = true; ATOR_TIPO = null;
   atualizarTudo();
-  if (t.fim) { OCUPADO = false; depoisDaAcao(true); return; }   // abriu o baú e cumpriu o objetivo
   mostrarFxT();
   while (T === t && t.fase === 'inimigos' && !t.fim) {
     await dormir(380);
@@ -573,6 +648,14 @@ async function encerrarTurno() {
   ATOR_TIPO = null;
   OCUPADO = false;
   depoisDaAcao(true);
+}
+
+async function encerrarTurno() {
+  const t = T;
+  if (!t || OCUPADO || !tEncerrarTurno(t, P)) return;
+  MODO = null; SUB = 'main';
+  if (t.fim) { depoisDaAcao(true); return; }   // abriu o baú e cumpriu o objetivo
+  await rodarInimigos();
 }
 
 /** Fim do cenário: recompensa aleatória, história do chefe (na 1ª vez), relíquia e, no cenário 20, o final do jogo. */
@@ -604,49 +687,60 @@ function abrirModal(html) { modal.innerHTML = `<div class="janela"><button class
 function fecharModal() { modal.classList.remove('on'); modal.innerHTML = ''; }
 let MODAL_ATUAL = null;
 
+/** Uma linha de equipamento vestido (ou "vazio"), com o botão de tirar. */
+function slotHtml(rotulo, ico, id, slot, lugar) {
+  return id
+    ? `<div class="slot"><span class="slot-nome">${ico} ${rotulo}</span>${linhaItem(id, `<small>${esc(descreverBonus(ITENS[id]) || 'sem bônus')}</small>`, `<button class="btn peq sec" data-a="desequipar" data-id="${slot}" data-lugar="${lugar}">Tirar</button>`)}</div>`
+    : `<div class="slot vazio-slot"><span>${ico}</span> ${rotulo}: vazio</div>`;
+}
+
 function modalPersonagem() {
   MODAL_ATUAL = 'personagem';
-  const d = derivados(P);
-  const c = CLASSES[P.classe];
+  const d = derivados(P), c = CLASSES[P.classe], e = P.equip;
   const attrs = ATRIBUTOS.map(a => `<div class="attr-linha">
     <div><b>${ATRIBUTO_NOME[a]}</b> <small>${ATRIBUTO_DESC[a]}</small></div>
-    <div class="attr-val">${P.attr[a]}${d[a] > P.attr[a] ? `<em>+${d[a] - P.attr[a]}</em>` : ''}</div>
+    <div class="attr-val">${P.attr[a]}</div>
     <button class="btn peq" data-a="ponto" data-id="${a}" ${P.pontos > 0 ? '' : 'disabled'}>＋</button></div>`).join('');
-  const habs = c.habilidades.map(id => { const h = HABILIDADES[id]; return `<li class="${h.nivel > P.nivel ? 'bloq' : ''}">${h.icone} <b>${h.nome}</b> <small>${h.nivel > P.nivel ? '🔒 Nv ' + h.nivel : '💧 ' + h.custo}</small></li>`; }).join('');
-  const slot = (nome, s, ico) => {
-    const id = P.equip[s];
-    return id
-      ? `<div class="slot">${linhaItem(id, '', `<button class="btn peq sec" data-a="desequipar" data-id="${s}">Tirar</button>`)}</div>`
-      : `<div class="slot vazio-slot"><span>${ico}</span> ${nome}: vazio</div>`;
-  };
+  const mochila = Array.from({ length: tamanhoMochila(P.nivel) }, (_, i) => {
+    const id = e.mochila[i];
+    return id ? `<div class="slot">${linhaItem(id, '', `<span class="bts"><button class="btn peq" data-a="mochila-usar" data-i="${i}">Usar</button><button class="btn peq sec" data-a="mochila-tirar" data-i="${i}">Tirar</button></span>`)}</div>`
+      : '<div class="slot vazio-slot"><span>🎒</span> lugar vazio</div>';
+  }).join('');
+  const cartas = (BARALHOS_HEROI[P.classe] || []).map(k => `<li><b>🃏 ${esc(k.nome)}</b> <small>iniciativa ${k.ini} · ${descreverCartaHeroi(k, d).map(x => `${x.icone} ${x.texto}`).join(' · ')}</small></li>`).join('');
   abrirModal(`<h2>${c.icone} ${esc(P.nome)} <small>${c.nome} · Nv ${P.nivel}</small></h2>
     <p class="pts">${P.pontos > 0 ? `✨ ${P.pontos} ponto(s) para distribuir!` : 'Sem pontos livres. Suba de nível para ganhar mais.'}</p>
     <div class="attrs">${attrs}</div>
     <div class="derivados">
-      <span>❤️ Vida <b>${d.hpMax}</b></span><span>💧 Mana <b>${d.mpMax}</b></span>
-      <span>⚔️ Ataque <b>+${d.atk}</b></span><span>🛡️ Defesa <b>${d.def}</b></span>
-      <span>💥 Crítico <b>${Math.round(d.crit * 100)}%</b></span><span>💨 Esquiva <b>${Math.round(d.esquiva * 100)}%</b></span>
-      <span>👣 Movimento <b>${d.mov}</b></span><span>🎯 Alcance <b>${c.alcanceBasico}</b></span>
+      <span>❤️ Vida <b>${P.hp}/${d.hpMax}</b></span><span>⚔️ Dano extra <b>+${d.dano}</b></span>
+      <span>👣 Movimento extra <b>+${d.mov}</b></span><span>✚ Cura extra <b>+${d.cura}</b></span>
+      <span>🛡️ Escudo <b>${d.esc}</b></span><span>🎯 Alcance extra <b>+${d.alc}</b></span>
     </div>
     <h3>Equipado</h3>
-    ${slot('Arma', 'arma', '🗡️')}${slot('Armadura', 'armadura', '🛡️')}${slot('Amuleto', 'amuleto', '📿')}
-    <h3>Habilidades</h3><ul class="habs">${habs}</ul>`);
+    ${slotHtml('Cabeça', '🪖', e.cabeca, 'cabeca', 0)}${slotHtml('Peito', '🥋', e.peito, 'peito', 0)}${slotHtml('Pés', '🥾', e.pes, 'pes', 0)}
+    ${slotHtml('Mão 1', '🗡️', e.maos[0], 'maos', 0)}${slotHtml('Mão 2', '🛡️', e.maos[1], 'maos', 1)}
+    <h3>Mochila (${e.mochila.length}/${tamanhoMochila(P.nivel)}) <small>cresce nos níveis 5, 10 e 15</small></h3>${mochila}
+    <h3>Suas cartas</h3><ul class="habs">${cartas}</ul>`);
 }
 
 function modalInventario() {
   MODAL_ATUAL = 'inventario';
   const ids = Object.keys(P.inv);
-  const cons = ids.filter(id => ITENS[id].tipo === 'consumivel');
-  const equip = ids.filter(id => ITENS[id].tipo !== 'consumivel');
-  const linhaC = id => linhaItem(id, `<small>Quantidade: ${qtd(P, id)}</small>`, `<button class="btn peq" data-a="usar" data-id="${id}">Usar</button>`);
+  const cons = ids.filter(id => ITENS[id].tipo === 'mochila');
+  const equip = ids.filter(id => ITENS[id].tipo !== 'mochila');
+  const cheia = P.equip.mochila.length >= tamanhoMochila(P.nivel);
+  const linhaC = id => linhaItem(id, `<small>Guardado: ${qtd(P, id)}</small>`, `<button class="btn peq" data-a="levar" data-id="${id}" ${cheia ? 'disabled' : ''}>Levar</button>`);
   const linhaE = id => {
-    const ok = podeEquipar(P, id);
-    return linhaItem(id, ok.ok ? '' : `<small class="pior">${ok.msg}</small>`, `<button class="btn peq" data-a="equipar" data-id="${id}" ${ok.ok ? '' : 'disabled'}>Equipar</button>`);
+    const ok = podeEquipar(P, id), it = ITENS[id];
+    const bts = !ok.ok ? `<button class="btn peq" disabled>Equipar</button>`
+      : it.tipo === 'maos' && P.equip.maos[0] && P.equip.maos[1]
+        ? `<span class="bts"><button class="btn peq" data-a="equipar" data-id="${id}" data-lugar="0">Mão 1</button><button class="btn peq" data-a="equipar" data-id="${id}" data-lugar="1">Mão 2</button></span>`
+        : `<button class="btn peq" data-a="equipar" data-id="${id}">Equipar</button>`;
+    return linhaItem(id, `<small class="slot-etq">${SLOTS[it.tipo]}</small>${ok.ok ? compararItem(id) : `<small class="pior">${ok.msg}</small>`}`, bts);
   };
   abrirModal(`<h2>🎒 Inventário <small>🪙 ${P.gold}</small></h2>
-    <h3>Consumíveis</h3>${cons.map(linhaC).join('') || '<p class="vazio">Nenhum.</p>'}
-    <h3>Equipamentos na mochila</h3>${equip.map(linhaE).join('') || '<p class="vazio">Nenhum. Compre ou ganhe itens para equipar.</p>'}
-    <p class="dica">Para ver o que está equipado, abra 🧙 Personagem.</p>`);
+    <p class="dica">Mochila: ${P.equip.mochila.length}/${tamanhoMochila(P.nivel)} lugares (veja e use em 🧙 Personagem). Usar itens da mochila na batalha <b>não gasta a sua jogada</b>.</p>
+    <h3>Equipamentos guardados</h3>${equip.map(linhaE).join('') || '<p class="vazio">Nenhum. Compre ou ganhe itens para equipar.</p>'}
+    <h3>Consumíveis guardados</h3>${cons.map(linhaC).join('') || '<p class="vazio">Nenhum. (Os que cabem vão direto para a mochila.)</p>'}`);
 }
 
 function atualizarModal() {
@@ -710,9 +804,9 @@ const ACOES = {
   },
   acampar() {
     const d = derivados(P);
-    if (P.hp >= d.hpMax && P.mp >= d.mpMax) { toast('Você já está descansado.'); return; }
+    if (P.hp >= d.hpMax) { toast('Você já está com a vida cheia.'); return; }
     if (!descansar(P, REINO)) { toast('Ouro insuficiente para acampar.'); return; }
-    salvar(); telaReino(); toast('Vida e mana restauradas. 🏕️');
+    salvar(); telaReino(); toast('Vida restaurada. 🏕️');
   },
   loja() { LOJA_ABA = 'comprar'; Tutorial.evento('loja'); telaLoja(); },
   'aba-loja'(el) { LOJA_ABA = el.dataset.id; telaLoja(); },
@@ -727,7 +821,7 @@ const ACOES = {
     if (e) {
       if (MODO) { executar(MODO, e.uid); return; }
       if (T.acaoUsada) { toast('Você já agiu neste turno.'); return; }
-      if (tAlvos(T, P, { tipo: 'atacar' }).some(x => x.uid === e.uid)) executar({ tipo: 'atacar' }, e.uid);
+      if (tAlvos(T, P).some(x => x.uid === e.uid)) executar({ tipo: 'atacar' }, e.uid);
       else toast(`${e.nome.split(',')[0]} está fora de alcance. Aproxime-se!`);
       return;
     }
@@ -756,22 +850,31 @@ const ACOES = {
   'tat-porta'() { if (T && T.livre && T.porta) { if (!irPara(T.porta.c, T.porta.r)) toast('Não dá para chegar até a porta daqui.'); } },
   'tat-atacar'() {
     if (!T || OCUPADO || T.acaoUsada) return;
-    if (!tAlvos(T, P, { tipo: 'atacar' }).length) { toast(`Nenhum inimigo ao alcance (${CLASSES[P.classe].alcanceBasico}). Mova-se!`); return; }
+    const c = cartaAtual(T);
+    if (!c.atq) { toast('A carta desta rodada não ataca.'); return; }
+    if (!tAlvos(T, P).length) { toast(c.alvo === 'ao-redor' ? 'Nenhum inimigo ao seu lado. Mova-se!' : `Nenhum inimigo ao alcance (${alcanceDa(P, T)}). Mova-se!`); return; }
+    if (c.alvo === 'ao-redor') { executar({ tipo: 'atacar' }); return; }
     MODO = { tipo: 'atacar' }; atualizarTudo();
   },
-  'tat-habs'() { SUB = 'habs'; atualizarHud(); },
+  'tat-carta'(el) {
+    if (!T || OCUPADO || T.fase !== 'escolha') return;
+    CARTA_SEL = CARTA_SEL === el.dataset.id ? null : el.dataset.id;     // 2º toque na mesma carta desmarca
+    atualizarHud();
+  },
+  'tat-jogar'() {
+    if (!T || OCUPADO || T.fase !== 'escolha' || !CARTA_SEL) return;
+    const id = CARTA_SEL;
+    CARTA_SEL = null; SUB = 'main'; MODO = null;
+    if (!tEscolherCarta(T, P, id)) { atualizarHud(); return; }
+    Tutorial.evento('carta');
+    if (T.fase === 'inimigos') rodarInimigos();      // alguém tem iniciativa menor que a sua
+    else { mostrarFxT(); depoisDaAcao(true); }       // você é o primeiro
+  },
+  'tat-gaveta'() { GAVETA = !GAVETA; atualizarHud(); },
   'tat-itens'() { SUB = 'itens'; atualizarHud(); },
   'tat-voltar'() { SUB = 'main'; atualizarHud(); },
   'tat-cancelar'() { MODO = null; atualizarTudo(); },
-  'tat-hab'(el) {
-    if (!T || OCUPADO || T.acaoUsada) return;
-    const id = el.dataset.id, h = HABILIDADES[id];
-    if (h.tipo === 'buff' || h.tipo === 'cura' || h.area === 'ao-redor') { executar({ tipo: 'hab', id }); return; }
-    if (!tAlvos(T, P, { tipo: 'habilidade', id }).length) { toast(`Nenhum inimigo ao alcance (${h.alcance}). Mova-se!`); return; }
-    MODO = { tipo: 'hab', id }; SUB = 'main'; atualizarTudo();
-  },
-  'tat-item'(el) { if (T && !OCUPADO) executar({ tipo: 'item', id: el.dataset.id }); },
-  'tat-defender'() { if (T && !OCUPADO) executar({ tipo: 'defender' }); },
+  'tat-item'(el) { if (T && !OCUPADO) executar({ tipo: 'item', i: +el.dataset.i }); },
   'tat-fugir'() { if (T && !OCUPADO) depoisDaAcao(tFugir(T)); },
   'tat-fim'() { return encerrarTurno(); },
   'tat-zoom-mais'() { Cena3D.zoom(1.25); },
@@ -791,11 +894,13 @@ const ACOES = {
   inventario() { Tutorial.evento('inventario'); modalInventario(); },
   fechar() { MODAL_ATUAL = null; fecharModal(); if (!T && CEN) telaBriefing(); else if (!T && REINO) telaReino(); else if (!T && P && !HIST) telaMapa(); },
   ponto(el) { if (distribuirPonto(P, el.dataset.id)) { salvar(); atualizarModal(); } },
-  equipar(el) { const r = equipar(P, el.dataset.id); if (r.ok) { salvar(); atualizarModal(); } else toast(r.msg); },
-  desequipar(el) { desequipar(P, el.dataset.id); salvar(); atualizarModal(); },
-  usar(el) {
-    const msg = usarConsumivel(P, el.dataset.id);
-    if (msg) { salvar(); atualizarModal(); toast(msg); } else toast('Sem efeito agora.');
+  equipar(el) { const r = equipar(P, el.dataset.id, el.dataset.lugar !== undefined ? +el.dataset.lugar : undefined); if (r.ok) { salvar(); atualizarModal(); } else toast(r.msg); },
+  desequipar(el) { desequipar(P, el.dataset.id, +(el.dataset.lugar || 0)); salvar(); atualizarModal(); },
+  levar(el) { const r = levarNaMochila(P, el.dataset.id); if (r.ok) { salvar(); atualizarModal(); } else toast(r.msg); },
+  'mochila-tirar'(el) { tirarDaMochila(P, +el.dataset.i); salvar(); atualizarModal(); },
+  'mochila-usar'(el) {
+    const ef = usarMochila(P, +el.dataset.i, null);
+    if (ef) { salvar(); atualizarModal(); toast(ef.msg); } else toast('Sem efeito agora.');
   },
 };
 
