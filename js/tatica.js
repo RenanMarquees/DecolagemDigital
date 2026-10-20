@@ -137,7 +137,7 @@ function criarInimigoT(id, esc, uid, pos, ehChefe, exp) {
   return {
     uid, id, tipo: id, nome: b.nome, icone: b.icone, chefe: ehChefe, estrutura: false,
     hp, hpMax: hp, atk, def: b.def,
-    mov: b.mov || 2, alc: b.alc || 1,
+    mov: Math.max(1, Math.ceil((b.mov || 2) * 0.65)), alc: b.alc || 1,   // monstros andam menos (a sala é pequena e eles começam perto)
     xp: ganho(b.xp), moedas: b.gold > 0 ? (ehChefe ? Math.max(2, Math.round(b.gold / 5)) : Math.max(1, Math.round(b.gold / 3))) : 0,   // quantas moedas ele solta
     drops: b.drops || [], reliquia: b.reliquia, fragmento: b.fragmento,
     c: pos.c, r: pos.r, vivo: true, efeitos: [], bonusAtq: 0, escudo: 0,
@@ -217,7 +217,24 @@ function criarTatica(exp, p) {
     for (let i = 0; i < n; i++) lista.push({ id: sorteio(), esc: ESCALA_GRUPO[n] });
     spawns = embaralhar(spawns);
   }
-  const inim = lista.map((e, i) => criarInimigoT(e.id, e.esc, i + 1, spawns[i], !!e.chefe, exp));
+  // os monstros começam PERTO do herói (como em Gloomhaven: Botões e Bichinhos): de 3 a 6 hexágonos, e o chefe um pouco mais longe
+  const proximas = (min, max, usadas) => {
+    const livres = [];
+    for (let r = 0; r < g.rows; r++) for (let c = 0; c < g.cols; c++) {
+      if (g.cel[r][c] !== '.' || armadilhas.has(chave(c, r))) continue;
+      const d = dist({ c, r }, heroi);
+      if (d < min || d > max || usadas.some(u => dist(u, { c, r }) < 2)) continue;
+      livres.push({ c, r });
+    }
+    return livres.length ? livres[Math.floor(Math.random() * livres.length)] : null;
+  };
+  const usadas = [], pontos = [];
+  for (const e of lista) {
+    const pos = e.chefe ? (proximas(5, 7, usadas) || proximas(4, 9, usadas)) : (proximas(3, 6, usadas) || proximas(3, 9, usadas));
+    const fallback = spawns.find(sp => !usadas.some(u => u.c === sp.c && u.r === sp.r)) || spawns[0];
+    const ponto = pos || fallback; usadas.push(ponto); pontos.push(ponto);
+  }
+  const inim = lista.map((e, i) => criarInimigoT(e.id, e.esc, i + 1, pontos[i], !!e.chefe, exp));
 
   const T = {
     g, nomeSala: sala.nome, idSala: etapa.mapa, parede: sala.parede, liquido: sala.liquido, reinoId: reino.id,
@@ -377,7 +394,10 @@ function checarFim(T) {
   T.objetivoCumprido = true;
   T.limpa = true;                 // a sala está limpa, mas o jogo continua: você ainda usa as cartas para andar até a saída
   if (!T.ultimaEtapa && T.porta) { T.porta.acessivel = true; T.g.cel[T.porta.r][T.porta.c] = '.'; }   // a porta só abre quando você chega nela
-  logar(T, T.ultimaEtapa ? '✅ Objetivo cumprido! Pegue o que ainda quiser e volte à entrada 🚪 para concluir. O que ficar para trás se perde!' : '✅ Sala limpa! Pegue as moedas e o baú e ande até a porta 🚪. O que ficar para trás se perde!', 'info');
+  if (T.ultimaEtapa) {            // última sala: cumpriu o objetivo, o cenário termina na hora (o que não foi pego se perde)
+    T.fim = 'vitoria';
+    logar(T, '🏆 Objetivo cumprido! O cenário termina agora.', 'info');
+  } else logar(T, '✅ Sala limpa! Pegue as moedas e o baú e ande até a porta 🚪. O que ficar para trás se perde!', 'info');
 }
 
 function verificarMortes(T) {
@@ -440,9 +460,6 @@ function tMover(T, p, c, r) {
   }
   if (T.limpa && T.porta && T.porta.acessivel && T.heroi.c === T.porta.c && T.heroi.r === T.porta.r) {      // chegou na porta: ela se abre
     T.porta.aberta = true; T.fim = 'porta'; return true;
-  }
-  if (T.limpa && T.ultimaEtapa && T.heroi.c === T.saida.c && T.heroi.r === T.saida.r) {                       // voltou à entrada: o cenário termina
-    T.fim = 'vitoria'; logar(T, '🏆 Você deixa a arena. Cenário concluído!', 'info'); return true;
   }
   lootarAqui(T, p);               // parou aqui: pega as moedas que estiverem no chão
   return true;
