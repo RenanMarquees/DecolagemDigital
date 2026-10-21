@@ -120,10 +120,14 @@ const INIMIGOS = {
     reliquia: 'presa_fenrir', fragmento: 'Fragmento do Destino: Gelo',
     drops: [{ id: 'hidromel', chance: 1 }],
     falaAntes: [
-      { icone: '🐺', texto: 'Das sombras de Valhala surge Fenrir, as correntes do mundo ainda penduradas em seu pescoço. "Mortal... o Fio se rompeu e eu estou livre. Vou devorar o sol, depois você."' },
+      { icone: '🐺', texto: 'Das sombras de Valhala surge Fenrir, o lobo gigante, com correntes quebradas penduradas no pescoço. "Não fui eu quem as rompeu, mortal. Elas foram cortadas por DENTRO. Alguém sussurrou meu nome no escuro... e os deuses não vieram me impedir."' },
     ],
     falaDepois: [
-      { icone: '🐺', texto: 'Fenrir tomba. Entre suas presas brilha um fio de luz gelada: o primeiro Fragmento do Destino. Hugin pousa no seu ombro: "Um de quatro. O Olimpo chama."' },
+
+      { icone: '🐺', texto: 'Fenrir tomba em fumaça e geada. Entre as suas presas brilha um fio de luz gelada: o primeiro Fragmento do Destino. Ao tocá-lo, a Marca no pulso de {nome} arde, e o Fragmento pulsa no mesmo ritmo, como um coração.' },
+      { icone: '🐺', texto: 'O lobo, quase sem voz: "Pergunte... a quem te escolheu... por que um mortal. Por que agora." Os olhos dele se apagam.' },
+      { icone: '🐦‍⬛', texto: 'Hugin ajeita as penas: "Delírios de uma fera moribunda. Vamos ao Olimpo." Mas Munin, o corvo mudo, pousa sobre o Fragmento e encara Hugin sem piscar, pela primeira vez.' },
+      { icone: '❓', texto: 'Um de quatro. {nome} guarda o Fragmento e uma dúvida que não passa: quem cortou as correntes de Fenrir?' },
     ],
   },
 
@@ -137,10 +141,14 @@ const INIMIGOS = {
     reliquia: 'elmo_ares', fragmento: 'Fragmento do Destino: Guerra',
     drops: [{ id: 'ambrosia', chance: 1 }],
     falaAntes: [
-      { icone: '🔱', texto: 'No topo do Olimpo, Ares ergue a lança. "Os outros deuses dormem, mas a guerra nunca dorme! Prove que merece o Fragmento, mortal!"' },
+      { icone: '🔱', texto: 'No topo do Olimpo, Ares ergue a lança, e o capacete esconde um olhar cansado. "Os outros deuses não dormem, mortal: estão PRESOS. Alguém trancou o Olimpo por fora, alguém de asas negras. E me ordenou: impedir quem juntar os Fragmentos."' },
     ],
     falaDepois: [
-      { icone: '🔱', texto: 'Ares ri, ferido e satisfeito: "Há muito tempo ninguém me fazia sangrar." Ele estende o segundo Fragmento. "Desça ao Inferno. Hades guarda o próximo, e ele não é tão gentil."' },
+
+      { icone: '🔱', texto: 'Ares ri, ferido e satisfeito: "Há muito tempo ninguém me fazia sangrar." Ele entrega o segundo Fragmento, ainda quente.' },
+      { icone: '🔱', texto: '"Escute, Tecelão: o Fio não se rompeu sozinho. Foi CORTADO. E quem corta, recolhe. Já pensou em quem ganha quando o Fio estiver inteiro de novo?"' },
+      { icone: '🐦‍⬛', texto: 'Munin, enfim, fala, com a voz rouca de quem ficou séculos calado: "Hugin não é o Pensamento de Odin. Odin arrancou os olhos do verdadeiro Hugin há mil anos. Olhe os olhos dele, Tecelão... são dourados demais."' },
+      { icone: '🌓', texto: 'Hugin sorri, frio: "O corvo velho enlouqueceu. O Inferno nos espera." {nome} avança, mas aperta os Fragmentos contra o peito: estão quentes demais.' },
     ],
   },
 
@@ -154,10 +162,14 @@ const INIMIGOS = {
     reliquia: 'coroa_hades', fragmento: 'Fragmento do Destino: Morte',
     drops: [{ id: 'nectar', chance: 1 }],
     falaAntes: [
-      { icone: '👑', texto: 'O trono de Hades range sob a chama negra. "Todo mortal chega até mim, cedo ou tarde. Você só veio mais cedo do que o previsto."' },
+      { icone: '👑', texto: 'O trono de Hades range sob a chama negra. "Eu nunca guardei o Inferno, mortal. Guardei uma PORTA. E você me trouxe a chave, dente por dente."' },
     ],
     falaDepois: [
-      { icone: '👑', texto: 'Hades se curva, sem fôlego. "O Fio rompido... não foi obra dos deuses. Algo desperta no Duat. Leve o Fragmento e termine isto." As chamas do Inferno se apagam por um instante.' },
+
+      { icone: '👑', texto: 'Hades cai de joelhos, sem fôlego. "Os Fragmentos são dentes de uma chave. Quando os quatro se unirem, a porta atrás do Duat se abre. Eu a mantive fechada por três mil anos."' },
+      { icone: '👑', texto: '"Por que o Fio precisava de um mortal? Porque nenhum de nós conseguiria juntar o que nós mesmos separamos... para trancá-LO."' },
+      { icone: '🐦‍⬛', texto: 'Hugin avança, os olhos dourados em chamas: "Cala-te, ferrugem de rei!" Munin voa na frente de {nome}: "Foge!" Hugin, calmo: "Ainda não, Tecelão. Falta UM."' },
+      { icone: '💔', texto: 'Três Fragmentos latejam nas mãos de {nome}, como corações. Hugin bloqueia a saída. O Duat é o único caminho.' },
     ],
   },
 
@@ -171,10 +183,15 @@ const INIMIGOS = {
     reliquia: 'olho_set', fragmento: 'Fragmento do Destino: Caos',
     drops: [{ id: 'nectar', chance: 1 }],
     falaAntes: [
-      { icone: '🦂', texto: 'Nas areias do Duat, Set sorri com mil dentes. "Fui eu quem cortou o Fio, mortal. Fui eu quem sussurrou o nome do Caos. E agora você vem me parar?"' },
+      { icone: '🦂', texto: 'Nas areias do Duat, Set sorri com mil dentes. "Sim, fui eu quem cortou o Fio. Mas cortei por ordem de quem? Pergunte ao seu passarinho dourado."' },
     ],
     falaDepois: [
-      { icone: '🦂', texto: 'Set se desfaz em areia, rindo. "Tarde demais... Ele já desperta." O quarto Fragmento brilha em suas mãos. Os quatro Fragmentos se unem sozinhos e o céu se parte. Um portal se abre: o Abismo do Caos.' },
+
+      { icone: '🦂', texto: 'Set se desfaz em areia, rindo. "Eu cortei... porque ELE pediu. Prometeu-me o trono dos mundos. Mentiu. Ele sempre mente."' },
+      { icone: '🐦‍⬛', texto: 'Hugin tira a máscara: as penas ficam negras e os olhos dourados viram um vazio cheio de estrelas. "Hugin morreu há milênios. Eu só vesti as penas dele. Obrigado, Tecelão: quatro Fragmentos, uma chave."' },
+      { icone: '🌌', texto: 'Os Fragmentos escapam das mãos de {nome}, se unem no ar e rasgam o céu. "Eu sou o Primeiro Fio," diz uma voz sem origem. "O que tece e o que desfaz. E foi você quem me libertou."' },
+      { icone: '🐦‍⬛', texto: 'Munin, ferido, cai no ombro de {nome}: "Ouça... só um Tecelão pode refazer o Fio. Ele precisa de você VIVO. Ele não pode te vencer. Só te convencer."' },
+      { icone: '🕳️', texto: 'O Abismo do Caos espera, aberto no céu. {nome} entra com a Marca ardendo e uma certeza: o destino não é de ninguém... ainda.' },
     ],
   },
 
@@ -183,9 +200,11 @@ const INIMIGOS = {
     nome: 'Caos Primordial', icone: '🌌', mov: 4, alc: 5, chefe: true, hp: 80, atk: 7, def: 2, xp: 0, gold: 0,
     drops: [],
     falaAntes: [
-      { icone: '🌌', texto: 'No Abismo não há chão nem céu. Só uma voz que vem de antes do primeiro deus: "Eu sou o que havia antes do Fio. Eu sou o que haverá depois."' },
+      { icone: '🌌', texto: 'No Abismo não há chão nem céu. Só uma voz de antes do primeiro deus: "Eu fui a primeira linha, Tecelão. Une-te a mim e tecerás mundos sem deuses e sem dor. Ou me enfrenta e destrói o único que poderia te ensinar a tecer."' },
     ],
-    falaDepois: [],
+    falaDepois: [
+      { icone: '🌌', texto: 'O Caos Primordial vacila, e não é a fúria que escapa dele: é um fio solto, velho, cansado. "Então este é o fim de quem quase foi tudo..."' },
+    ],
   },
 };
 
@@ -280,13 +299,17 @@ const REINOS = [
 
 /* ---------- HISTÓRIA ---------- */
 const HISTORIA_PROLOGO = [
-  { icone: '🧶', texto: 'Antes de todos os tempos, os deuses antigos teciam o Fio do Destino: nórdicos, gregos, egípcios, cada um em seu reino, cada fio ligado ao próximo.' },
-  { icone: '✂️', texto: 'Mas o Fio se rompeu. Os deuses mergulharam em fúria e silêncio. Os mortos andam em Valhala, os monstros tomam o Olimpo, o Inferno transborda e o Duat sussurra o nome do Caos.' },
-  { icone: '🐦‍⬛', texto: 'Dois corvos pousam no ombro de {nome}. "Mortal", diz Hugin, "tu foste escolhido. Reúne os quatro Fragmentos do Destino antes que o Caos Primordial desperte."' },
+  { icone: '🧶', texto: 'Antes de todos os tempos, os deuses de todos os mundos teciam o Fio do Destino. Cada reino era um fio; cada deus, um nó.' },
+  { icone: '✂️', texto: 'Numa noite sem lua o Fio se rompeu. Valhala congelou e os mortos se levantaram. O Olimpo foi tomado por monstros. O Inferno transborda. E o Duat sussurra um nome que ninguém ousa repetir.' },
+  { icone: '🤲', texto: '{nome} acorda com o pulso queimando: uma marca em forma de nó, a Marca do Tecelão. Há séculos ninguém nasce com ela.' },
+  { icone: '🐦‍⬛', texto: 'Dois corvos entram pela janela. O de olhos dourados fala: "Sou Hugin, o Pensamento de Odin. O Fio precisa de um Tecelão e só restas tu. Reúne os quatro Fragmentos." O outro corvo, Munin, apenas te encara, em silêncio.' },
+  { icone: '🌑', texto: 'Antes de partir, Hugin avisa: "Não confies nos deuses. Eles cortaram o Fio por orgulho." Munin balança a cabeça, devagar. Algo nesta jornada não está sendo dito.' },
 ];
 
 const HISTORIA_FINAL = [
-  { icone: '🌌', texto: 'O Caos Primordial se desfaz como névoa ao amanhecer. Os quatro Fragmentos giram, brilham e se unem num fio dourado.' },
-  { icone: '🧶', texto: '{nome} ergue o Fio. Ele se estende pelos nove mundos: Valhala, Olimpo, Inferno e Duat voltam a se ligar, e os deuses antigos acordam, um por um.' },
-  { icone: '🌅', texto: 'Odin, Zeus, Hades e Rá se curvam diante de um mortal. "O destino agora é seu para tecer", dizem. Fim do primeiro ato. Mas há outros mundos além destes...' },
+  { icone: '🌌', texto: 'O Caos Primordial se desfaz como névoa ao amanhecer, mas não morre: dobra-se, como um fio velho, e se entrelaça nos Fragmentos. "Obrigado... por me lembrar de como se tece."' },
+  { icone: '🧶', texto: '{nome} ergue o Fio. Ele se estende pelos nove mundos: Valhala, Olimpo, Inferno e Duat voltam a se ligar, e os deuses presos acordam, um por um.' },
+  { icone: '🐦‍⬛', texto: 'Munin pousa no ombro de {nome}: "Hugin enganou a todos. Menos o Fio. Ele sabia que você nunca pediria o poder para si. Por isso escolheu você." É a última coisa que o corvo diz. Ele se desfaz em penas brancas.' },
+  { icone: '🌅', texto: 'Odin, Zeus, Hades e Rá se curvam diante de um mortal. "O destino agora é seu para tecer", dizem. {nome} sorri e deixa, de propósito, um nó solto no fim do Fio.' },
+  { icone: '🔭', texto: 'Fim do primeiro ato. Mas além dos nove mundos, alguma coisa percebeu o nó solto... e começou a puxá-lo. O Fio do Destino continua.' },
 ];

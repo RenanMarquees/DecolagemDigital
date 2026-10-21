@@ -429,3 +429,8 @@ b { font-weight: 700; }
 .mc-cartas { display: flex; gap: 10px; align-items: center; }
 .mc-carta.descartada { opacity: .45; transform: scale(.85) rotate(-6deg); filter: grayscale(.6); }
 .mc-carta.escolhida { box-shadow: 0 0 20px #fff8, 0 6px 18px #000c; }
+.mc-carta.bom { border-color: #5fd068; background: linear-gradient(160deg, #1f4a2a, #11251a); } .mc-carta.bom b { color: #b6ffbd; }
+.mc-carta.ruim { border-color: #ff6b6b; background: linear-gradient(160deg, #5a1f24, #2a1013); } .mc-carta.ruim b { color: #ffb3b3; }
+.mc-carta.x2 { border-color: #ffd166; background: linear-gradient(160deg, #6a4c10, #2d2106); } .mc-carta.x2 b { color: #ffe08a; }
+.mc-carta.bloqueio { border-color: #9aa0b4; background: linear-gradient(160deg, #3a3d4a, #14151c); } .mc-carta.bloqueio b { color: #ff8a8a; }
+.modcarta-cx .mc-carta { border-color: inherit; }
