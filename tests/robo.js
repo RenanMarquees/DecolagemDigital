@@ -13,7 +13,8 @@ module.exports = `window.robo = async function (maxIter = 400) {
     if (!T) return 'sem etapa';
     if (T.fim) return T.fim;
     if (T.fase === 'escolha' && !OCUPADO) {      // escolhe a carta da rodada: a que anda e ataca (na sala limpa: a que mais anda)
-      if (window.ROBO_INVENCIVEL && P.hp < derivados(P).hpMax) P.hp = derivados(P).hpMax;   // só nos testes de fluxo (boss.js): o robô não precisa sobreviver, só andar pela campanha
+      if (window.ROBO_INVENCIVEL && P.hp < derivados(P).hpMax) P.hp = derivados(P).hpMax;
+      if (window.ROBO_INVENCIVEL && T.perdidas.length >= 4) T.mao.push(...T.perdidas.splice(0));   // idem para as cartas: só o fluxo importa   // só nos testes de fluxo (boss.js): o robô não precisa sobreviver, só andar pela campanha
       if (T.descarte.length >= 2 && !T.rapidoUsado && (T.mao.length <= 1 || (!window.ROBO_INVENCIVEL && P.hp < derivados(P).hpMax * 0.4))) ACOES['tat-rapido']();   // descanso rápido: a mão acabando
       const mao = [...T.mao];
       if (!mao.length) { await new Promise(r => setTimeout(r, 5)); continue; }
