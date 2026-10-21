@@ -484,7 +484,7 @@ function cartasLinhaHtml() {
       <div class="mc-nome">${esc(c.nome)}</div>
       <div class="mc-nums"><span class="${movEf === null ? 'nada' : ''}">👣 ${movEf === null ? '—' : movEf}</span><span class="${atqEf === null ? 'nada' : ''}">⚔️ ${atqEf === null ? '—' : atqEf}</span>${atqEf === null ? '' : `<span>🎯 ${alcEf}</span>`}</div>
       ${extras ? `<div class="mc-efs">${extras}</div>` : ''}
-      <div class="mc-vida">${grupo.map(e => `<span>❤️ ${e.hp}</span>`).join('')}</div></div>`;
+</div>`;
   }).join('');
   return cartas ? `<div class="cartas-linha">${cartas}</div>` : '';
 }
@@ -498,7 +498,7 @@ function cartasHtml() {
     if (!c) return `<div class="carta-inim oculta" style="--cor:${Cena3D.corDoTipo(tipo)}">
       <div class="carta-topo"><span class="ini">?</span>${miniIcone(ref.id, 28)}<b>${esc(ref.nome.split(',')[0])}</b>${grupo.length > 1 ? `<em>×${grupo.length}</em>` : ''}</div>
       <div class="carta-nome">🂠 Carta oculta</div><small>Revelada quando você escolher a sua.</small>
-      <div class="vidas">${grupo.map(e => `<span class="vida-tag">❤️ ${e.hp}/${e.hpMax}${e.efeitos.map(ef => (ef.tipo === 'gelo' ? '❄️' : '☠️')).join('')}</span>`).join('')}</div></div>`;
+    </div>`;
     const movEf = c.mov === undefined ? 0 : Math.max(1, ref.mov + c.mov), alcEf = Math.max(1, ref.alc + (c.alc || 0));
     const atqEf = c.atq === undefined ? null : Math.max(0, ref.atk + c.atq + (ref.bonusAtq || 0));   // dano exato desta rodada
     const numeros = [c.mov !== undefined ? `👣 ${movEf}` : '', atqEf !== null ? `⚔️ ${atqEf} de dano` : '', atqEf !== null ? `🎯 alcance ${alcEf}` : ''].filter(Boolean).join('  ');
@@ -507,14 +507,12 @@ function cartasHtml() {
       <div class="carta-nome">🃏 ${esc(c.nome)}</div>
       <ul class="efeitos">${descreverCarta(c).map(d => `<li>${d.icone} ${d.texto}</li>`).join('')}</ul>
       ${numeros ? `<div class="carta-num">${numeros}</div>` : ''}
-      <div class="vidas">${grupo.map(e => `<span class="vida-tag">❤️ ${e.hp}/${e.hpMax}${e.efeitos.map(ef => (ef.tipo === 'gelo' ? '❄️' : '☠️')).join('')}</span>`).join('')}</div>
     </div>`;
   }).join('');
   const estr = T.inim.filter(e => e.vivo && e.estrutura);
   const estrHtml = estr.length ? `<div class="carta-inim estrutura" style="--cor:#8a8a99">
       <div class="carta-topo">${miniIcone(estr[0].id, 28)}<b>${esc(estr[0].nome)}</b><em>×${estr.length}</em></div>
       <div class="carta-nome">🏗️ Estrutura: não ataca nem anda</div>
-      <div class="vidas">${estr.map(e => `<span class="vida-tag">❤️ ${e.hp}/${e.hpMax}</span>`).join('')}</div>
     </div>` : '';
   return cartas + estrHtml;
 }
