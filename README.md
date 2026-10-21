@@ -4,7 +4,7 @@ RPG de turnos para celular sobre os deuses antigos. Feito em HTML + JavaScript p
 
 **Reinos:** Valhala → Olimpo → Inferno → Duat → Abismo do Caos
 **Classes:** Guerreiro, Caçador, Oráculo
-**Sistemas:** atributos (FOR/DES/INT/VIT), níveis (até 20), **5 tipos de item** (cabeça, peito, mãos, pés e mochila), loja, salvamento automático. **Números pequenos:** vida máxima do jogo = 30, dano de 2, 3, 6… e **sem mana**. A única sorte do jogo é o **baralho de modificadores** (abaixo).
+**Sistemas:** **sem atributos**: o herói melhora por **cartas** (1 a cada nível, escolhendo entre 2), níveis (até 20), **5 tipos de item** (cabeça, peito, mãos, pés e mochila), loja, salvamento automático. **Números pequenos:** vida máxima do jogo = 30, dano de 2, 3, 6… e **sem mana**. A única sorte do jogo é o **baralho de modificadores** (abaixo).
 
 **Campanha de 20 cenários:** 4 por reino, em sequência (terminar um destrava o próximo; o último de cada reino abre o reino seguinte). Cada cenário tem um **objetivo**:
 
@@ -27,7 +27,15 @@ RPG de turnos para celular sobre os deuses antigos. Feito em HTML + JavaScript p
 
 **Monstros começam perto** (de 3 a 6 hexágonos; o chefe de 5 a 7) e andam menos (como em Gloomhaven: Botões e Bichinhos).
 
-**Moedas:** cada monstro solta moedas no chão (pare em cima para pegar). Elas viram ouro **no fim do cenário**: **2 de ouro por moeda até o cenário 10 e 3 do cenário 11 em diante** (se você cair, as moedas que carregava ficam para trás; só valem as que você pegou antes de sair da sala). **Itens por etapa:** os mercadores liberam equipamentos melhores **a cada 5 cenários concluídos** (nível 1; 5 cenários → nível 2; 10 → 3; 15 → 4), e baús e recompensas também só dão equipamento do nível liberado.
+**Moedas:** cada monstro solta moedas no chão (termine o turno em cima, como no baú, para pegar). Elas viram ouro **no fim do cenário**: **2 de ouro por moeda até o cenário 10 e 3 do cenário 11 em diante** (se você cair, as moedas que carregava ficam para trás; só valem as que você pegou antes de sair da sala). **Itens por etapa:** os mercadores liberam equipamentos melhores **a cada 5 cenários concluídos** (nível 1; 5 cenários → nível 2; 10 → 3; 15 → 4), e baús e recompensas também só dão equipamento do nível liberado.
+
+**Cartas por nível:** a cada nível você escolhe **1 de 2 cartas novas** (`MODELOS_NIVEL` em `js/cartas.js`; os números crescem com o nível) e **a outra se perde para sempre**. A coleção cresce, mas a **mão de cada cenário tem de 6 a 10 cartas**: monte a sua em 🧙 Personagem. A vida cresce um pouco por nível (máx. 30).
+
+**Equipamento de uso único:** cabeça, peito, pés e mãos **não dão bônus fixos**: cada peça vestida pode ser **usada 1 vez por cenário**, de graça, no seu turno (🎒 Itens), e dá cura, escudo, +dano, +movimento ou +alcance conforme o item. Depois fica gasta até o cenário seguinte.
+
+**Mover só uma vez:** o movimento da carta é usado de uma vez só; se você andar menos do que a carta permite, o resto **se perde**. **Moedas, como o baú:** só são pegas se você **terminar o turno** em cima delas.
+
+**Salas pequenas e monstros em grupo:** as salas são de 8×8 hexágonos (feitas para jogar sozinho), com 3 a 5 monstros por sala (o chefe vem com 3 capangas), que nascem **juntos e perto** do herói (de 4 a 6 hexágonos) e andam menos.
 
 **Itens:** usar um item da mochila **não gasta a sua jogada**. Slots: 1 de cabeça, 1 de peito, 1 de pés, 2 de mãos, e a **mochila** começa com 2 lugares e vai a 5 (níveis 5, 10 e 15).
 
