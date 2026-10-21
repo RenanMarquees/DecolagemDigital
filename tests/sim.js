@@ -175,7 +175,7 @@ const robo = `(function () {
 
   function atacarSePuder(T, p) {
     const c = cartaAtual(T);
-    if (T.acaoUsada || !c.atq || querBau(T, p)) return false;
+    if (T.acaoUsada || !c.atq || querBau(T, p) || temCond(T.efeitos, 'desarmado')) return false;
     const quem = alvosDoRobo(T), alvos = tAlvos(T, p);
     if (!alvos.length) return false;
     const alvo = alvos.filter(e => quem.includes(e)).sort((a, b) => a.hp - b.hp)[0] || alvos[0];
