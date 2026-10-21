@@ -120,7 +120,7 @@ const srv = http.createServer((q, r) => {
   });
   if (!alvo) throw new Error('nenhum hexágono alcançável visível para tocar');
   const antes = await page.evaluate(() => JSON.stringify(T.heroi));
-  await page.touchscreen.tap(alvo.x, alvo.y);
+  await page.touchscreen.tap(alvo.x + 9, alvo.y + 6);   // um pouco fora do centro exato (o raio no vértice central do hexágono é instável)
   await page.waitForTimeout(500);
   const depois = await page.evaluate(() => JSON.stringify(T.heroi));
   if (antes === depois) throw new Error('o herói não se moveu ao tocar num hexágono do mapa 3D');

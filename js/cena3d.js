@@ -474,6 +474,7 @@ const Cena3D = (() => {
   function hexEm(clientX, clientY) {
     const rect = E.cv.getBoundingClientRect();
     const ndc = new THREE.Vector2(((clientX - rect.left) / rect.width) * 2 - 1, -((clientY - rect.top) / rect.height) * 2 + 1);
+    E.camera.updateMatrixWorld();                                  // a câmera pode ter acabado de se mexer (o desenho só atualiza no próximo quadro)
     const rc = new THREE.Raycaster(); rc.setFromCamera(ndc, E.camera);
     const alvos = [...E.pick];
     for (const u of E.unid.values()) if (!u.morrendo) alvos.push(u.pick);
@@ -490,6 +491,7 @@ const Cena3D = (() => {
   function telaDe(c, r) {
     if (!E) return null;
     const t = E.tiles.get(chave(c, r)), p = pos3d(c, r);
+    E.camera.updateMatrixWorld();
     const v = new THREE.Vector3(p.x, t ? t.topo : 0.3, p.z).project(E.camera);
     const rect = E.cv.getBoundingClientRect();
     return { x: rect.left + (v.x * 0.5 + 0.5) * rect.width, y: rect.top + (-v.y * 0.5 + 0.5) * rect.height };
@@ -738,6 +740,6 @@ const Cena3D = (() => {
     girar: graus => { if (E) E.cam.alvoYaw += (graus * Math.PI) / 180; },
     corDoTipo: tipo => (E && E.cores.get(tipo)) || '#888',
     ativa: () => !!E,
-    estado: () => (E ? { quadros: E.quadros, tiles: E.tiles.size, unidades: E.unid.size, armadilhas: E.arm.size, moedas: E.moedas.size, dist: E.cam.dist, yaw: E.cam.yaw } : null),
+    estado: () => (E ? { quadros: E.quadros, tiles: E.tiles.size, unidades: E.unid.size, armadilhas: E.arm.size, moedas: E.moedas.size, dist: E.cam.dist, yaw: E.cam.yaw, ponteiros: E.ponteiros.size } : null),
   };
 })();
