@@ -510,11 +510,11 @@ teste('empurrar: afasta o inimigo em linha reta, na direção oposta ao herói',
   const r = R(`(() => { const { p, T } = cen(1, { vivos: true }); const e = T.inim[0]; sozinho(T, e); pe(e, 5, 7); e.hp = e.hpMax = 99; T.heroi = { c: 3, r: 7 }; const n = forcarMovimento(T, p, e, T.heroi, 2, 'empurrar'); return [n, e.c, e.r]; })()`);
   igual(r.join(), '2,7,7');
 });
-teste('empurrar para antes de uma parede e para antes de outro inimigo', () => {
-  const r = R(`(() => { const { p, T } = cen(1, { vivos: true }); const [a, b] = T.inim; sozinho(T, a); pe(a, 8, 4); T.heroi = { c: 6, r: 4 }; const n1 = forcarMovimento(T, p, a, T.heroi, 3, 'empurrar');
+teste('empurrar nunca atravessa parede nem outro inimigo, e cada passo afasta de quem empurra', () => {
+  const r = R(`(() => { const { p, T } = cen(1, { vivos: true }); const [a, b] = T.inim; sozinho(T, a); pe(a, 8, 4); T.heroi = { c: 6, r: 4 }; const d0 = dist(a, T.heroi); const n1 = forcarMovimento(T, p, a, T.heroi, 3, 'empurrar');
     const { p: q, T: U } = cen(1, { vivos: true }); const [c, d] = U.inim; pe(c, 5, 7); pe(d, 6, 7); d.parado = true; U.heroi = { c: 3, r: 7 }; const n2 = forcarMovimento(U, q, c, U.heroi, 2, 'empurrar');
-    return [n1, celula(T.g, 9, 4), a.c, n2]; })()`);
-  igual(r.join(), '0,#,8,0');
+    return [celula(T.g, a.c, a.r), dist(a, T.heroi) - d0 === n1, n1 <= 3, celula(U.g, c.c, c.r), !(c.c === d.c && c.r === d.r), dist(c, U.heroi) >= 2]; })()`);
+  igual(r.join(), '.,true,true,.,true,true');
 });
 teste('empurrar para cima de uma armadilha dispara o efeito nela', () => {
   const r = R(`(() => { const { p, T } = cen(9, { vivos: true }); const e = T.inim[0]; sozinho(T, e); pe(e, 5, 7); e.hp = e.hpMax = 99; T.heroi = { c: 3, r: 7 }; armar(T, 6, 7, 'fogo'); forcarMovimento(T, p, e, T.heroi, 1, 'empurrar'); return { dano: 99 - e.hp, some: !T.armadilhas.has(chave(6, 7)) }; })()`);
@@ -527,10 +527,10 @@ teste('chefes e estruturas não saem do lugar; puxar aproxima e para colado no h
 });
 teste('cartas dos inimigos também empurram e puxam o herói (sem esquiva, conta exata)', () => {
   const r = R(`(() => { const out = {};
-    { const { p, T } = cen(1, { vivos: true }); const e = T.inim[0]; sozinho(T, e); limpar(T, 7); e.tipo = 'troll_gelo'; pe(e, 5, 7); T.heroi = { c: 4, r: 7 }; p.hp = 20; atacarHeroi(T, p, derivados(p), e, K('t', 1, { atq: 0, empurrarHeroi: 2 })); out.empurrado = T.heroi.c; }
-    { const { p, T } = cen(1, { vivos: true }); const e = T.inim[0]; sozinho(T, e); limpar(T, 7); e.tipo = 'harpia'; e.alc = 4; pe(e, 8, 7); T.heroi = { c: 4, r: 7 }; p.hp = 20; atacarHeroi(T, p, derivados(p), e, K('t', 1, { atq: 0, puxarHeroi: 2 })); out.puxado = T.heroi.c; }
+    { const { p, T } = cen(1, { vivos: true }); const e = T.inim[0]; sozinho(T, e); limpar(T, 7); e.tipo = 'troll_gelo'; pe(e, 5, 7); T.heroi = { c: 4, r: 7 }; p.hp = 20; atacarHeroi(T, p, derivados(p), e, K('t', 1, { atq: 0, empurrarHeroi: 2 })); out.empurrado = dist(T.heroi, e); }
+    { const { p, T } = cen(1, { vivos: true }); const e = T.inim[0]; sozinho(T, e); limpar(T, 7); e.tipo = 'harpia'; e.alc = 4; pe(e, 8, 7); T.heroi = { c: 4, r: 7 }; p.hp = 20; atacarHeroi(T, p, derivados(p), e, K('t', 1, { atq: 0, puxarHeroi: 2 })); out.puxado = dist(T.heroi, e); }
     return out; })()`);
-  igual(r.empurrado, 2, 'empurrado 2 para longe do inimigo'); igual(r.puxado, 6, 'puxado 2 em direção ao inimigo');
+  igual(r.empurrado, 3, 'empurrado 2 para longe do inimigo (de 1 para 3 de distância)'); igual(r.puxado, 2, 'puxado 2 em direção ao inimigo (de 4 para 2 de distância)');
 });
 
 console.log('\nNíveis e dificuldades');
@@ -727,6 +727,21 @@ teste('atirador (alcance) colado no herói se afasta para atacar sem desvantagem
     pe(e, 0, 9); for (const [c, r] of [[1, 8], [1, 9], [1, 10], [0, 8], [0, 10]]) T.g.cel[r][c] = '#'; T.heroi = { c: 1, r: 9 }; T.g.cel[9][1] = '.'; const p0 = p.hp; T.cartas[e.tipo] = carta;
     agirInimigo(T, p, derivados(p), e); return [afastou, e.c === 0, p.hp < p0]; })()`);
   igual(r.join(), 'true,true,true');
+});
+
+teste('empurrar/puxar: o JOGADOR escolhe o lugar (fila de escolhas) e os monstros escolhem o pior para o herói (armadilha, cercado)', () => {
+  const r = R(`(() => { const out = {};
+    { const { p, T } = cen(1, { semTurno: true, vivos: true }); T.escolhaForca = true; const e = T.inim[0]; sozinho(T, e); e.parado = true; limpar(T, 7); limpar(T, 6); limpar(T, 8); e.chefe = false; e.hp = e.hpMax = 99; e.def = 0; pe(e, 4, 7); T.heroi = { c: 3, r: 7 };
+      T.mao.unshift({ id: 'em', nome: 'E', ini: 1, mov: 1, atq: 2, empurrar: 2 }); tEscolherCarta(T, p, 'em'); T.heroi = { c: 3, r: 7 }; tAtacar(T, p, e.uid);
+      const antes = [e.c, e.r], pend = pendenciaForca(T), bloq = [tMover(T, p, 2, 7), tEncerrarTurno(T, p)]; const alvoOp = pend.opcoes.find(o => o.passos === 1 && o.r !== 7);
+      const ok = tResolverForca(T, p, alvoOp.c, alvoOp.r); out.jog = { antes, pendencias: pend.opcoes.length > 3, bloq: bloq.join(), ok, depois: [e.c, e.r], igual: e.c === alvoOp.c && e.r === alvoOp.r, fila: T.forcaFila.length }; }
+    { const { p, T } = cen(1, { semTurno: true, vivos: true }); T.escolhaForca = true; const e = T.inim[0]; sozinho(T, e); e.parado = true; limpar(T, 7); pe(e, 4, 7); e.hp = e.hpMax = 99; T.heroi = { c: 3, r: 7 };
+      T.mao.unshift({ id: 'em', nome: 'E', ini: 1, mov: 1, atq: 2, empurrar: 2 }); tEscolherCarta(T, p, 'em'); T.heroi = { c: 3, r: 7 }; tAtacar(T, p, e.uid); tResolverForca(T, p, null); out.pular = [e.c, T.forcaFila.length, tEncerrarTurno(T, p)]; }
+    { const { p, T } = cen(1, { vivos: true }); const e = T.inim[0]; sozinho(T, e); limpar(T, 7); e.tipo = 'troll_gelo'; pe(e, 5, 7); T.heroi = { c: 4, r: 7 }; p.hp = 20; armar(T, 2, 7, 'fogo'); armar(T, 3, 7, 'fogo');
+      const hp0 = p.hp; atacarHeroi(T, p, derivados(p), e, K('t', 1, { atq: 0, empurrarHeroi: 2 })); out.pior = [T.heroi.c, hp0 - p.hp > 3]; }
+    return out; })()`);
+  verdade(r.jog.pendencias, 'há várias opções de lugar'); igual(r.jog.bloq, 'false,false', 'enquanto escolhe, não anda nem encerra'); verdade(r.jog.ok && r.jog.igual, 'o inimigo vai para onde o jogador escolheu'); igual(r.jog.fila, 0);
+  igual(r.pular.join(), '4,0,true', 'pular deixa o inimigo onde está'); verdade(r.pior[0] <= 3 && r.pior[1], 'o monstro joga o herói nas armadilhas');
 });
 
 console.log('\nConquistas e cartas novas');

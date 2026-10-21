@@ -295,6 +295,7 @@ let GAVETA = false;
 let ESCOLHENDO_PERDA = false;   // janela para escolher qual carta se perde no descanso longo
 
 function telaTatica() {
+  T.escolhaForca = true;        // empurrar/puxar: o jogador escolhe para onde o inimigo vai
   CARTA_SEL = null; GAVETA = false; ESCOLHENDO_PERDA = false;
   app.innerHTML = `<div class="tela tatica reino-${T.reinoId}">
     <div class="tat-topo"><span class="tat-nome">📍 <b>${esc(T.nomeSala)}</b></span><span id="rod"></span></div>
@@ -345,7 +346,9 @@ function alvosDoModo() { return MODO ? tAlvos(T, P) : []; }
 function atualizarTabuleiro() {
   if (!T) return;
   const alc = new Set(), alvos = new Set(), perigo = new Set();
-  if (T.fase === 'heroi' && !T.fim && !OCUPADO) {
+  const pend = T.fase === 'heroi' && !T.fim && !OCUPADO ? pendenciaForca(T) : null;
+  if (pend) { pend.opcoes.forEach(o => alc.add(chave(o.c, o.r))); alvos.add(chave(pend.alvo.c, pend.alvo.r)); }   // escolher o lugar do empurrão/puxão
+  else if (T.fase === 'heroi' && !T.fim && !OCUPADO) {
     if (MODO) alvosDoModo().forEach(e => alvos.add(chave(e.c, e.r)));
     else {
       if (T.movRest > 0) tAlcance(T).forEach(h => { alc.add(chave(h.c, h.r)); if (h.armadilhas > 0) perigo.add(chave(h.c, h.r)); });
@@ -550,6 +553,8 @@ function dockHtml() {
     </div>`;
   const tick = ult ? `<div class="tick l-${ult.cls}">${esc(ult.msg)}</div>` : '';
   if (T.fim === 'vitoria' || T.fim === 'porta') return tick + barras;
+  const pendF = pendenciaForca(T);
+  if (pendF && !OCUPADO) return tick + barras + `<div class="alvo-msg forca"><span>${pendF.modo === 'puxar' ? '🧲' : '💨'} <b>Escolha para onde ${pendF.modo === 'puxar' ? 'puxar' : 'empurrar'} ${esc(pendF.alvo.nome.split(',')[0])}</b> (até ${pendF.n}): toque num hexágono destacado</span><button class="btn peq" data-a="tat-forca-pular">Deixar onde está</button></div>`;
   if (T.fim === 'derrota') return tick + barras;
   if (OCUPADO || T.fase === 'inimigos') return tick + barras + '<div class="aguarde">⏳ Os inimigos estão agindo…</div>';
   if (T.fase === 'escolha') return tick + barras + (SUB === 'itens' ? acoesHtml() : maoHtml());
@@ -910,6 +915,11 @@ const ACOES = {
   hex(el) {
     if (!T || OCUPADO || T.fase !== 'heroi' || T.fim) return;
     const c = +el.dataset.c, r = +el.dataset.r;
+    if (pendenciaForca(T)) {                               // escolhendo para onde o inimigo vai
+      if (tResolverForca(T, P, c, r)) { Cena3D.investir('heroi', c, r); depoisDaAcao(true); }
+      else toast('Toque num dos hexágonos destacados (ou em "Deixar onde está").');
+      return;
+    }
     const e = inimigoEm(T, c, r);
     if (e) {
       if (MODO) { executar(MODO, e.uid); return; }
@@ -957,6 +967,7 @@ const ACOES = {
     salvar(); atualizarTudo();
   },
   'tat-gaveta'() { GAVETA = !GAVETA; atualizarHud(); },
+  'tat-forca-pular'() { if (T && !OCUPADO && tResolverForca(T, P, null)) depoisDaAcao(true); },
   'tat-itens'() { SUB = 'itens'; atualizarHud(); },
   'tat-voltar'() { SUB = 'main'; atualizarHud(); },
   'tat-cancelar'() { MODO = null; atualizarTudo(); },

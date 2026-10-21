@@ -22,6 +22,8 @@ module.exports = `window.robo = async function (maxIter = 400) {
       continue;
     }
     if (T.fase !== 'heroi' || OCUPADO) { await new Promise(r => setTimeout(r, 5)); continue; }
+    const pf = pendenciaForca(T);       // empurrar/puxar: escolhe o melhor lugar (como o jogador faria)
+    if (pf) { const op = melhorOpcaoForca(T, pf.opcoes, pf.alvo, T.heroi, pf.modo); ACOES.hex({ dataset: { c: op.c, r: op.r } }); continue; }
     if (T.limpa) {      // sala limpa: pega as moedas e o baú (sem pisar em armadilhas) e vai à porta (ou à entrada, na última sala)
       if (T.bau && !T.bau.aberto && T.heroi.c === T.bau.c && T.heroi.r === T.bau.r) { await fim(); continue; }
       const loot = [...T.moedas.keys()].map(k => { const [c, r] = k.split(',').map(Number); return { c, r }; }).filter(a => !T.armadilhas.has(chave(a.c, a.r)));

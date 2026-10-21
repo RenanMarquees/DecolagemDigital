@@ -254,7 +254,7 @@ function criarTatica(exp, p) {
     tipoArm: reino.armadilha || null, armadilhas, porta, livre: false,
     moedas: new Map(), bau: null, objetivoCumprido: false,
     heroi, saida: { ...heroi }, inim, mortos: [],
-    rodada: 1, fase: 'escolha', movRest: 0, acaoUsada: false, bonusItem: { atq: 0, alc: 0 }, efeitos: [],
+    rodada: 1, forcaFila: [], escolhaForca: false, fase: 'escolha', movRest: 0, acaoUsada: false, bonusItem: { atq: 0, alc: 0 }, efeitos: [],
     baralhos: {}, cartas: {}, fila: [], fim: null, log: [], fx: [], modFx: [],
     mao: null, descarte: null, cartaHeroi: null, escudoHeroi: 0, heroiJogou: false,
   };
@@ -420,25 +420,48 @@ function verificarMortes(T) {
 }
 
 /* ---------- Movimento forçado: empurrar e puxar ---------- */
-/** Move `alvo` (um inimigo ou 'heroi') à força, em linha reta. 'empurrar' afasta de `origem`, 'puxar' aproxima.
- *  Para antes de obstáculos e de outras unidades. Pisar numa armadilha dispara. Chefes e estruturas resistem. */
-function forcarMovimento(T, p, alvo, origem, n, modo) {
-  const ehHeroi = alvo === 'heroi';
-  if (!ehHeroi && (alvo.chefe || alvo.estrutura) && n > 0) {
-    if (alvo.chefe) logar(T, `${alvo.nome} é grande demais e não sai do lugar.`, 'info');
-    return 0;
-  }
-  let movidos = 0;
-  for (let i = 0; i < n; i++) {
-    const ref = ehHeroi ? T.heroi : alvo;
-    const atual = { c: ref.c, r: ref.r };
-    let d = melhorDirecao(origem, atual);          // direção que afasta da origem
-    if (modo === 'puxar') {
-      if (dist(atual, origem) <= 1) break;          // já está colado
-      d = (d + 3) % 6;                              // direção contrária = em direção à origem
+/** Onde `alvo` (um inimigo ou 'heroi') pode parar ao ser empurrado/puxado até `n` hexágonos a partir de `origem`.
+ *  Cada passo precisa AFASTAR (empurrar) ou APROXIMAR (puxar) da origem; não atravessa paredes nem unidades.
+ *  Devolve [{ c, r, passos, armadilhas, caminho }] (o caminho de cada lugar é o que pisa menos armadilhas). */
+function opcoesForca(T, alvo, origem, n, modo) {
+  const ehHeroi = alvo === 'heroi', ini = ehHeroi ? T.heroi : alvo;
+  const melhores = new Map();
+  const passo = (atual, caminho, trs) => {
+    if (caminho.length >= n) return;
+    for (const v of vizinhos(T.g, atual.c, atual.r)) {
+      const d0 = dist(atual, origem), d1 = dist(v, origem);
+      if (modo === 'empurrar' ? d1 <= d0 : (d1 >= d0 || d1 < 1)) continue;
+      if (celula(T.g, v.c, v.r) !== '.' || ocupado(T, v.c, v.r)) continue;
+      const cam = [...caminho, { c: v.c, r: v.r }], t = trs + (temArmadilha(T, v.c, v.r) ? 1 : 0), k = chave(v.c, v.r);
+      const ja = melhores.get(k);
+      if (!ja || t < ja.armadilhas || (t === ja.armadilhas && cam.length < ja.passos)) melhores.set(k, { c: v.c, r: v.r, passos: cam.length, armadilhas: t, caminho: cam });
+      passo(v, cam, t);
     }
-    const prox = somaCubo(atual.c, atual.r, CUBO_DIRS[d]);
-    if (celula(T.g, prox.c, prox.r) !== '.' || ocupado(T, prox.c, prox.r)) break;
+  };
+  passo({ c: ini.c, r: ini.r }, [], 0);
+  return [...melhores.values()];
+}
+
+/** A melhor escolha para quem manda: o herói quer o inimigo numa armadilha, o mais longe (empurrar) ou o mais perto (puxar);
+ *  os monstros escolhem o que é PIOR para o herói: armadilha, depois o lugar com mais inimigos colados nele. */
+function melhorOpcaoForca(T, ops, alvo, origem, modo) {
+  const ehHeroi = alvo === 'heroi';
+  const pontos = o => {
+    let sc = o.armadilhas * 20;
+    if (ehHeroi) {                                    // monstro mexendo no herói
+      sc += combatentes(T).filter(e => e !== origem && dist(e, o) === 1).length * 4;          // cercado por mais monstros
+      sc += (modo === 'empurrar' ? 1 : -1) * dist(o, origem) * 0.5;
+    } else sc += (modo === 'empurrar' ? 1 : -1) * dist(o, origem) * 3 - o.passos * 0.01;
+    return sc;
+  };
+  return ops.slice().sort((a, b) => pontos(b) - pontos(a))[0] || null;
+}
+
+/** Anda pelo caminho da opção, disparando armadilhas. Devolve quantos hexágonos andou. */
+function executarForca(T, p, alvo, origem, modo, op) {
+  const ehHeroi = alvo === 'heroi';
+  let movidos = 0;
+  for (const prox of op.caminho) {
     if (ehHeroi) T.heroi = { c: prox.c, r: prox.r }; else { alvo.c = prox.c; alvo.r = prox.r; }
     movidos++;
     const arm = dispararArmadilha(T, p, ehHeroi ? 'heroi' : alvo, prox.c, prox.r);
@@ -452,10 +475,46 @@ function forcarMovimento(T, p, alvo, origem, n, modo) {
   return movidos;
 }
 
+/** Move `alvo` à força, escolhendo o melhor lugar sozinho (monstros e testes). Chefes e estruturas resistem. */
+function forcarMovimento(T, p, alvo, origem, n, modo) {
+  const ehHeroi = alvo === 'heroi';
+  if (!ehHeroi && (alvo.chefe || alvo.estrutura) && n > 0) {
+    if (alvo.chefe) logar(T, `${alvo.nome} é grande demais e não sai do lugar.`, 'info');
+    return 0;
+  }
+  const op = melhorOpcaoForca(T, opcoesForca(T, alvo, origem, n, modo), alvo, origem, modo);
+  return op ? executarForca(T, p, alvo, origem, modo, op) : 0;
+}
+
+/** O herói escolhe para onde cada inimigo atingido vai (só quando a tela pede: T.escolhaForca). Fila de pendências. */
+function pendenciaForca(T) {
+  const f = T.forcaFila[0];
+  if (!f) return null;
+  const alvo = T.inim.find(e => e.uid === f.uid);
+  if (!alvo || !alvo.vivo) { T.forcaFila.shift(); return pendenciaForca(T); }
+  const opcoes = opcoesForca(T, alvo, T.heroi, f.n, f.modo);
+  if (!opcoes.length) { T.forcaFila.shift(); return pendenciaForca(T); }
+  return { alvo, modo: f.modo, n: f.n, opcoes };
+}
+/** Resolve a pendência atual: (c, r) = lugar escolhido, ou null para deixar o inimigo onde está. */
+function tResolverForca(T, p, c, r) {
+  const pend = pendenciaForca(T);
+  if (!pend) return false;
+  if (c === null || c === undefined) { T.forcaFila.shift(); logar(T, `Você deixa ${pend.alvo.nome} onde está.`, 'info'); }
+  else {
+    const op = pend.opcoes.find(o => o.c === c && o.r === r);
+    if (!op) { logar(T, 'Escolha um dos hexágonos destacados.', 'erro'); return false; }
+    T.forcaFila.shift();
+    executarForca(T, p, pend.alvo, T.heroi, pend.modo, op);
+  }
+  verificarMortes(T);
+  return true;
+}
+
 /* ---------- Ações do herói ---------- */
 /** Anda pelo caminho mais curto (e mais seguro) até o hexágono. Armadilhas pelo caminho disparam; a porta aberta leva à próxima etapa. */
 function tMover(T, p, c, r) {
-  if (T.fase !== 'heroi' || T.fim) return false;
+  if (T.fase !== 'heroi' || T.fim || T.forcaFila.length) return false;
   const nos = bfs(T.g, T.heroi, T.movRest, (cc, rr) => !!inimigoEm(T, cc, rr), (cc, rr) => temArmadilha(T, cc, rr));
   const alvo = nos.get(chave(c, r));
   if (!alvo || alvo.d === 0) return false;
@@ -504,7 +563,7 @@ function golpeT(T, alvo, ataque) {
 }
 
 function podeAgir(T) {
-  if (T.fase !== 'heroi' || T.fim) return false;
+  if (T.fase !== 'heroi' || T.fim || T.forcaFila.length) return false;
   if (T.acaoUsada) { logar(T, 'Você já usou a ação neste turno.', 'erro'); return false; }
   return true;
 }
@@ -544,8 +603,12 @@ function tAtacar(T, p, uid) {
     const sobreviventes = alvos.filter(e => e.hp > 0).sort((a, b) => dist(a, T.heroi) - dist(b, T.heroi));
     for (const alvo of sobreviventes) {
       if (!alvo.vivo || T.fim) continue;
-      if (c.empurrar) forcarMovimento(T, p, alvo, T.heroi, c.empurrar, 'empurrar');
-      if (c.puxar) forcarMovimento(T, p, alvo, T.heroi, c.puxar, 'puxar');
+      for (const [n, modo] of [[c.empurrar, 'empurrar'], [c.puxar, 'puxar']]) {
+        if (!n) continue;
+        if ((alvo.chefe || alvo.estrutura)) { forcarMovimento(T, p, alvo, T.heroi, n, modo); continue; }
+        if (T.escolhaForca) T.forcaFila.push({ uid: alvo.uid, n, modo });     // a tela deixa o jogador escolher o lugar
+        else forcarMovimento(T, p, alvo, T.heroi, n, modo);
+      }
     }
   }
   verificarMortes(T);
@@ -775,7 +838,7 @@ const maoVazia = T => !T.mao || T.mao.length === 0;
 /* ---------- Turno dos inimigos ---------- */
 /** Encerra o turno do herói. Se ele estiver parado em cima do baú, abre. Depois os inimigos que faltam agem, na ordem da iniciativa. */
 function tEncerrarTurno(T, p) {
-  if (T.fase !== 'heroi' || T.fim || T.livre) return false;
+  if (T.fase !== 'heroi' || T.fim || T.livre || T.forcaFila.length) return false;
   lootarAqui(T, p);                // terminou o turno em cima de moedas: pega
   if (T.bau && !T.bau.aberto && T.bau.c === T.heroi.c && T.bau.r === T.heroi.r) {
     abrirBau(T, p);                // ficou 1 turno em cima do baú
