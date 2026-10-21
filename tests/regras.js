@@ -649,12 +649,12 @@ teste('só dá para fugir pela entrada, e nunca na arena do chefe', () => {
   igual(r.join(), 'true,false,false');
 });
 
-teste('os monstros nascem em GRUPO (colados uns nos outros) e perto do herói; as salas têm 3 a 5 e o chefe vem com 3 capangas', () => {
-  const r = R(`(() => { let pior = 0, maxHeroi = 0, minHeroi = 99, juntos = true; const tams = new Set();
-    for (const id of [1, 4, 5, 9, 13, 20]) for (let k = 0; k < 8; k++) { const { T } = cen(id, { etapa: id === 4 || id === 20 ? 2 : 1, vivos: true }); const cs = T.inim.filter(e => !e.estrutura); tams.add(cs.length);
-      for (const e of cs) { const d = dist(e, T.heroi); maxHeroi = Math.max(maxHeroi, d); minHeroi = Math.min(minHeroi, d); const viz = cs.filter(o => o !== e).map(o => dist(o, e)); if (viz.length && Math.min(...viz) > 3) juntos = false; } }
-    return { maxHeroi, minHeroi, juntos, tams: [...tams].sort().join() }; })()`);
-  verdade(r.juntos, 'cada monstro tem outro a até 3 hexágonos'); verdade(r.minHeroi >= 3, 'nunca colado no herói'); verdade(r.maxHeroi <= 13, 'perto do herói: ' + r.maxHeroi);   // (nos mapas grandes de teste; no jogo as salas são de 8x8 e o máximo medido é 9) verdade(!r.tams.includes('1') && !r.tams.includes('2'), 'tamanhos ' + r.tams);
+teste('os monstros nascem variados: alguns em grupo, outros separados, sempre longe do herói (3+); salas com 3 a 5 e o chefe com 3 capangas', () => {
+  const r = R(`(() => { let minHeroi = 99, maxHeroi = 0, comVizinho = 0, sozinhos = 0, total = 0; const tams = new Set();
+    for (const id of [1, 4, 5, 9, 13, 20]) for (let k = 0; k < 10; k++) { const { T } = cen(id, { etapa: id === 4 || id === 20 ? 2 : 1, vivos: true }); const cs = T.inim.filter(e => !e.estrutura); tams.add(cs.length);
+      for (const e of cs) { total++; const d = dist(e, T.saida); maxHeroi = Math.max(maxHeroi, d); minHeroi = Math.min(minHeroi, d); const viz = cs.filter(o => o !== e).map(o => dist(o, e)); if (Math.min(...viz) <= 2) comVizinho++; else sozinhos++; } }
+    return { minHeroi, maxHeroi, comVizinho, sozinhos, tams: [...tams].sort().join() }; })()`);
+  verdade(r.comVizinho > 20 && r.sozinhos > 20, `variedade: ${r.comVizinho} em grupo, ${r.sozinhos} sozinhos`); verdade(r.minHeroi >= 3, 'nunca colado no herói'); verdade(r.maxHeroi <= 16, 'distância máxima ' + r.maxHeroi); verdade(!r.tams.includes('1') && !r.tams.includes('2'), 'tamanhos ' + r.tams);
 });
 
 console.log('\nBaralho de modificadores (a sorte)');

@@ -218,7 +218,7 @@ function criarTatica(exp, p) {
     for (let i = 0; i < n; i++) lista.push({ id: sorteio(), esc: ESCALA_GRUPO[n] });
     spawns = embaralhar(spawns);
   }
-  // os monstros começam JUNTOS (um grupo colado) e PERTO do herói (de 4 a 6 hexágonos; o chefe de 5 a 7), como em Gloomhaven: Botões e Bichinhos
+  // os monstros começam espalhados de forma variada: alguns em grupo (colados), outros sozinhos, a 3 a 8 hexágonos do herói (o chefe um pouco mais longe)
   const livres = (min, max) => {
     const l = [];
     for (let r = 0; r < g.rows; r++) for (let c = 0; c < g.cols; c++) {
@@ -231,16 +231,17 @@ function criarTatica(exp, p) {
   const sorteia = l => l[Math.floor(Math.random() * l.length)] || null;
   const ocupa = (pos, usadas) => usadas.some(u => u.c === pos.c && u.r === pos.r);
   const pontos = [];
-  const ancora = lista.some(e => e.chefe) ? sorteia(livres(5, 7)) || sorteia(livres(4, 9)) : sorteia(livres(4, 6)) || sorteia(livres(3, 9));
   for (const e of lista) {
     let pos = null;
-    if (ancora && !pontos.length) pos = ancora;
-    else if (ancora) {                    // o mais colado possível no grupo (distância 1 do primeiro, depois 2, depois 3)
-      for (let d = 1; d <= 3 && !pos; d++) {
-        const cand = livres(0, 99).filter(h => !ocupa(h, pontos) && pontos.some(u => dist(u, h) <= d) && dist(h, heroi) >= 3);
-        cand.sort((a, b) => pontos.reduce((s, u) => s + dist(u, a), 0) - pontos.reduce((s, u) => s + dist(u, b), 0));
-        pos = cand[0] || null;
-      }
+    const junta = pontos.length > 0 && !e.chefe && Math.random() < 0.5;     // metade das vezes cola num grupo; senão fica sozinho em outro canto
+    if (junta) {
+      for (let d = 1; d <= 2 && !pos; d++) pos = sorteia(livres(3, 99).filter(h => !ocupa(h, pontos) && pontos.some(u => dist(u, h) <= d)));
+    }
+    if (!pos) {                                                             // um canto novo, longe dos outros grupos
+      const [min, max] = e.chefe ? [5, 8] : [3, 8];
+      pos = sorteia(livres(min, max).filter(h => !ocupa(h, pontos) && pontos.every(u => dist(u, h) >= 3)))
+        || sorteia(livres(3, 99).filter(h => !ocupa(h, pontos) && pontos.every(u => dist(u, h) >= 2)))
+        || sorteia(livres(3, 99).filter(h => !ocupa(h, pontos)));
     }
     pontos.push(pos || spawns.find(sp => !ocupa(sp, pontos)) || spawns[0]);
   }
