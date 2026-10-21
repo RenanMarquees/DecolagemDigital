@@ -3,8 +3,8 @@
    iniciativa, itens e mochila, objetivos, empurrar/puxar, dificuldades, armadilhas, portas, moedas e baú.
    Como não há mais sorte no dano, quase tudo aqui é conta exata.   Uso: node tests/regras.js */
 const fs = require('fs'), path = require('path'), vm = require('vm');
-const ctx = vm.createContext({ Math, console });
-for (const f of ['data.js', 'cartas.js', 'cenarios.js', 'logic.js', 'mapas.js', 'tatica.js']) vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'js', f), 'utf8'), ctx);
+const ctx = vm.createContext({ Math, console, structuredClone });
+for (const f of ['data.js', 'cartas.js', 'cenarios.js', 'eventos.js', 'logic.js', 'mapas.js', 'tatica.js']) vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'js', f), 'utf8'), ctx);
 vm.runInContext(fs.readFileSync(path.join(__dirname, 'mapas-teste.js'), 'utf8'), ctx);   // mapas grandes: as coordenadas dos testes valem para eles
 const R = (code) => vm.runInContext(code, ctx);
 R('SORTE.ativa = false');   // os testes de dano são contas exatas; os testes do baralho de modificadores ligam a sorte de volta
@@ -37,7 +37,7 @@ function armar(T, c, r, tipo) { T.armadilhas.set(chave(c, r), { tipo }); }
 function rodada(T, p) { tEncerrarTurno(T, p); let g = 0; while (T.fase === 'inimigos' && !T.fim && g++ < 20) tProximoInimigo(T, p); if (T.fase === 'escolha') turnoDeTeste(T, p); }
 function matarTodos(T) { T.inim.forEach(e => { e.hp = 0; }); verificarMortes(T); }
 function carta(T, tipo, c) { T.cartas[tipo] = c; T.fila = ordemDaRodada(T).filter(x => x.tipo !== 'heroi').map(x => x.uid); }   // refaz a fila com as cartas novas
-function sozinho(T, e) { T.inim.forEach(x => { if (x !== e) { x.parado = true; x.c = 11; x.r = 0; } }); }
+function sozinho(T, e) { e.jeito = null; e.dorme = false; T.inim.forEach(x => { if (x !== e) { x.parado = true; x.c = 11; x.r = 0; } }); }
 function limpar(T, r) { for (let c = 0; c < 12; c++) T.g.cel[r][c] = '.'; }
 function pe(e, c, r) { e.c = c; e.r = r; return e; }
 `);
@@ -48,8 +48,11 @@ teste('são 20, em ordem, 4 por reino, e cada mapa citado existe', () => {
     porReino: REINOS.map(rn => cenariosDoReino(rn.id).length).join(), mapas: CENARIOS.every(c => c.etapas.every(e => MAPAS[e.mapa])) })`);
   igual(r.n, 20); verdade(r.ids, 'ids 1..20'); igual(r.porReino, '4,4,4,4,4'); verdade(r.mapas, 'todos os mapas existem');
 });
-teste('os 4 tipos de objetivo aparecem em todos os reinos, e o chefe é o último de cada reino', () => {
-  for (const linha of R(`REINOS.map(rn => cenariosDoReino(rn.id).map(c => c.objetivo).join('/'))`)) igual(linha, 'matar_todos/bau/destruir/chefe');
+teste('cada reino tem: um cenário de abertura (matar, resistir ou resgatar), baú, estruturas e o chefe por último', () => {
+  const r = R(`REINOS.map(rn => cenariosDoReino(rn.id).map(c => c.objetivo))`);
+  for (const l of r) { verdade(['matar_todos', 'resistir', 'resgatar'].includes(l[0]), l.join()); igual(l.slice(1).join(), 'bau,destruir,chefe'.replace('bau,destruir', l.slice(1, 3).join())); igual(l[3], 'chefe'); verdade(l[1] === 'bau' || l[1] === 'resgatar'); verdade(l[2] === 'destruir'); }
+  const todos = R(`CENARIOS.map(c => c.objetivo)`);
+  for (const o of ['matar_todos', 'bau', 'destruir', 'chefe', 'resgatar', 'resistir']) verdade(todos.includes(o), 'falta o objetivo ' + o);
 });
 teste('o chefe fica sempre (e só) na última etapa dos cenários de chefe; os outros não têm chefe', () => {
   const r = R(`CENARIOS.map(c => { const e = c.etapas; const ch = e.map((x, i) => !!x.chefe);
@@ -68,10 +71,10 @@ teste('saves antigos (formato com atributos e mana) ganham equipamento e cartas 
   const r = R(`(() => { const p = novoJogador('T', 'guerreiro'); delete p.cenarios; delete p.dificuldade; delete p.colecao; delete p.mao; delete p.escolhas; p.derrotados.fenrir = true; p.nivel = 6; p.gold = 5000; p.mp = 40;
     p.equip = { arma: 'guerreiro_2', armadura: 'armadura_1', amuleto: null }; p.attr = { FOR: 30, DES: 10, INT: 5, VIT: 20 }; migrarSave(p);
     return [p.dificuldade, p.cenarios[1], p.cenarios[4], !!p.cenarios[5], Array.isArray(p.equip.maos), p.gold, p.attr === undefined, p.colecao.length, p.mao.length, p.escolhas.length, p.mp === undefined, p.hp > 0]; })()`);
-  igual(r.join(), 'intermediario,true,true,false,true,60,true,10,10,5,true,true');   // nível 6: 5 escolhas de carta (níveis 2 a 6) esperando
+  igual(r.join(), 'intermediario,true,true,false,true,60,true,12,12,5,true,true');   // nível 6: 5 escolhas de carta (níveis 2 a 6) esperando
 });
 teste('as etapas têm mais inimigos que as anteriores (Valhala 3 → 4; Inferno 4 → 5)', () => {
-  const r = R(`[1, 9].map(id => { const { p, c } = cen(id); const exp = criarExpedicao(c, p); const n = [];
+  const r = R(`[1, 10].map(id => { const { p, c } = cen(id); const exp = criarExpedicao(c, p); const n = [];
     for (let i = 0; i < 2; i++) { exp.idx = i; n.push(criarTatica(exp, p).inim.filter(e => !e.estrutura).length); } return n.join('→'); })`);
   igual(r.join(), '3→4,4→5');
 });
@@ -96,25 +99,25 @@ teste('não há atributos: o herói não tem FOR/DES/INT/VIT nem pontos para dis
   const r = R(`(() => { const p = novoJogador('T', 'guerreiro'); return [p.attr === undefined, p.pontos === undefined, typeof distribuirPonto, typeof ATRIBUTOS]; })()`);
   igual(r.join(), 'true,true,undefined,undefined');
 });
-teste('ao subir de nível você escolhe 1 de 2 cartas (a outra se perde); a carta nova entra na mão se houver lugar (máx. 10)', () => {
+teste('ao subir de nível você escolhe 1 de 2 cartas (a outra se perde); a carta nova entra na mão se houver lugar (máx. 12)', () => {
   const r = R(`(() => { const p = novoJogador('T', 'cacador'); p.nivel = 1; const s = ganharXp(p, xpParaProximo(1)); const op = cartasDoNivel('cacador', 2);
     const antes = [p.escolhas.join(), p.colecao.length, p.mao.length]; const errada = escolherCartaNivel(p, 3, 0); const c = escolherCartaNivel(p, 2, 1);
     const depois = [p.escolhas.length, p.colecao.length, p.mao.length, c.id === op[1].id, p.colecao.includes(op[0].id), escolherCartaNivel(p, 2, 0)];
     for (let n = 3; n <= 8; n++) { p.escolhas.push(n); escolherCartaNivel(p, n, 0); }
     return { antes, errada, depois, final: [p.colecao.length, p.mao.length], distintas: op[0].id !== op[1].id && op[0].nome !== op[1].nome }; })()`);
-  igual(r.antes.join(), '2,10,10'); igual(r.errada, null, 'só níveis pendentes'); igual(r.depois.join(), '0,11,10,true,false,'); igual(r.final.join(), '17,10', 'a mão para em 10; o resto fica na coleção'); verdade(r.distintas);
+  igual(r.antes.join(), '2,12,12'); igual(r.errada, null, 'só níveis pendentes'); igual(r.depois.join(), '0,13,12,true,false,'); igual(r.final.join(), '19,12', 'a mão para em 12; o resto fica na coleção'); verdade(r.distintas);
 });
 teste('as cartas de nível crescem com o nível e existem para todas as classes (2 a 20), com iniciativa de 6 a 94', () => {
   const r = R(`['guerreiro', 'cacador', 'oraculo'].map(c => { let ok = true, maxAtq = 0; for (let n = 2; n <= 20; n++) for (const k of cartasDoNivel(c, n)) { ok = ok && k.ini >= 6 && k.ini <= 94 && cartaHeroiPorId(k.id).nome === k.nome; maxAtq = Math.max(maxAtq, k.atq || 0); }
     const a2 = cartasDoNivel(c, 2)[0], a20 = cartasDoNivel(c, 20)[0]; return [ok, maxAtq <= 10, (a20.atq || a20.cura || a20.mov) >= (a2.atq || a2.cura || a2.mov) || a20.nome !== a2.nome]; })`);
   for (const x of r) verdade(x.every(Boolean), JSON.stringify(x));
 });
-teste('montar a mão: de 6 a 10 cartas da coleção', () => {
+teste('montar a mão: de 6 a 12 cartas da coleção', () => {
   const r = R(`(() => { const p = novoJogador('T', 'guerreiro'); const out = []; for (let n = 2; n <= 6; n++) { p.escolhas.push(n); escolherCartaNivel(p, n, 0); }
     out.push(p.colecao.length, p.mao.length); const novo = p.colecao.find(id => !p.mao.includes(id)); out.push(alternarCartaMao(p, novo));      // mão cheia: não entra
     out.push(alternarCartaMao(p, p.mao[0]), alternarCartaMao(p, novo), p.mao.length);
     for (let i = 0; i < 10; i++) alternarCartaMao(p, p.mao[0]); out.push(p.mao.length, alternarCartaMao(p, 'xxx')); return out; })()`);
-  igual(r.join(), '15,10,false,true,true,10,6,false');
+  igual(r.join(), '17,12,false,true,true,12,6,false');
 });
 teste('a mochila começa com 2 lugares e vai a 3, 4 e 5 nos níveis 5, 10 e 15', () => {
   igual(R(`[1, 4, 5, 9, 10, 14, 15, 20].map(tamanhoMochila).join()`), '2,2,3,3,4,4,5,5');
@@ -279,14 +282,14 @@ teste('as moedas e o baú: ambos só valem se você TERMINAR O TURNO em cima (an
 });
 
 console.log('\nCartas do herói (habilidades + iniciativa)');
-teste('a rodada começa escolhendo uma carta; a mão tem 10 cartas e a jogada vai para o descarte', () => {
+teste('a rodada começa escolhendo uma carta; a mão tem 12 cartas e a jogada vai para o descarte', () => {
   const r = R(`(() => { const { p, T } = cen(1, { semTurno: true }); const a = [T.fase, T.mao.length, T.descarte.length];
-    const id = T.mao[0].id; const ok = tEscolherCarta(T, p, id); return [...a, ok, T.fase, T.mao.length, T.descarte.length, T.cartaHeroi.id === id]; })()`);
-  igual(r.join(), 'escolha,10,0,true,heroi,9,1,true');
+    const id = T.mao.find(c => !c.queima).id; const ok = tEscolherCarta(T, p, id); return [...a, ok, T.fase, T.mao.length, T.descarte.length, T.cartaHeroi.id === id]; })()`);
+  igual(r.join(), 'escolha,12,0,true,heroi,11,1,true');
 });
-teste('cada classe começa com 10 cartas de iniciativas diferentes e números pequenos (dano até 6, andar até 5)', () => {
-  const r = R(`['guerreiro', 'cacador', 'oraculo'].map(c => { const m = maoDoHeroi(novoJogador('T', c)); return [m.length, new Set(m.map(x => x.ini)).size === 10, m.every(x => x.ini >= 1 && x.ini <= 99), Math.max(...m.map(x => x.atq || 0)) <= 6, Math.max(...m.map(x => x.mov || 0)) <= 5, m.some(x => x.empurrar || x.puxar), m.some(x => x.mov)]; })`);
-  for (const x of r) { igual(x[0], 10); verdade(x.slice(1).every(Boolean), JSON.stringify(x)); }
+teste('cada classe começa com 12 cartas de iniciativas diferentes e números pequenos (dano até 6, andar até 5)', () => {
+  const r = R(`['guerreiro', 'cacador', 'oraculo'].map(c => { const m = maoDoHeroi(novoJogador('T', c)); return [m.length, new Set(m.map(x => x.ini)).size === 12, m.every(x => x.ini >= 1 && x.ini <= 99), Math.max(...m.map(x => x.atq || 0)) <= 7, Math.max(...m.map(x => x.mov || 0)) <= 5, m.some(x => x.empurrar || x.puxar), m.some(x => x.mov)]; })`);
+  for (const x of r) { igual(x[0], 12); verdade(x.slice(1).every(Boolean), JSON.stringify(x)); }
 });
 teste('não dá para andar nem atacar antes de escolher a carta', () => {
   igual(R(`(() => { const { p, T } = cen(1, { semTurno: true }); return [tMover(T, p, 1, 10), tAtacar(T, p, 1), tEncerrarTurno(T, p), tAlcance(T).length]; })()`).join(), 'false,false,false,0');
@@ -309,11 +312,11 @@ teste('inimigos com número menor agem ANTES do turno do herói; o herói só jo
   igual(r.join(), 'inimigos,heroi,true,true,true,escolha');
 });
 teste('o ataque é a carta: dano da carta + bônus de atributo/arma, menos a defesa do alvo (conta exata)', () => {
-  const r = R(`(() => { const { p, T } = cen(1, { semTurno: true }); const e = T.inim[0]; pe(e, 1, 10); e.hp = e.hpMax = 99; e.def = 0; tEscolherCarta(T, p, T.mao.find(x => x.nome === 'Marretada').id);
+  const r = R(`(() => { const { p, T } = cen(1, { semTurno: true }); const e = T.inim[0]; pe(e, 1, 10); e.hp = e.hpMax = 99; e.def = 0; tEscolherCarta(T, p, T.mao.find(x => x.nome === 'Golpe pesado').id);
     const bonus = derivados(p).dano; tAtacar(T, p, e.uid); const sem = 99 - e.hp;
-    const { p: q, T: U } = cen(1, { semTurno: true }); const f = U.inim[0]; pe(f, 1, 10); f.hp = f.hpMax = 99; f.def = 2; tEscolherCarta(U, q, U.mao.find(x => x.nome === 'Marretada').id); tAtacar(U, q, f.uid);
-    return { sem, esperado: 6 + bonus, comDef: 99 - f.hp }; })()`);
-  igual(r.sem, r.esperado, 'Marretada = 6 + bônus'); igual(r.comDef, r.esperado - 2, 'a defesa do alvo tira 2 de cada golpe');
+    const { p: q, T: U } = cen(1, { semTurno: true }); const f = U.inim[0]; pe(f, 1, 10); f.hp = f.hpMax = 99; f.def = 2; tEscolherCarta(U, q, U.mao.find(x => x.nome === 'Golpe pesado').id); tAtacar(U, q, f.uid);
+    return { sem, esperado: 5 + bonus, comDef: 99 - f.hp }; })()`);
+  igual(r.sem, r.esperado, 'Golpe pesado = 5 + bônus'); igual(r.comDef, r.esperado - 2, 'a defesa do alvo tira 2 de cada golpe');
 });
 teste('todo golpe causa pelo menos 1 de dano, mesmo contra defesa alta', () => {
   const r = R(`(() => { const { p, T } = cen(1); const e = T.inim[0]; pe(e, 1, 10); e.hp = e.hpMax = 99; e.def = 50; tAtacar(T, p, e.uid); return 99 - e.hp; })()`);
@@ -382,30 +385,30 @@ teste('o movimento da carta + botas; gelo tira 1; cartas sem "anda" não andam',
 });
 teste('descanso longo: iniciativa 99, não anda nem age, cura 3, e a carta usada ESCOLHIDA se perde (as outras voltam)', () => {
   const r = R(`(() => { const { p, T } = cen(1, { semTurno: true }); const d = derivados(p);
-    for (let i = 0; i < 3; i++) { tEscolherCarta(T, p, T.mao[0].id); T.fase = 'escolha'; T.cartaHeroi = null; }
+    for (let i = 0; i < 3; i++) { tEscolherCarta(T, p, T.mao.find(c => !c.queima).id); T.fase = 'escolha'; T.cartaHeroi = null; }
     const antes = T.mao.length; const escolhida = T.descarte[1]; p.hp = 2; tEscolherCarta(T, p, 'descanso', escolhida.id);
     return [antes, T.mao.length, T.descarte.length, T.perdidas.length, T.perdidas[0].id === escolhida.id, T.mao.some(c => c.id === escolhida.id), p.hp, T.cartaHeroi.ini, T.movRest, T.acaoUsada]; })()`);
-  igual(r.join(), '7,9,0,1,true,false,5,99,0,true');
+  igual(r.join(), '9,11,0,1,true,false,5,99,0,true');
 });
 teste('descanso longo exige 2 cartas usadas e que você diga qual se perde', () => {
   const r = R(`(() => { const { p, T } = cen(1, { semTurno: true }); const a = tEscolherCarta(T, p, 'descanso', 'x');      // nada usado ainda
-    tEscolherCarta(T, p, T.mao[0].id); T.fase = 'escolha'; T.cartaHeroi = null; const b = tEscolherCarta(T, p, 'descanso', T.descarte[0].id);   // só 1 usada
-    tEscolherCarta(T, p, T.mao[0].id); T.fase = 'escolha'; T.cartaHeroi = null; const c = tEscolherCarta(T, p, 'descanso');                    // 2 usadas, sem dizer qual
+    tEscolherCarta(T, p, T.mao.find(c => !c.queima).id); T.fase = 'escolha'; T.cartaHeroi = null; const b = tEscolherCarta(T, p, 'descanso', T.descarte[0].id);   // só 1 usada
+    tEscolherCarta(T, p, T.mao.find(c => !c.queima).id); T.fase = 'escolha'; T.cartaHeroi = null; const c = tEscolherCarta(T, p, 'descanso');                    // 2 usadas, sem dizer qual
     const d = tEscolherCarta(T, p, 'descanso', T.descarte[0].id); return [a, b, c, d]; })()`);
   igual(r.join(), 'false,false,false,true');
 });
 teste('descanso rápido: uma carta usada SORTEADA se perde, as outras voltam à mão e você ainda joga na mesma rodada (1 por rodada)', () => {
   const r = R(`(() => { const { p, T } = cen(1, { semTurno: true }); const hp0 = p.hp = 5;
-    for (let i = 0; i < 4; i++) { tEscolherCarta(T, p, T.mao[0].id); T.fase = 'escolha'; T.cartaHeroi = null; }
+    for (let i = 0; i < 4; i++) { tEscolherCarta(T, p, T.mao.find(c => !c.queima).id); T.fase = 'escolha'; T.cartaHeroi = null; }
     const mao0 = T.mao.length, usadas = T.descarte.length; const ids = T.descarte.map(c => c.id);
     const perdida = tDescansoRapido(T, p); const ok2 = tDescansoRapido(T, p);
     const depois = [T.mao.length, T.descarte.length, T.perdidas.length, ids.includes(perdida.id), T.fase, p.hp === hp0, ok2];
-    const joga = tEscolherCarta(T, p, T.mao[0].id); return [mao0, usadas, ...depois, joga, T.fase]; })()`);
-  igual(r.join(), '6,4,9,0,1,true,escolha,true,,true,heroi');
+    const joga = tEscolherCarta(T, p, T.mao.find(c => !c.queima).id); return [mao0, usadas, ...depois, joga, T.fase]; })()`);
+  igual(r.join(), '8,4,11,0,1,true,escolha,true,,true,heroi');
 });
 teste('descanso rápido precisa de 2 cartas usadas; na próxima rodada pode de novo', () => {
   const r = R(`(() => { const { p, T } = cen(1, { semTurno: true }); const a = tDescansoRapido(T, p);
-    for (let i = 0; i < 3; i++) { tEscolherCarta(T, p, T.mao[0].id); T.fase = 'escolha'; T.cartaHeroi = null; }
+    for (let i = 0; i < 3; i++) { tEscolherCarta(T, p, T.mao.find(c => !c.queima).id); T.fase = 'escolha'; T.cartaHeroi = null; }
     const b = tDescansoRapido(T, p); T.rapidoUsado = false; const c = tDescansoRapido(T, p); return [a, !!b, !!c, T.perdidas.length]; })()`);
   igual(r.join(), ',true,false,1');
 });
@@ -414,15 +417,15 @@ teste('sem cartas na mão e com menos de 2 no descarte o herói desmaia (derrota
   igual(r.join(), 'derrota,true');
 });
 teste('as cartas perdidas ficam perdidas na próxima etapa também (o baralho do herói vale pelo cenário todo)', () => {
-  const r = R(`(() => { const { p, T, exp } = cen(1, { semTurno: true }); for (let i = 0; i < 2; i++) { tEscolherCarta(T, p, T.mao[0].id); T.fase = 'escolha'; T.cartaHeroi = null; }
+  const r = R(`(() => { const { p, T, exp } = cen(1, { semTurno: true }); for (let i = 0; i < 2; i++) { tEscolherCarta(T, p, T.mao.find(c => !c.queima).id); T.fase = 'escolha'; T.cartaHeroi = null; }
     tDescansoRapido(T, p); const T2 = criarTatica(exp, p); return [T2.perdidas.length, T2.mao.length + T2.descarte.length + T2.perdidas.length]; })()`);
-  igual(r.join(), '1,10');
+  igual(r.join(), '1,12');
 });
 teste('com a mão vazia só dá para descansar; a mão e o descarte seguem para a etapa seguinte', () => {
   const r = R(`(() => { const { p, T, exp } = cen(1, { semTurno: true }); T.descarte.push(...T.mao.splice(0)); const ruim = tEscolherCarta(T, p, T.descarte[0].id); const bom = tEscolherCarta(T, p, 'descanso', T.descarte[0].id);
     const { p: q, T: U, exp: e2 } = cen(1, { semTurno: true }); tEscolherCarta(U, q, U.mao[3].id); const U2 = criarTatica(e2, q);
     return [maoVazia({ mao: [] }), ruim, bom, U2.mao.length, U2.descarte.length, U2.fase]; })()`);
-  igual(r.join(), 'true,false,true,9,1,escolha');
+  igual(r.join(), 'true,false,true,11,1,escolha');
 });
 teste('sala limpa: não há modo livre; você segue usando cartas (a rodada passa sem inimigos)', () => {
   const r = R(`(() => { const { p, T } = cen(1, { semTurno: true, etapa: 0 }); turnoDeTeste(T, p); matarTodos(T); p.hp = 3;
@@ -803,6 +806,242 @@ teste('baú e recompensa sorteiam equipamento só do nível liberado', () => {
     p.cenarios = {}; for (let i = 1; i <= 10; i++) p.cenarios[i] = true; const v2 = new Set(); for (let k = 0; k < 400; k++) v2.add(sortearEquipamento(REINOS[3], p));
     return [[...vistos].every(id => /_1$/.test(id)), [...v2].every(id => /_3$/.test(id))]; })()`);
   verdade(r[0] && r[1], 'tier segue o progresso, não o reino');
+});
+
+console.log('\nDuas cartas por rodada, queima, custo, condições, elementos e jeitos (ciclo 8)');
+R(`
+function mao2(T, ...cs) { cs.forEach((c, i) => T.mao.unshift({ nome: 'C' + i, ini: 10 + i * 10, id: 'x' + i, ...c, id: 'x' + i })); }
+function dois(T, p, a, b) { mao2(T, a, b); return tEscolherCarta(T, p, 'x0', undefined, 'x1'); }
+`);
+teste('cada carta tem duas metades: em cima ataque (ou cura), embaixo movimento/escudo', () => {
+  const r = R(`(() => { const g = BARALHOS_HEROI.guerreiro, m = c => metadesDaCarta(c);
+    return [JSON.stringify(m(g[0])), JSON.stringify(m(g[3])), JSON.stringify(m(g[6])), JSON.stringify(m(BARALHOS_HEROI.cacador[4]))]; })()`);
+  igual(r[0], '{"topo":{"atq":3},"base":{"mov":2}}'); igual(r[1], '{"topo":{"atq":2},"base":{"mov":2,"escudo":2}}');
+  igual(r[2], '{"topo":{"cura":4},"base":{"mov":1}}'); igual(r[3], '{"topo":null,"base":{"mov":5}}');
+});
+teste('duas cartas: a primeira dá a iniciativa, as duas vão para o descarte e nada acontece até escolher uma metade', () => {
+  const r = R(`(() => { const { p, T } = cen(1, { semTurno: true }); const m0 = T.mao.length;
+    dois(T, p, { ini: 33, mov: 2, atq: 3 }, { ini: 7, mov: 4, atq: 1 });
+    return [T.cartaHeroi.ini, T.modo2, T.mao.length - m0, T.descarte.length, T.pendentes.length, T.movRest, T.acaoUsada, tMover(T, p, 1, 10)]; })()`);
+  igual(r.join(), '33,true,0,2,2,0,true,false');
+});
+teste('usar uma metade gasta a carta inteira: a outra metade dela se perde, e a outra carta continua disponível', () => {
+  const r = R(`(() => { const { p, T } = cen(1, { semTurno: true });
+    dois(T, p, { mov: 2, atq: 3 }, { mov: 4, atq: 1 });
+    const a = tAtivarMetade(T, p, 'x0', 'topo'); const b = tAtivarMetade(T, p, 'x0', 'base'); const c = tAtivarMetade(T, p, 'x1', 'base');
+    return [a, b, c, T.movRest, T.pendentes.length]; })()`);
+  igual(r.join(), 'true,false,true,4,0');
+});
+teste('ataque pela metade de cima usa só o dano da carta; metade de baixo anda e o movimento só vale uma vez', () => {
+  const r = R(`(() => { const { p, T } = cen(1, { semTurno: true }); const e = T.inim[0]; pe(e, 1, 10); e.hp = e.hpMax = 50; e.def = 0;
+    dois(T, p, { mov: 2, atq: 3 }, { mov: 3, atq: 1 });
+    tAtivarMetade(T, p, 'x0', 'topo'); tAtacar(T, p, e.uid); const dano = 50 - e.hp;
+    pe(e, 9, 10); tAtivarMetade(T, p, 'x1', 'base'); const h = tAlcance(T).sort((a, b) => b.custo - a.custo)[0] || { c: 0, r: 9, custo: 1 }; tMover(T, p, h.c, h.r); const passos = [dist(T.heroi, { c: 0, r: 10 }) === h.custo, T.movRest];
+    return [dano, passos.join(':')]; })()`);
+  igual(r[0], 3); igual(r[1], 'true:0');
+});
+teste('carta que QUEIMA vai para as perdidas (não volta no descanso) e carta com CUSTO tira vida ao usar', () => {
+  const r = R(`(() => { const { p, T } = cen(1, { semTurno: true }); p.hp = 10;
+    dois(T, p, { mov: 1, atq: 6, queima: true }, { mov: 3, atq: 4, custo: { vida: 2 } });
+    const perd = T.perdidas.length, desc = T.descarte.length; tAtivarMetade(T, p, 'x1', 'topo'); return [perd, desc, p.hp]; })()`);
+  igual(r.join(), '1,1,8');
+});
+teste('custo de vida não pode matar: sem vida suficiente a metade não é usada', () => {
+  const r = R(`(() => { const { p, T } = cen(1, { semTurno: true }); p.hp = 2; dois(T, p, { mov: 3, atq: 4, custo: { vida: 2 } }, { mov: 1 });
+    return [tAtivarMetade(T, p, 'x0', 'topo'), p.hp]; })()`);
+  igual(r.join(), 'false,2');
+});
+teste('elementos: uma carta cria 🔥 e outra gasta para ganhar +2 de dano (some depois de gasto e esmaece com as rodadas)', () => {
+  const r = R(`(() => { const { p, T } = cen(1, { semTurno: true }); const e = T.inim[0]; pe(e, 1, 10); e.hp = e.hpMax = 50; e.def = 0;
+    dois(T, p, { mov: 2, atq: 2, elem: 'fogo' }, { mov: 1, atq: 3, usaElem: { elem: 'fogo', atq: 2 } });
+    tAtivarMetade(T, p, 'x0', 'topo'); tAtacar(T, p, e.uid); const criou = T.elementos.fogo;
+    tAtivarMetade(T, p, 'x1', 'topo'); tAtacar(T, p, e.uid); const gasto = T.elementos.fogo;
+    return [criou, gasto, 50 - e.hp]; })()`);
+  igual(r.join(), '2,0,7');
+  const r2 = R(`(() => { const { p, T } = cen(1, { semTurno: true }); T.elementos.gelo = 2; T.fase = 'inimigos'; T.fila = []; finalizarRodada(T, p); const a = T.elementos.gelo; T.fase = 'inimigos'; finalizarRodada(T, p); return [a, T.elementos.gelo]; })()`);
+  igual(r2.join(), '1,0');
+});
+teste('sem o elemento, a carta que gasta funciona normal (sem bônus)', () => {
+  const r = R(`(() => { const { p, T } = cen(1, { semTurno: true }); const e = T.inim[0]; pe(e, 1, 10); e.hp = e.hpMax = 50; e.def = 0;
+    dois(T, p, { mov: 1, atq: 3, usaElem: { elem: 'fogo', atq: 2 } }, { mov: 1 }); tAtivarMetade(T, p, 'x0', 'topo'); tAtacar(T, p, e.uid); return 50 - e.hp; })()`);
+  igual(r, 3);
+});
+teste('atordoar: o monstro perde o próximo turno; imobilizar: não anda; desarmar: não ataca (e passam depois de 1 turno)', () => {
+  const r = R(`(() => { const { p, T } = cen(1, { etapa: 1, vivos: true }); const e = T.inim[0]; sozinho(T, e); e.tipo = 'draugr'; e.mov = 4; e.alc = 1; e.atk = 3; e.hp = e.hpMax = 99; pe(e, 3, 10); T.heroi = { c: 0, r: 10 }; p.hp = 30;
+    const out = [];
+    for (const cond of ['atordoar', 'imobilizar', 'desarmar']) {
+      pe(e, 3, 10); p.hp = 30; e.efeitos = []; aplicarCond(T, e, cond);
+      carta(T, 'draugr', K('t', 30, { mov: 0, atq: 0 })); T.fase = 'heroi'; tEncerrarTurno(T, p); tProximoInimigo(T, p);
+      out.push(dist(e, T.heroi) + ':' + (30 - p.hp) + ':' + e.efeitos.length);
+    }
+    return out; })()`);
+  igual(r[0], '3:0:0'); igual(r[1], '3:0:0'); igual(r[2], '1:0:0');
+});
+teste('cegar: o ataque do monstro cega vira desvantagem (2 cartas de modificador)', () => {
+  const r = R(`(() => { SORTE.ativa = true; const { p, T } = cen(1, { etapa: 1, vivos: true }); const e = T.inim[0]; sozinho(T, e); e.tipo = 'draugr'; e.mov = 3; e.alc = 1; e.atk = 3; pe(e, 1, 10); T.heroi = { c: 0, r: 10 }; p.hp = 30;
+    aplicarCond(T, e, 'cegar'); carta(T, 'draugr', K('t', 30, { mov: 0, atq: 0 })); tEncerrarTurno(T, p); tProximoInimigo(T, p); const d = T.modFx.some(m => m.quem === 'inim' && m.desv); SORTE.ativa = false; return d; })()`);
+  verdade(r, 'desvantagem esperada');
+});
+teste('ferir: 1 de dano por rodada até curar; curar fecha a ferida', () => {
+  const r = R(`(() => { const { p, T } = cen(1, { semTurno: true }); p.hp = 10; aplicarCond(T, 'heroi', 'ferir'); T.fase = 'inimigos'; T.fila = []; finalizarRodada(T, p); const a = p.hp; T.fase = 'inimigos'; finalizarRodada(T, p); const b = p.hp;
+    T.fase = 'escolha'; dois(T, p, { cura: 3 }, { mov: 1 }); T.fila = []; T.fase = 'heroi'; tAtivarMetade(T, p, 'x0', 'topo'); return [a, b, T.efeitos.length]; })()`);
+  igual(r.join(), '9,8,0');
+});
+teste('herói atordoado só usa uma das duas cartas; imobilizado não anda; desarmado não ataca', () => {
+  const r = R(`(() => { const { p, T } = cen(1, { semTurno: true }); aplicarCond(T, 'heroi', 'atordoar'); dois(T, p, { mov: 2, atq: 3 }, { mov: 3, atq: 1 });
+    const n = T.pendentes.length;
+    const { p: q, T: U } = cen(1, { semTurno: true }); aplicarCond(U, 'heroi', 'imobilizar'); dois(U, q, { mov: 2, atq: 3 }, { mov: 3 }); tAtivarMetade(U, q, 'x1', 'base');
+    const { p: s, T: V } = cen(1, { semTurno: true }); const e = V.inim[0]; pe(e, 1, 10); aplicarCond(V, 'heroi', 'desarmar'); dois(V, s, { mov: 2, atq: 3 }, { mov: 3 }); tAtivarMetade(V, s, 'x0', 'topo');
+    return [n, U.movRest, tAtacar(V, s, e.uid)]; })()`);
+  igual(r.join(), '1,0,false');
+});
+teste('condições de um turno só desaparecem depois do turno de quem sofreu', () => {
+  const r = R(`(() => { const { p, T } = cen(1, { semTurno: true }); aplicarCond(T, 'heroi', 'cegar'); dois(T, p, { mov: 2, atq: 3 }, { mov: 3 }); const dentro = T.efeitos.length; tEncerrarTurno(T, p); return [dentro, T.efeitos.length]; })()`);
+  igual(r.join(), '1,0');
+});
+teste('jeito bando: +1 de ataque por aliado colado (até +2)', () => {
+  const r = R(`(() => { const { p, T } = cen(1, { etapa: 1, vivos: true }); const e = T.inim[0]; sozinho(T, e); e.tipo = 'draugr'; e.jeito = 'bando'; e.atk = 3; e.mov = 3; e.alc = 1; pe(e, 1, 10); T.heroi = { c: 0, r: 10 }; p.hp = 30;
+    const a = T.inim[1]; a.parado = false; a.vivo = true; pe(a, 2, 10); const b = T.inim[2]; b.parado = false; b.vivo = true; pe(b, 1, 9);
+    a.tipo = b.tipo = 'draugr'; a.jeito = b.jeito = null; carta(T, 'draugr', K('t', 30, { mov: 0, atq: 0 })); tEncerrarTurno(T, p); tProximoInimigo(T, p); return 30 - p.hp; })()`);
+  igual(r, 5);
+});
+teste('jeito dorminhoco: dorme até o herói chegar a 3 hexágonos (ou ser ferido)', () => {
+  const r = R(`(() => { const { p, T } = cen(1, { etapa: 1, vivos: true }); const e = T.inim[0]; sozinho(T, e); e.tipo = 'draugr'; e.jeito = 'adormecido'; e.dorme = true; e.atk = 3; e.mov = 3; e.alc = 1; pe(e, 8, 10); T.heroi = { c: 0, r: 10 }; p.hp = 30;
+    carta(T, 'draugr', K('t', 30, { mov: 1, atq: 0 })); tEncerrarTurno(T, p); tProximoInimigo(T, p); const longe = [e.dorme, e.c];
+    T.heroi = { c: 6, r: 10 }; T.fase = 'heroi'; carta(T, 'draugr', K('t', 30, { mov: 1, atq: 0 })); tEncerrarTurno(T, p); tProximoInimigo(T, p); return [...longe, e.dorme]; })()`);
+  igual(r.join(), 'true,8,false');
+});
+teste('jeito covarde: com pouca vida foge; guardião não passa de 3 hexágonos do posto; furioso bate mais forte', () => {
+  const r = R(`(() => { const { p, T } = cen(1, { etapa: 1, vivos: true }); const e = T.inim[0]; sozinho(T, e); e.tipo = 'draugr'; e.jeito = 'covarde'; e.atk = 3; e.mov = 3; e.alc = 1; e.hp = 1; e.hpMax = 10; pe(e, 3, 10); T.heroi = { c: 0, r: 10 }; p.hp = 30;
+    carta(T, 'draugr', K('t', 30, { mov: 1, atq: 0 })); tEncerrarTurno(T, p); tProximoInimigo(T, p); const fugiu = dist(e, T.heroi) > 3 && p.hp === 30;
+    const { p: q, T: U } = cen(1, { etapa: 1, vivos: true }); const g = U.inim[0]; sozinho(U, g); g.tipo = 'draugr'; g.jeito = 'guardiao'; g.atk = 3; g.mov = 4; g.alc = 1; pe(g, 8, 10); g.casa = { c: 8, r: 10 }; U.heroi = { c: 0, r: 10 };
+    carta(U, 'draugr', K('t', 30, { mov: 2, atq: 0 })); tEncerrarTurno(U, q); tProximoInimigo(U, q); const guarda = dist(g, g.casa) <= 3;
+    const { p: s, T: V } = cen(1, { etapa: 1, vivos: true }); const f = V.inim[0]; sozinho(V, f); f.tipo = 'draugr'; f.jeito = 'berserker'; f.atk = 3; f.mov = 3; f.alc = 1; f.hp = 2; f.hpMax = 10; pe(f, 1, 10); V.heroi = { c: 0, r: 10 }; s.hp = 30;
+    carta(V, 'draugr', K('t', 30, { mov: 0, atq: 0 })); tEncerrarTurno(V, s); tProximoInimigo(V, s);
+    return [fugiu, guarda, 30 - s.hp]; })()`);
+  igual(r.join(), 'true,true,5');
+});
+
+console.log('\nSalas e objetivos variados: chave, alavanca, ondas, resistir, resgatar, terreno (ciclo 8)');
+R(`function fimRodada(T, p) { T.fase = 'inimigos'; T.fila = []; finalizarRodada(T, p); }`);
+teste('chave: a porta trancada só abre depois de pegar a 🔑 (terminando o turno em cima dela)', () => {
+  const r = R(`(() => { const { p, T } = cen(6, { etapa: 0 }); const out = [!!T.chave, !!T.porta.trancada];
+    matarTodos(T); const v = vizinhos(T.g, T.porta.c, T.porta.r)[0]; T.heroi = { c: v.c, r: v.r }; T.armadilhas.clear();
+    tMover(T, p, T.porta.c, T.porta.r); out.push(T.fim, T.chave.pega);
+    T.fim = null; T.heroi = { c: T.chave.c, r: T.chave.r }; tEncerrarTurno(T, p); out.push(T.chave.pega);
+    T.fase = 'heroi'; T.heroi = { c: v.c, r: v.r }; T.movRest = 3; tMover(T, p, T.porta.c, T.porta.r); out.push(T.fim); return out; })()`);
+  igual(r.join(), 'true,true,,false,true,porta');
+});
+teste('alavanca: terminar o turno nela desarma as armadilhas e solta moedas (só uma vez)', () => {
+  const r = R(`(() => { const { p, T } = cen(6, { etapa: 1 }); const antes = T.armadilhas.size; armar(T, 5, 5, 'raio'); armar(T, 6, 6, 'raio');
+    T.heroi = { c: T.alavanca.c, r: T.alavanca.r }; tEncerrarTurno(T, p); const out = [!!T.alavanca.usada, T.armadilhas.size, T.moedas.size >= 1];
+    T.armadilhas.set('3,3', { tipo: 'raio' }); T.fase = 'heroi'; tEncerrarTurno(T, p); out.push(T.armadilhas.size); return out; })()`);
+  igual(r.join(), 'true,0,true,1');
+});
+teste('ondas: quando a sala esvazia chega outra leva (até acabarem); só depois o objetivo é cumprido', () => {
+  const r = R(`(() => { const { p, T } = cen(5, { etapa: 1, vivos: true }); const out = [T.ondas, T.tamOnda, combatentes(T).length];
+    matarTodos(T); out.push(T.limpa, T.fim, combatentes(T).length, T.ondas);
+    matarTodos(T); out.push(T.limpa, T.fim, T.ondas); return out; })()`);
+  igual(r.join(), '1,3,3,false,,3,0,true,vitoria,0');
+});
+teste('resistir: sobreviva N rodadas; reforços chegam a cada 2 rodadas; na rodada final o cenário termina', () => {
+  const r = R(`(() => { const { p, T } = cen(9, { etapa: 1, vivos: true }); p.hp = 99; const out = [T.resistir, T.objetivo]; const n0 = combatentes(T).length;
+    for (let i = 0; i < 5; i++) fimRodada(T, p); out.push(combatentes(T).length > n0, T.fim || 'nada'); fimRodada(T, p); out.push(T.fim, T.limpa); return out; })()`);
+  igual(r.join(), '6,resistir,true,nada,vitoria,true');
+});
+teste('resgatar: termine o turno em cima do prisioneiro para libertá-lo (cenário termina; ele dá um item de agradecimento)', () => {
+  const r = R(`(() => { const { p, T } = cen(13, { etapa: 1 }); const out = [!!T.prisioneiro, T.objetivo];
+    T.heroi = { c: T.prisioneiro.c, r: T.prisioneiro.r }; tEncerrarTurno(T, p); out.push(T.prisioneiro.solto, T.fim);
+    const antes = Object.values(p.inv).reduce((a, b) => a + b, 0) + p.equip.mochila.length; const res = aplicarVitoriaT(T, p); out.push(res.itens.length >= 1, p.flags.resgates); return out; })()`);
+  igual(r.join(), 'true,resgatar,true,vitoria,true,1');
+});
+teste('terreno: a cada 3 rodadas o chão racha e surgem armadilhas novas', () => {
+  const r = R(`(() => { const { p, T } = cen(7, { etapa: 1 }); p.hp = 99; T.armadilhas.clear(); const out = [T.terreno];
+    for (let i = 0; i < 2; i++) fimRodada(T, p); out.push(T.armadilhas.size); fimRodada(T, p); out.push(T.armadilhas.size, T.rodada); return out; })()`);
+  igual(r.join(), 'true,0,2,4');
+});
+teste('atravessar a porta devolve as cartas usadas à mão (as perdidas não voltam)', () => {
+  const r = R(`(() => { const { p, T, exp } = cen(1, { semTurno: true, etapa: 0 }); for (let i = 0; i < 3; i++) { tEscolherCarta(T, p, T.mao.find(c => !c.queima).id); T.fase = 'escolha'; T.cartaHeroi = null; }
+    tDescansoRapido(T, p); const N = tProximaEtapa(T, p); return [N.descarte.length, N.perdidas.length, N.mao.length + N.perdidas.length]; })()`);
+  igual(r.join(), '0,1,12');
+});
+
+console.log('\nHistória com escolhas: eventos, consequências, ordem livre e finais (ciclo 8)');
+teste('nos reinos depois de Valhala dá para escolher a ordem dos 3 primeiros cenários; o chefe só abre depois deles (Valhala segue em ordem)', () => {
+  const r = R(`(() => { const p = novoJogador('T', 'guerreiro'); const d = id => cenarioDesbloqueado(p, cenarioPorId(id));
+    const out = [d(3)]; for (let i = 1; i <= 4; i++) p.cenarios[i] = true;
+    out.push(d(5), d(6), d(7), d(8)); p.cenarios[7] = true; p.cenarios[5] = true; out.push(d(8)); p.cenarios[6] = true; out.push(d(8), d(9)); return out; })()`);
+  igual(r.join(), 'false,true,true,true,false,false,true,false');
+});
+teste('há eventos de história em cenários distintos (nunca depois de um chefe) e cada um tem 2 ou 3 escolhas', () => {
+  const r = R(`({ n: EVENTOS.length, ids: new Set(EVENTOS.map(e => e.depoisDe)).size, chefe: EVENTOS.some(e => [4, 8, 12, 16, 20].includes(e.depoisDe)), opcoes: EVENTOS.every(e => e.opcoes.length >= 2 && e.opcoes.length <= 3) })`);
+  verdade(r.n >= 10); igual(r.ids, r.n); verdade(!r.chefe); verdade(r.opcoes);
+});
+teste('escolher no evento aplica os efeitos (ouro, vida sem matar, XP, item, flags) e marca o evento como visto', () => {
+  const r = R(`(() => { const p = novoJogador('T', 'guerreiro'); const ev = { id: 'x', depoisDe: 1, opcoes: [{ efeitos: { ouro: 5, vida: -99, xp: 1, item: 'pocao', flags: { munin: 2, aliado: true } } }] };
+    EVENTOS.push(ev); const g0 = p.gold, pocoes = p.equip.mochila.length + (p.inv.pocao || 0); const antes = eventoDoCenario(p, 1) === ev || !!eventoDoCenario(p, 1);
+    const res = aplicarEvento(p, ev, 0); EVENTOS.pop();
+    return [p.gold - g0, p.hp, p.flags.munin, p.flags.aliado, p.eventosVistos.x, res.linhas.length > 3, p.equip.mochila.length + (p.inv.pocao || 0) - pocoes, antes]; })()`);
+  igual(r.join(), '5,1,2,true,1,true,1,true');
+});
+teste('o evento só aparece uma vez; ouro negativo nunca deixa o ouro abaixo de zero', () => {
+  const r = R(`(() => { const p = novoJogador('T', 'guerreiro'); p.gold = 3; const ev = EVENTOS.find(e => e.depoisDe === 1); const a = eventoDoCenario(p, 1) === ev;
+    aplicarEvento(p, { id: 'neg', opcoes: [{ efeitos: { ouro: -50 } }] }, 0); aplicarEvento(p, ev, 0); return [a, eventoDoCenario(p, 1), p.gold >= 0]; })()`);
+  igual(r.join(), 'true,,true');
+});
+teste('consequência no próximo cenário: começa com menos vida, armadilhas novas e inimigos a mais — e some depois de usada', () => {
+  const r = R(`(() => { const { p, T } = cen(5, { etapa: 0, vivos: true }); const n0 = combatentes(T).length, a0 = T.armadilhas.size;
+    p.proxEfeito = { armadilhas: 2, inimigosExtra: 2, vidaInicial: -2 }; aplicarProxEfeito(T, p);
+    return [combatentes(T).length - n0, T.armadilhas.size - a0, p.proxEfeito === undefined, textoProxEfeito(p)]; })()`);
+  igual(r.join(), '2,2,true,');
+});
+teste('os finais dependem das escolhas: Munin (≥3 e maior que o pacto), Pacto (≥3) ou neutro — sempre 5 páginas', () => {
+  const r = R(`[{}, { munin: 3 }, { pacto: 3 }, { munin: 3, pacto: 3 }, { munin: 5, pacto: 4 }, { hugin: 9 }].map(f => finalDoJogo(f).map(x => x.texto.slice(0, 20)).join('|'))`);
+  for (const t of r) igual(t.split('|').length, 5);
+  verdade(r[0] === r[5] && r[1] !== r[0] && r[2] !== r[0] && r[1] !== r[2], 'finais diferentes');
+  igual(r[3], r[2]); igual(r[4], r[1]);
+});
+teste('cenas dos chefes ganham páginas extras conforme a confiança (Munin/Hugin/Pacto)', () => {
+  const r = R(`(() => { const base = [{ icone: 'x', texto: 'a' }]; return ['fenrir', 'ares', 'hades', 'set'].map(c => [paginasDaCena(c, base, { munin: 9, hugin: 9, pacto: 9 }).length, paginasDaCena(c, base, {}).length]); })()`);
+  for (const [cheio, vazio] of r) verdade(cheio >= 2 && vazio >= 1);
+  verdade(r.some(([a, b]) => a !== b));
+});
+
+console.log('\nExtras: desfazer movimento, rebobinar a rodada e batalha guardada (ciclo 8)');
+teste('desfazer o movimento: volta ao lugar e devolve o movimento — mas não depois de atacar, nem se pisou em armadilha', () => {
+  const r = R(`(() => { const { p, T } = cen(1); const e = T.inim[0]; pe(e, 11, 0); const antes = { ...T.heroi };
+    const h = tAlcance(T).find(x => x.custo === 2); tMover(T, p, h.c, h.r); const moveu = T.heroi.c !== antes.c || T.heroi.r !== antes.r; const ok = tDesfazerMover(T);
+    const out = [moveu, ok, T.heroi.c === antes.c && T.heroi.r === antes.r, T.movRest, tDesfazerMover(T)];
+    // depois de atacar não dá para desfazer
+    const { p: q, T: U } = cen(1); const f = U.inim[0]; pe(f, 1, 10); f.hp = f.hpMax = 99; f.def = 0; const h2 = tAlcance(U).find(x => x.custo === 1 && dist(x, f) <= 1);
+    if (h2) { tMover(U, q, h2.c, h2.r); tAtacar(U, q, f.uid); out.push(tDesfazerMover(U)); } else out.push(false);
+    // armadilha: não desfaz
+    const { p: s, T: V } = cen(1); armar(V, 1, 10, 'gelo'); tMover(V, s, 1, 10); out.push(tDesfazerMover(V)); return out; })()`);
+  igual(r.join(), 'true,true,true,3,false,false,false');
+});
+teste('rebobinar: volta ao começo da rodada (vida, cartas, inimigos), vale 1 vez por cenário e embaralha os baralhos', () => {
+  const r = R(`(() => { const { p, T } = cen(1, { semTurno: true }); const hp0 = p.hp = 10, mao0 = T.mao.length, rod0 = T.rodada, e = T.inim[0], vida0 = e.hp; tirarFoto(T, p);
+    tEscolherCarta(T, p, T.mao.find(c => !c.queima).id); p.hp = 3; e.hp = 1; T.exp.moedasColetadas = 7;
+    const N = tRebobinar(T, p); const out = [!!N, p.hp, N.mao.length, N.rodada, N.inim[0].hp === vida0, N.fase, N.exp.rebobinar, N.exp.moedasColetadas, N.mao === N.exp.cartasHeroi.mao];
+    out.push(tRebobinar(N, p)); return out; })()`);
+  igual(r.join(), 'true,10,12,1,true,escolha,0,0,true,');
+});
+teste('rebobinar também funciona depois de cair; não vale com a sala limpa ou o cenário vencido', () => {
+  const r = R(`(() => { const { p, T } = cen(1, { semTurno: true }); tEscolherCarta(T, p, T.mao.find(c => !c.queima).id); p.hp = 0; T.fim = 'derrota'; const a = !!tRebobinar(T, p);
+    const { p: q, T: U } = cen(1, { semTurno: true }); matarTodos(U); const b = !!tRebobinar(U, q); return [a, b]; })()`);
+  igual(r.join(), 'true,false');
+});
+teste('batalha guardada: salvar e restaurar devolve tudo igual (posições, vida, moedas, armadilhas, cartas, cenário)', () => {
+  const r = R(`(() => { const { p, T } = cen(7, { etapa: 1 }); T.moedas.set('2,3', { valor: 2 }); T.exp.moedasColetadas = 4; const hp = T.inim[0].hp;
+    tEscolherCarta(T, p, T.mao.find(c => !c.queima).id); const txt = serializarBatalha(T); const U = restaurarBatalha(txt);
+    return [U.heroi.c === T.heroi.c, U.inim.length === T.inim.length, U.inim[0].hp === hp, U.moedas instanceof Map && U.moedas.get('2,3').valor === 2, U.armadilhas instanceof Map && U.armadilhas.size === T.armadilhas.size,
+      U.mao.length === T.mao.length, U.mao === U.exp.cartasHeroi.mao, U.exp.cenario === cenarioPorId(7), U.exp.moedasColetadas, U.cartaHeroi.id === T.cartaHeroi.id, U.terreno === true, U.fase === T.fase, txt.length < 60000].join(); })()`);
+  igual(r, 'true,true,true,true,true,true,true,true,4,true,true,true,true');
+});
+teste('a batalha restaurada continua a jogar normalmente (rodada completa sem erro)', () => {
+  const r = R(`(() => { const { p, T } = cen(1, { semTurno: true, vivos: true }); const U = restaurarBatalha(serializarBatalha(T)); U.exp.jogador = p;
+    tEscolherCarta(U, p, U.mao.find(c => !c.queima).id, undefined, U.mao.filter(c => !c.queima)[1].id); tEncerrarTurno(U, p); let g = 0; while (U.fase === 'inimigos' && !U.fim && g++ < 20) tProximoInimigo(U, p); return [U.rodada >= 1, g < 20]; })()`);
+  igual(r.join(), 'true,true');
 });
 
 console.log(`\n${ok} testes passaram${falhas.length ? `, ${falhas.length} FALHARAM: ${falhas.join('; ')}` : ''}.`);

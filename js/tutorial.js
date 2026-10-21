@@ -40,10 +40,13 @@ const Tutorial = (() => {
     { id: 'b_iniciativa', tela: 'batalha', quando: () => naBatalha(1), titulo: '⚡ Ordem de iniciativa',
       texto: 'Esta faixa lá em cima mostra QUEM JOGA PRIMEIRO. Cada carta tem um número de iniciativa: o menor joga antes. Mas atenção: as cartas dos monstros ficam OCULTAS ("?") até você escolher a sua — não dá para planejar em cima delas! Depois que você joga, elas são reveladas numa fileira embaixo, bem legíveis (👣 anda, ⚔️ dano, 🎯 alcance, ❤️ vida) e a ordem aparece. A vida de todos é um número: o seu fica no painel e o dos monstros em cima deles.',
       destaque: '.ini-faixa', botao: 'Entendi' },
-    { id: 'b_escolher', tela: 'batalha', quando: () => naBatalha(1) && T.fase === 'escolha', titulo: '🃏 Escolha a sua carta',
-      texto: 'Embaixo estão as SUAS cartas (a mão). Toque numa para marcar e depois em ▶ Jogar. A carta define o que você faz na rodada (andar, atacar, curar...) e o número dourado é a sua iniciativa. Cartas jogadas vão para o descarte. Para recuperá-las, descanse (precisa de 2 cartas usadas): 💤 Descanso longo (iniciativa 99, cura 3 e VOCÊ escolhe a carta usada que se perde) ou ⚡ Descanso rápido (perde uma ao acaso, mas você ainda joga na mesma rodada). Cartas perdidas só voltam no próximo cenário; sem cartas, você desmaia!',
+    { id: 'b_escolher', tela: 'batalha', quando: () => naBatalha(1) && T.fase === 'escolha', titulo: '🃏 Escolha 2 cartas',
+      texto: 'Embaixo estão as SUAS cartas (a mão). Em cada rodada você joga DUAS: toque em duas e depois em ▶ Jogar. Cada carta tem duas metades: a de CIMA (ataque ou cura) e a de BAIXO (movimento e escudo); você usa uma metade de cada carta. A primeira carta marcada (①) dá a sua iniciativa (número dourado). Ao marcar, o mapa mostra uma PRÉVIA do que você alcançaria. Cartas jogadas vão para o descarte. Para recuperá-las, descanse (precisa de 2 cartas usadas): 💤 Descanso longo (iniciativa 99, cura 3 e VOCÊ escolhe a carta usada que se perde) ou ⚡ Descanso rápido (perde uma ao acaso, mas você ainda joga na mesma rodada). Cartas perdidas só voltam no próximo cenário; sem cartas, você desmaia!',
       destaque: '.mao', esperar: () => feito('carta') },
-    { id: 'b_mover', tela: 'batalha', quando: () => naBatalha(1) && T.fase === 'heroi', titulo: '👣 Andar',
+    { id: 'b_metades', tela: 'batalha', quando: () => naBatalha(1) && T.fase === 'heroi' && T.modo2 && T.pendentes.length === 2, titulo: '⬆⬇ Use uma metade de cada carta',
+      texto: 'Aqui embaixo estão as duas cartas que você jogou. Toque numa metade para usá-la: ⬆ em cima (ataque ou cura), ⬇ embaixo (andar e escudo). Ao usar uma metade, a outra metade da MESMA carta se perde. Você pode atacar e depois andar, andar e depois atacar, ou atacar duas vezes! Quando as duas cartas forem usadas, o turno acaba.',
+      destaque: '.turno2', esperar: () => T.pendentes.length < 2 || T.rodada > 1 },
+    { id: 'b_mover', tela: 'batalha', quando: () => naBatalha(1) && T.fase === 'heroi' && T.movRest > 0, titulo: '👣 Andar',
       texto: () => `Você é o herói da base dourada. Toque num hexágono azul brilhante para andar até lá (até ${T.movRest} agora). Atenção: você anda UMA vez só por turno — o que sobrar do movimento da carta se perde. Pedras e paredes bloqueiam o caminho.`,
       destaque: '.pips', esperar: () => T.heroi.c !== T.saida.c || T.heroi.r !== T.saida.r },
 
@@ -109,6 +112,12 @@ const Tutorial = (() => {
       texto: 'Algumas cartas EMPURRAM (💨) ou PUXAM (🧲) o alvo, e VOCÊ escolhe para onde ele vai (toque num dos hexágonos destacados). Empurrar joga o inimigo para longe; puxar traz até você. Os monstros também empurram e puxam você, sempre do jeito que for pior para você! Se ele bater numa parede ou em outro monstro, para; se cair numa armadilha, ela dispara nele! Chefes e estruturas resistem. Olhe a mão e escolha uma carta assim.',
       destaque: '.mao', botao: 'Entendi' },
 
+    { id: 'b2_extras', tela: 'batalha', quando: () => naBatalha(2) && T.fase === 'escolha' && T.rodada >= 2, titulo: '🔥 Queimar, elementos e condições',
+      texto: 'Algumas cartas têm um selo 🔥 QUEIMA: são fortes, mas somem para sempre depois de usadas (no cenário). Outras CUSTAM vida (💔). Cartas com +🔥/+❄️/+✨/+🌑 CRIAM um elemento, e cartas com −🔥 etc. GASTAM esse elemento para ganhar dano ou uma condição (dura a rodada em que foi criado e a seguinte). As CONDIÇÕES: 💫 atordoado (perde o turno), 🕸️ imobilizado (não anda), ⛓️ desarmado (não ataca), 🕶️ cego (ataca com desvantagem), 🩸 ferido (perde 1 de vida por rodada até curar). Valem para você e para os monstros!',
+      destaque: '.mao', botao: 'Entendi' },
+    { id: 'b2_jeito', tela: 'batalha', quando: () => naBatalha(2) && T.fase === 'heroi' && T.rodada >= 2 && combatentes(T).some(e => e.jeito), titulo: '🐺 Cada monstro tem um jeito',
+      texto: 'Além da carta, cada monstro tem um jeito de lutar, com um ícone nas cartas deles e explicado no 📋: 🐺 bando (mais forte em grupo), 🛡️ guardião (não sai do posto), 🐔 covarde (foge quando ferido), 😡 furioso (mais forte quando ferido), 😴 dorminhoco (dorme até você chegar perto) e 💚 curandeiro (cura os aliados e fica longe).',
+      destaque: '.cartas-linha', botao: 'Entendi' },
     { id: 'b2_desv', tela: 'batalha', quando: () => naBatalha(2) && T.fase === 'heroi' && T.rodada >= 2, titulo: '⚠️ Desvantagem',
       texto: 'Se a carta que você jogou ataca de LONGE (alcance maior que 1) e há um monstro COLADO em você, o ataque sofre desvantagem: viram DUAS cartas de sorte e vale a PIOR. Com os monstros que atiram é igual: eles tentam se afastar de você para não sofrer isso. Afaste-se antes de atirar!',
       destaque: '.pips', botao: 'Entendi' },
@@ -143,7 +152,7 @@ const Tutorial = (() => {
       texto: 'Primeiro cuide dos monstros que machucam você; depois destrua as torres com calma. Use a faixa de iniciativa para prever quem vai atacar, e jogue-os nas armadilhas com empurrar/puxar.',
       destaque: '.ini-faixa', botao: 'Entendi' },
     { id: 'r_fim', tela: 'reino', quando: () => !!P.cenarios[3], titulo: '🎉 Tutorial concluído!',
-      texto: 'Você aprendeu o básico: andar, cartas de iniciativa, atacar, objetivos, moedas, baú, loja e estruturas. O próximo é o Covil de Fenrir, com um CHEFE. Compre equipamento, gaste seus pontos e boa sorte! (Para rever o tutorial, use o link no mapa dos reinos.)',
+      texto: 'Você aprendeu o básico: andar, duas cartas por rodada, atacar, objetivos, moedas, baú, loja e estruturas. O próximo é o Covil de Fenrir, com um CHEFE. Compre equipamento, gaste seus pontos e boa sorte! (Para rever o tutorial, use o link no mapa dos reinos.)',
       botao: 'Entendi' },
   ];
 

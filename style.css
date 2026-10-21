@@ -434,3 +434,34 @@ b { font-weight: 700; }
 .mc-carta.x2 { border-color: #ffd166; background: linear-gradient(160deg, #6a4c10, #2d2106); } .mc-carta.x2 b { color: #ffe08a; }
 .mc-carta.bloqueio { border-color: #9aa0b4; background: linear-gradient(160deg, #3a3d4a, #14151c); } .mc-carta.bloqueio b { color: #ff8a8a; }
 .modcarta-cx .mc-carta { border-color: inherit; }
+
+/* ---- Ciclo 8: duas cartas por rodada, metades, elementos, condições ---- */
+.cartaH .meta { display: block; padding: 3px 5px; border-radius: 6px; font-size: .72rem; background: #ffffff10; }
+.cartaH .meta.topo { border-bottom: 2px solid var(--ouro); border-radius: 6px 6px 0 0; }
+.cartaH .meta.base { border-radius: 0 0 6px 6px; margin-top: -3px; background: #ffffff08; }
+.cartaH .ordem { position: absolute; top: -8px; left: -4px; text-decoration: none; background: #fff; color: #1a1626; border-radius: 50%; width: 20px; height: 20px; display: grid; place-items: center; font-size: .8rem; font-weight: 800; }
+.cartaH.queima { border-color: #ff8a3d; }
+.cartaH .selo { font-style: normal; font-size: .62rem; color: #ffb27a; }
+.dica-2 { display: block; font-size: .68rem; color: var(--suave); padding: 0 2px; }
+.turno2 { display: flex; gap: 6px; padding: 2px 2px 4px; }
+.turno2 .c2 { flex: 1 1 0; display: flex; flex-direction: column; gap: 3px; background: #181328; border: 1.5px solid var(--borda); border-radius: 10px; padding: 4px 5px; min-width: 0; }
+.turno2 .c2.usada { opacity: .55; }
+.c2-nome { font-size: .68rem; color: var(--ouro); font-weight: 700; display: flex; gap: 4px; align-items: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.c2-nome i { font-style: normal; background: var(--ouro); color: #1a1626; border-radius: 50%; min-width: 18px; height: 18px; display: grid; place-items: center; font-size: .65rem; }
+.m2 { text-align: left; font-size: .72rem; padding: 6px 6px; min-height: 34px; border-radius: 8px; border: 1.5px solid var(--borda); background: #2a2150; color: var(--texto); }
+.m2.topo { border-color: #c9a64a88; }
+.m2.ativa { border-color: #7fe0a0; background: #1d3a2a; }
+.m2:disabled { opacity: .4; }
+.tag.elem { background: #3a2a10; border: 1px solid #ffb27a; }
+.tag.elem.fraco { opacity: .6; }
+.jeito { display: block; color: var(--suave); font-size: .66rem; margin-top: 2px; }
+
+.ev-titulo { margin: 4px 0 8px; text-align: center; color: var(--ouro); }
+.ev-opcoes { display: flex; flex-direction: column; gap: 10px; width: 100%; margin-top: 10px; }
+.ev-op { text-align: left; white-space: normal; line-height: 1.3; }
+.ev-efeitos { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin: 8px 0; }
+.ev-efeitos span { background: #ffffff14; border-radius: 12px; padding: 4px 10px; font-size: .8rem; }
+.aviso-escolha { color: #ffb27a; font-size: .85rem; }
+
+.banner-bat { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; padding: 10px 12px; margin-bottom: 10px; border-radius: 12px; background: #3a2a10; border: 1.5px solid #ffb27a; font-size: .85rem; }
+.previa { display: block; color: #9fd1ff; margin-top: 2px; }

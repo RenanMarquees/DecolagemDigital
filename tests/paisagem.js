@@ -33,7 +33,7 @@ const srv = http.createServer((q, r) => {
       return { palco, dock, heroi: h && { x: h.x - cv.left, y: h.y - cv.top }, rola: document.documentElement.scrollHeight > innerHeight + 2, mapaBtns: r('.mapa-botoes'), vp: { w: innerWidth, h: innerHeight } };
     });
     for (const fase of ['escolha', 'turno']) {
-      if (fase === 'turno') { await page.click('.cartaH >> nth=0'); await page.click('[data-a=tat-jogar]'); await page.waitForFunction(() => T.fase === 'heroi' && !OCUPADO, null, { timeout: 20000 }); await page.waitForTimeout(400); }
+      if (fase === 'turno') { await page.click('.cartaH >> nth=0'); await page.click('.cartaH >> nth=1'); await page.click('[data-a=tat-jogar]'); await page.waitForFunction(() => T.fase === 'heroi' && !OCUPADO, null, { timeout: 20000 }); await page.waitForTimeout(400); }
       const m = await medir();
       await page.screenshot({ path: path.join(out, `${nome}-${fase}.png`) });
       if (m.rola) throw new Error(`${nome}/${fase}: a tela rola`);

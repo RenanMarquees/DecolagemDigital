@@ -5,6 +5,7 @@
    ============================================================ */
 
 const SAVE_KEY = 'fio_do_destino_v1';
+const BAT_KEY = SAVE_KEY + '_batalha';       // a batalha em andamento (continuar depois)
 const app = document.getElementById('app');
 const modal = document.getElementById('modal');
 
@@ -28,7 +29,40 @@ const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;'
 const pct = (v, m) => Math.max(0, Math.min(100, (v / m) * 100));
 const reinoPorId = id => REINOS.find(r => r.id === id);
 
-function salvar() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(P)); } catch (e) { /* sem armazenamento */ } }
+function salvar() {
+  try {
+    localStorage.setItem(SAVE_KEY, JSON.stringify(P));
+    if (T && T.fim !== 'derrota' && T.fim !== 'fugiu' && T.fim !== 'porta') localStorage.setItem(BAT_KEY, JSON.stringify({ T: serializarBatalha(T), RES, t: Date.now() }));   // a batalha também fica guardada
+  } catch (e) { /* sem armazenamento */ }
+}
+function limparBatalhaSalva() { try { localStorage.removeItem(BAT_KEY); } catch (e) { /* ok */ } }
+/** Resumo da batalha guardada (ou null). */
+function batalhaSalva() {
+  try {
+    const b = JSON.parse(localStorage.getItem(BAT_KEY) || 'null');
+    if (!b || !b.T) return null;
+    const t = JSON.parse(b.T), cen = cenarioPorId(t.exp.cenarioId);
+    return cen ? { nome: cen.nome, etapa: t.etapa, total: t.totalEtapas, rodada: t.rodada } : null;
+  } catch (e) { return null; }
+}
+/** Volta para a batalha guardada exatamente de onde parou. */
+function continuarBatalha() {
+  try {
+    const b = JSON.parse(localStorage.getItem(BAT_KEY));
+    const t = restaurarBatalha(b.T);
+    CEN = t.exp.cenario; REINO = reinoPorId(t.reinoId);
+    T = t; RES = b.RES || null; SUB = 'main'; MODO = null; OCUPADO = false; ARM_AVISO = null; ATOR_TIPO = null;
+    T.exp.jogador = P; tirarFoto(T, P);
+    telaTatica();
+    if (T.fase === 'inimigos' && !T.fim) rodarInimigos();
+    return true;
+  } catch (e) { limparBatalhaSalva(); toast('Não consegui abrir a batalha guardada.'); return false; }
+}
+function bannerBatalha() {
+  const b = batalhaSalva();
+  return b ? `<div class="banner-bat"><span>⚔️ <b>Batalha em andamento:</b> ${esc(b.nome)} · etapa ${b.etapa}/${b.total} · rodada ${b.rodada}</span>
+    <button class="btn peq" data-a="bat-continuar">▶ Continuar</button><button class="btn link peq" data-a="bat-descartar">Descartar</button></div>` : '';
+}
 function carregar() {
   try {
     const s = localStorage.getItem(SAVE_KEY);
@@ -92,6 +126,30 @@ function telaHistoria() {
   </div>`;
 }
 
+/** Evento de história: uma situação, 2 ou 3 escolhas e a consequência (js/eventos.js). */
+let EVENTO = null;
+function telaEvento(ev, depois) {
+  Cena3D.destruir();
+  EVENTO = { ev, depois, feito: null };
+  desenharEvento();
+}
+function desenharEvento() {
+  const { ev, feito } = EVENTO, nome = P ? P.nome : '';
+  const sub = t => esc(t).replace(/\{nome\}/g, `<b>${esc(nome)}</b>`);
+  const corpo = feito
+    ? `<p class="hist-texto">${sub(ev.opcoes[feito.i].resultado)}</p>
+       ${feito.res.linhas.length ? `<div class="ev-efeitos">${feito.res.linhas.map(l => `<span>${esc(l)}</span>`).join('')}</div>` : ''}
+       ${feito.res.subidas.map(sb => `<p class="nivelup">⭐ Nível ${sb.nivel}! Uma carta nova espera por você.</p>`).join('')}
+       <button class="btn grande" data-a="ev-continuar">Continuar</button>`
+    : `<p class="hist-texto">${sub(ev.texto)}</p>
+       <div class="ev-opcoes">${ev.opcoes.map((o, i) => `<button class="btn ev-op" data-a="ev-escolher" data-i="${i}">${esc(o.rotulo)}</button>`).join('')}</div>`;
+  app.innerHTML = `<div class="tela historia evento ${REINO ? 'reino-' + REINO.id : ''}">
+    <div class="hist-icone">${ev.icone}</div>
+    <h2 class="ev-titulo">${esc(ev.titulo)}</h2>
+    ${corpo}
+  </div>`;
+}
+
 /* ---------- título e criação ---------- */
 function telaTitulo() {
   Cena3D.destruir();
@@ -139,6 +197,7 @@ function telaMapa() {
   app.innerHTML = `<div class="tela mapa">
     ${statusTopo()}
     <div class="corpo">
+      ${bannerBatalha()}
       <h2>Reinos dos Deuses</h2>
       <div class="fragmentos">${[0, 1, 2, 3].map(i => `<span class="${P.fragmentos[i] ? 'on' : ''}" title="${esc(P.fragmentos[i] || 'Fragmento ainda oculto')}">${P.fragmentos[i] ? '🔶' : '◇'}</span>`).join('')}<small>Fragmentos do Destino</small></div>
       <div class="rotulo-dif">Dificuldade</div>
@@ -182,8 +241,10 @@ function telaReino() {
   app.innerHTML = `<div class="tela reino reino-${r.id}">
     ${statusTopo()}
     <div class="corpo">
+      ${bannerBatalha()}
       <div class="banner"><span>${r.icone}</span><h2>${r.nome}</h2></div>
       <p class="intro">${esc(r.intro)}</p>
+      ${REINOS.indexOf(r) > 0 ? '<p class="dica">🧭 Aqui você escolhe a ordem dos três primeiros cenários. O do chefe só abre depois deles.</p>' : ''}
       <div class="lista-cen">
         ${cenariosDoReino(r.id).map(c => {
           const liberado = cenarioDesbloqueado(P, c), feito = !!P.cenarios[c.id], o = OBJETIVOS[c.objetivo];
@@ -222,6 +283,7 @@ function telaBriefing() {
       <div class="detalhes-cen">
         <span>🚪 ${c.etapas.length} etapas</span>
         <span>🧰 1 baú</span>
+        ${c.etapas.some(e => e.chave) ? '<span>🔑 porta trancada</span>' : ''}${c.etapas.some(e => e.alavanca) ? '<span>🕹️ alavanca</span>' : ''}${c.etapas.some(e => e.ondas) ? '<span>🌊 inimigos em levas</span>' : ''}${c.etapas.some(e => e.terreno) ? '<span>⚠️ chão que racha</span>' : ''}${c.objetivo === 'resistir' ? `<span>⏳ ${c.rodadas} rodadas</span>` : ''}
         <span>${ARMADILHAS[r.armadilha].icone} ${ARMADILHAS[r.armadilha].nome.replace('Armadilha ', 'armadilhas ').replace('armadilhas de', 'armadilhas de').replace('armadilhas venenosa', 'armadilhas venenosas')}</span>
         ${chefe ? `<span>${chefe.icone} ${esc(chefe.nome.split(',')[0])}</span>` : ''}
       </div>
@@ -234,6 +296,7 @@ function telaBriefing() {
         <span>Você <b>Nv ${P.nivel}</b> · ❤️ ${P.hp}/${d.hpMax}</span>
       </div>
       <p class="dica">O nível do cenário sobe a cada 2 níveis seus, e os inimigos ficam mais fortes junto.</p>
+      ${P.proxEfeito ? `<p class="aviso-escolha">📖 Consequência da sua última escolha: ${esc(textoProxEfeito(P))}.</p>` : ''}
       <div class="acoes-reino">
         <button class="btn grande" data-a="iniciar">⚔️ Começar o cenário</button>
         <button class="btn link" data-a="voltar-reino">← Voltar</button>
@@ -285,18 +348,22 @@ function telaLoja() {
 /* ---------- batalha tática em 3D ---------- */
 function iniciarBatalha() {
   const exp = criarExpedicao(CEN, P, P.dificuldade);
+  const pe = P.proxEfeito;
+  if (pe && pe.vidaInicial) P.hp = Math.max(1, P.hp + pe.vidaInicial);       // consequência de uma escolha da história
   T = criarTatica(exp, P);
+  aplicarProxEfeito(T, P);
   RES = null; SUB = 'main'; MODO = null; OCUPADO = false; ARM_AVISO = null; ATOR_TIPO = null;
   telaTatica();
 }
 
-let CARTA_SEL = null;   // carta de iniciativa tocada na mão (ainda não jogada)
+let CARTA_SEL = null;   // 'descanso' (descanso longo) quando escolhido
+let CARTAS_SEL = [];    // as cartas tocadas na mão (até 2; a primeira dá a iniciativa)
 let GAVETA = false;
 let ESCOLHENDO_PERDA = false;   // janela para escolher qual carta se perde no descanso longo
 
 function telaTatica() {
   T.escolhaForca = true;        // empurrar/puxar: o jogador escolhe para onde o inimigo vai
-  CARTA_SEL = null; GAVETA = false; ESCOLHENDO_PERDA = false;
+  CARTA_SEL = null; CARTAS_SEL = []; GAVETA = false; ESCOLHENDO_PERDA = false;
   app.innerHTML = `<div class="tela tatica reino-${T.reinoId}">
     <div class="tat-topo"><span class="tat-nome">📍 <b>${esc(T.nomeSala)}</b></span><span id="rod"></span></div>
     <div class="palco">
@@ -321,9 +388,9 @@ function telaTatica() {
 }
 
 /** Joga a carta escolhida (ou o descanso longo, com a carta perdida) e segue a rodada. */
-function jogarCartaEscolhida(id, perder) {
-  CARTA_SEL = null; SUB = 'main'; MODO = null;
-  if (!tEscolherCarta(T, P, id, perder)) { atualizarHud(); return; }
+function jogarCartaEscolhida(id, perder, id2) {
+  CARTA_SEL = null; CARTAS_SEL = []; SUB = 'main'; MODO = null;
+  if (!tEscolherCarta(T, P, id, perder, id2)) { atualizarHud(); return; }
   Tutorial.evento('carta');
   if (T.fase === 'inimigos') rodarInimigos();      // alguém tem iniciativa menor que a sua
   else { mostrarFxT(); depoisDaAcao(true); }       // você é o primeiro
@@ -357,7 +424,26 @@ function atualizarTabuleiro() {
       if (!T.acaoUsada) tAlvos(T, P).forEach(e => alvos.add(chave(e.c, e.r)));
     }
   }
+  if (T.fase === 'escolha' && !T.limpa && CARTAS_SEL.length) {            // prévia: onde você poderia andar e quem poderia atingir com as cartas marcadas
+    const pv = previaDasCartas();
+    pv.alc.forEach(k => alc.add(k)); pv.alvos.forEach(k => alvos.add(k));
+  }
   Cena3D.sincronizar(T, P, { alc, alvos, perigo, escolha });
+}
+
+/** Prévia das cartas marcadas na mão: hexágonos alcançáveis (maior movimento entre elas) e inimigos ao alcance (andando e atacando). */
+function previaDasCartas() {
+  const cartas = CARTAS_SEL.map(id => T.mao.find(c => c.id === id)).filter(Boolean);
+  let mov = 0, alc = 1;
+  for (const c of cartas) {
+    const m = T.mao.length === 1 ? { base: { mov: c.mov }, topo: { alc: c.alc } } : metadesDaCarta(c);
+    mov = Math.max(mov, (m.base && m.base.mov) || 0); if (m.topo && m.topo.atq !== undefined || (m.topo && m.topo.alc)) alc = Math.max(alc, (m.topo && m.topo.alc) || 1);
+  }
+  const d = derivados(P), movTot = mov ? mov + d.mov : 0, alcTot = alc + (alc > 1 ? d.alc : 0);
+  const livre = new Set(), alvos = new Set();
+  if (movTot > 0) for (const n of bfs(T.g, T.heroi, movTot, (c, r) => !!inimigoEm(T, c, r), (c, r) => temArmadilha(T, c, r)).values()) if (n.d > 0) livre.add(chave(n.c, n.r));
+  for (const e of combatentes(T)) if (dist(e, T.heroi) <= movTot + alcTot) alvos.add(chave(e.c, e.r));
+  return { alc: livre, alvos, mov: movTot, alcance: alcTot };
 }
 
 function mostrarFxT() {
@@ -406,13 +492,16 @@ function objetivoHtml() {
   const moedas = [...T.moedas.values()].reduce((a, m) => a + m.valor, 0);
   let txt;
   if (T.limpa) txt = T.ultimaEtapa ? '✅ <b>Objetivo cumprido!</b> Pegue o que quiser e volte à entrada 🚪' : '✅ <b>Sala limpa:</b> pegue o que quiser e chegue até a porta 🚪';
-  else if (!T.ultimaEtapa) txt = `🚪 <b>Limpe a sala</b> para poder chegar à porta · inimigos: ${comb}`;
+  else if (!T.ultimaEtapa) txt = `🚪 <b>Limpe a sala</b> para poder chegar à porta${T.chave ? ' (trancada: pegue a 🔑)' : ''} · inimigos: ${comb}`;
   else if (T.objetivo === 'matar_todos') txt = `☠️ <b>Derrote todos os inimigos</b> · restam ${comb}`;
   else if (T.objetivo === 'bau') txt = T.bau && T.bau.aberto ? '🧰 <b>Baú aberto!</b>' : '🧰 <b>Abra o baú:</b> termine o turno parado em cima dele';
   else if (T.objetivo === 'destruir') txt = `🏗️ <b>Destrua as estruturas</b> · ${total - estr}/${total}`;
+  else if (T.objetivo === 'resgatar') txt = T.prisioneiro && T.prisioneiro.solto ? '🔓 <b>Prisioneiro libertado!</b>' : `🔓 <b>Liberte ${esc(T.prisioneiro ? T.prisioneiro.nome : 'o prisioneiro')}:</b> termine o turno em cima dele`;
+  else if (T.objetivo === 'resistir') txt = `⏳ <b>Resista!</b> rodada ${Math.min(T.rodada, T.resistir)}/${T.resistir} · inimigos: ${comb}`;
   else { const b = T.inim.find(e => e.chefe); txt = `👑 <b>Derrote ${esc(b ? b.nome.split(',')[0] : 'o chefe')}</b>${b && b.vivo ? ` · ❤️ ${Math.round(pct(b.hp, b.hpMax))}%` : ''}`; }
-  const aviso = T.limpa && (moedas || (T.bau && !T.bau.aberto)) ? '⚠️ o que ficar para trás se perde' : '';
-  const extras = [moedas ? `🪙 no chão: ${moedas}` : '', T.bau && !T.bau.aberto && T.objetivo !== 'bau' ? '🧰 baú no mapa' : '', aviso].filter(Boolean).join(' · ');
+  const aviso = T.limpa && (moedas || (T.bau && !T.bau.aberto) || (T.chave && !T.chave.pega)) ? '⚠️ o que ficar para trás se perde' : '';
+  const extras = [moedas ? `🪙 no chão: ${moedas}` : '', T.bau && !T.bau.aberto && T.objetivo !== 'bau' ? '🧰 baú no mapa' : '',
+    T.chave ? (T.chave.pega ? '🔑 chave na mão' : '🔒 porta trancada: ache a 🔑') : '', T.alavanca && !T.alavanca.usada ? '🕹️ alavanca no mapa' : '', T.ondas > 0 && !T.limpa ? `🌊 +${T.ondas} ${T.ondas > 1 ? 'levas' : 'leva'}` : '', T.terreno && !T.limpa ? '⚠️ o chão racha' : '', aviso].filter(Boolean).join(' · ');
   return `${txt}${extras ? ` <small>· ${extras}</small>` : ''}`;
 }
 
@@ -423,7 +512,7 @@ function resumoCarta(c, ref) {
   const o = [c.mov === undefined ? '👣✕' : `👣${mov}`, c.atq === undefined ? '⚔️✕' : `⚔️${atq}`];
   if (c.atq !== undefined) o.push('🎯' + Math.max(1, ref.alc + (c.alc || 0)));
   if (c.curar) o.push('✚' + c.curar); if (c.fortalecer) o.push('💪'); if (c.escudo) o.push('🛡️');
-  if (c.empurrarHeroi) o.push('💨'); if (c.puxarHeroi) o.push('🧲');
+  if (c.empurrarHeroi) o.push('💨'); if (c.puxarHeroi) o.push('🧲'); if (c.cond) o.push(CONDICOES[c.cond].icone);
   return o.join(' ');
 }
 
@@ -478,12 +567,14 @@ function cartasLinhaHtml() {
     const movEf = c.mov === undefined ? null : Math.max(1, ref.mov + c.mov - (temEfeito(ref.efeitos, 'gelo') ? 1 : 0)), alcEf = Math.max(1, ref.alc + (c.alc || 0));
     const atqEf = c.atq === undefined ? null : Math.max(0, ref.atk + c.atq + (ref.bonusAtq || 0));
     const extras = descreverCarta(c).slice(2).filter(d => !d.texto.startsWith('alcance')).map(d => `<span>${d.icone} ${d.texto}</span>`).join('');
+    const jeito = ref.jeito ? `<span title="${esc(JEITOS_IA[ref.jeito].nome + ': ' + JEITOS_IA[ref.jeito].desc)}">${JEITOS_IA[ref.jeito].icone}</span>` : '';
+    const estado = [grupo.some(e => e.dorme) ? '😴' : '', ...[...new Set(grupo.flatMap(e => e.efeitos.map(x => (CONDICAO_POR_TIPO[x.tipo] || {}).icone).filter(Boolean)))]].join('');
     const feito = !grupo.some(e => emFila.has(e.uid)), agindo = OCUPADO && ATOR_TIPO === tipo;
     return `<div class="mcarta ${ref.chefe ? 'chefe' : ''} ${agindo ? 'agindo' : ''} ${feito && !agindo ? 'feito' : ''}" style="--cor:${Cena3D.corDoTipo(tipo)}">
       <div class="mc-topo"><i class="n" title="Iniciativa">${c.ini}</i>${miniIcone(ref.id, 26)}<b>${esc(ref.nome.split(',')[0])}${grupo.length > 1 ? ` ×${grupo.length}` : ''}</b></div>
       <div class="mc-nome">${esc(c.nome)}</div>
       <div class="mc-nums"><span class="${movEf === null ? 'nada' : ''}">👣 ${movEf === null ? '—' : movEf}</span><span class="${atqEf === null ? 'nada' : ''}">⚔️ ${atqEf === null ? '—' : atqEf}</span>${atqEf === null ? '' : `<span>🎯 ${alcEf}</span>`}</div>
-      ${extras ? `<div class="mc-efs">${extras}</div>` : ''}
+      ${extras || jeito || estado ? `<div class="mc-efs">${extras}${jeito}${estado ? `<span>${estado}</span>` : ''}</div>` : ''}
 </div>`;
   }).join('');
   return cartas ? `<div class="cartas-linha">${cartas}</div>` : '';
@@ -498,6 +589,7 @@ function cartasHtml() {
     if (!c) return `<div class="carta-inim oculta" style="--cor:${Cena3D.corDoTipo(tipo)}">
       <div class="carta-topo"><span class="ini">?</span>${miniIcone(ref.id, 28)}<b>${esc(ref.nome.split(',')[0])}</b>${grupo.length > 1 ? `<em>×${grupo.length}</em>` : ''}</div>
       <div class="carta-nome">🂠 Carta oculta</div><small>Revelada quando você escolher a sua.</small>
+      ${ref.jeito ? `<small class="jeito">${JEITOS_IA[ref.jeito].icone} <b>${JEITOS_IA[ref.jeito].nome}:</b> ${JEITOS_IA[ref.jeito].desc}</small>` : ''}
     </div>`;
     const movEf = c.mov === undefined ? 0 : Math.max(1, ref.mov + c.mov), alcEf = Math.max(1, ref.alc + (c.alc || 0));
     const atqEf = c.atq === undefined ? null : Math.max(0, ref.atk + c.atq + (ref.bonusAtq || 0));   // dano exato desta rodada
@@ -506,6 +598,7 @@ function cartasHtml() {
       <div class="carta-topo"><span class="ini" title="Iniciativa: quem tem número menor age primeiro">${c.ini}</span>${miniIcone(ref.id, 28)}<b>${esc(ref.nome.split(',')[0])}</b>${grupo.length > 1 ? `<em>×${grupo.length}</em>` : ''}</div>
       <div class="carta-nome">🃏 ${esc(c.nome)}</div>
       <ul class="efeitos">${descreverCarta(c).map(d => `<li>${d.icone} ${d.texto}</li>`).join('')}</ul>
+      ${ref.jeito ? `<small class="jeito">${JEITOS_IA[ref.jeito].icone} <b>${JEITOS_IA[ref.jeito].nome}:</b> ${JEITOS_IA[ref.jeito].desc}</small>` : ''}
       ${numeros ? `<div class="carta-num">${numeros}</div>` : ''}
     </div>`;
   }).join('');
@@ -530,27 +623,73 @@ function gavetaHtml() {
       ${T.limpa ? '' : `<div><small>Baralho dos monstros · ${T.exp.baralhos.inim.compra.length} no monte</small>${baralhoChips(T.exp.baralhos.inim)}</div>`}
       <small class="dica-mod">Cada ataque vira uma carta sozinha. Só quando sai ×2 ou ✖ o baralho é embaralhado de novo.</small></div>
     <div class="cartas-titulo">Histórico</div><div class="log">${log}</div>
+    ${T.instante && T.exp.rebobinar > 0 && !T.fim && !T.limpa ? `<button class="btn sec" data-a="tat-rebobinar" ${OCUPADO ? 'disabled' : ''}>⏪ Rebobinar a rodada <small>(${T.exp.rebobinar} chance neste cenário)</small></button>` : ''}
     ${!T.limpa && !T.chefeId ? `<button class="btn sec" data-a="tat-fugir" ${naSaida && (T.fase === 'heroi' || T.fase === 'escolha') && !OCUPADO ? '' : 'disabled'}>🚪 Fugir do cenário <small>${naSaida ? '' : '(só na entrada)'}</small></button>` : ''}`;
 }
 
-/** Uma carta da mão do herói. */
+/** Texto curtinho de uma metade, para os botões: "⚔️3 🎯4 💨1". */
+function metadeCurta(h) {
+  if (!h) return '—';
+  const b = derivados(P), o = [];
+  if (h.atq) o.push(`⚔️${h.atq + b.dano}` + ((h.alc || 1) > 1 ? ` 🎯${h.alc}` : ''));
+  if (h.alvo === 'ao-redor') o.push('⭕'); if (h.alvo === 'vizinhos') o.push('➕');
+  if (h.mov) o.push(`👣${h.mov + b.mov}`);
+  if (h.escudo) o.push(`🛡️${h.escudo}`);
+  if (h.cura) o.push(`✚${h.cura + b.cura}`);
+  if (h.empurrar) o.push(`💨${h.empurrar}`); if (h.puxar) o.push(`🧲${h.puxar}`);
+  if (h.dreno) o.push('🩸');
+  if (h.cond) o.push(CONDICOES[h.cond].icone);
+  if (h.elem) o.push('+' + ELEMENTOS[h.elem].icone);
+  if (h.usaElem) o.push(`−${ELEMENTOS[h.usaElem.elem].icone}`);
+  if (h.custo) o.push(`💔${h.custo.vida}`);
+  return o.join(' ') || '—';
+}
+
+/** Uma carta da mão do herói: número de iniciativa, metade de cima (ataque/cura) e metade de baixo (movimento/escudo). */
 function cartaMaoHtml(c, sel, desabilitada = false, acao = 'tat-carta') {
-  const efs = c.descanso
-    ? `<span>✚ cura ${DESCANSO_CURA}</span><span>🗑️ perde 1 carta usada (você escolhe)</span>`
-    : descreverCartaHeroi(c, derivados(P)).map(d => `<span>${d.icone} ${d.texto}</span>`).join('');
-  return `<button class="cartaH ${sel ? 'sel' : ''} ${c.descanso ? 'desc' : ''}" data-a="${acao}" data-id="${c.id}" ${desabilitada ? 'disabled' : ''}>
-    <i class="ini">${c.ini}</i><b>${esc(c.nome)}</b>
-    <span class="efs">${efs}</span></button>`;
+  const ordem = CARTAS_SEL.indexOf(c.id);
+  if (c.descanso) {
+    return `<button class="cartaH desc ${sel ? 'sel' : ''}" data-a="${acao}" data-id="${c.id}" ${desabilitada ? 'disabled' : ''}>
+      <i class="ini">${c.ini}</i><b>${esc(c.nome)}</b>
+      <span class="efs"><span>✚ cura ${DESCANSO_CURA}</span><span>🗑️ perde 1 carta usada</span></span></button>`;
+  }
+  const m = metadesDaCarta(c);
+  return `<button class="cartaH ${sel ? 'sel' : ''} ${c.queima ? 'queima' : ''}" data-a="${acao}" data-id="${c.id}" ${desabilitada ? 'disabled' : ''}>
+    <i class="ini">${c.ini}</i>${ordem >= 0 ? `<u class="ordem">${ordem === 0 ? '①' : '②'}</u>` : ''}<b>${esc(c.nome)}</b>
+    <span class="meta topo">${metadeCurta(m.topo)}</span><span class="meta base">${metadeCurta(m.base)}</span>
+    ${c.queima ? '<em class="selo">🔥 queima</em>' : ''}</button>`;
 }
 function maoHtml() {
   const ordenada = [...T.mao].sort((a, b) => a.ini - b.ini);
-  const sel = CARTA_SEL === 'descanso' ? CARTA_DESCANSO : T.mao.find(c => c.id === CARTA_SEL);
+  const sel = CARTA_SEL === 'descanso' ? CARTA_DESCANSO : null;
+  const escolhidas = CARTAS_SEL.map(id => T.mao.find(c => c.id === id)).filter(Boolean);
+  const precisa = Math.min(2, T.mao.length);                           // com 1 carta só na mão, vale a carta inteira
+  const pronto = !sel && escolhidas.length === precisa && precisa > 0;
   const naSaida = T.heroi.c === T.saida.c && T.heroi.r === T.saida.r;
   const podeDescansar = T.descarte.length >= 2;
   const longo = { ...CARTA_DESCANSO, id: 'descanso', nome: 'Descanso longo' };
+  const botao = sel ? `<button class="btn jogar" data-a="tat-jogar">▶ Descansar (ini 99)</button>`
+    : pronto ? `${escolhidas.length === 2 ? '<button class="btn peq sec" data-a="tat-trocar" title="Trocar qual carta dá a iniciativa">⇄</button>' : ''}<button class="btn jogar" data-a="tat-jogar">▶ Jogar (ini ${escolhidas[0].ini})</button>`
+    : (naSaida && !T.chefeId && !T.limpa && !escolhidas.length ? '<button class="btn link peq" data-a="tat-fugir">🚪 Fugir</button>' : '');
+  const pv = !sel && escolhidas.length ? previaDasCartas() : null;
+  const previa = pv ? ` <span class="previa">👁️ Prévia no mapa: anda até ${pv.mov} · ataca a ${pv.alcance} de alcance (azul = onde chega, vermelho = quem alcança).</span>` : '';
+  const dica = sel ? '' : precisa === 2 ? `<span class="dica-2">Toque em <b>2 cartas</b>: ① dá a iniciativa; use a metade de cima de uma e a de baixo da outra (ou as duas de cima...).${escolhidas.length ? ` ${escolhidas.length}/2` : ''}${previa}</span>` : `<span class="dica-2">Última carta: vale ela inteira.${previa}</span>`;
   return `<div class="mao-topo"><span>🃏 ${T.mao.length} na mão · ${T.descarte.length} usadas · ${T.perdidas.length} perdidas</span>
-      <span class="mao-bts"><button class="btn link peq" data-a="tat-itens">🎒 ${P.equip.mochila.length}</button><button class="btn peq sec" data-a="tat-rapido" ${podeDescansar && !T.rapidoUsado ? '' : 'disabled'} title="Perde 1 carta usada ao acaso; as outras voltam para a mão e você joga nesta rodada">⚡ Descanso rápido</button>${sel ? `<button class="btn jogar" data-a="tat-jogar">▶ ${CARTA_SEL === 'descanso' ? 'Descansar' : 'Jogar'} (ini ${sel.ini})</button>` : (naSaida && !T.chefeId && !T.limpa ? '<button class="btn link peq" data-a="tat-fugir">🚪 Fugir</button>' : '')}</span></div>
-    <div class="mao">${ordenada.map(c => cartaMaoHtml(c, c.id === CARTA_SEL)).join('')}${cartaMaoHtml(longo, CARTA_SEL === 'descanso', !podeDescansar)}</div>`;
+      <span class="mao-bts"><button class="btn link peq" data-a="tat-itens">🎒 ${P.equip.mochila.length}</button><button class="btn peq sec" data-a="tat-rapido" ${podeDescansar && !T.rapidoUsado ? '' : 'disabled'} title="Perde 1 carta usada ao acaso; as outras voltam para a mão e você joga nesta rodada">⚡ Descanso rápido</button>${botao}</span></div>
+    ${dica}
+    <div class="mao">${ordenada.map(c => cartaMaoHtml(c, CARTAS_SEL.includes(c.id))).join('')}${cartaMaoHtml(longo, CARTA_SEL === 'descanso', !podeDescansar)}</div>`;
+}
+
+/** No turno do herói (duas cartas): as duas cartas jogadas, cada uma com a metade de cima e a de baixo para escolher. */
+function turno2Html() {
+  if (!T.modo2 || T.livre) return '';
+  const cartas = T.cartasTurno || [];
+  const bloco = c => {
+    const m = metadesDaCarta(c), pend = T.pendentes.some(x => x.id === c.id);
+    const b = (q, h) => `<button class="m2 ${q} ${T.usadas && T.usadas[c.id] === q ? 'ativa' : ''}" data-a="tat-metade" data-id="${c.id}" data-q="${q}" ${pend && h ? '' : 'disabled'}>${q === 'topo' ? '⬆' : '⬇'} ${metadeCurta(h)}</button>`;
+    return `<div class="c2 ${pend ? '' : 'usada'}"><span class="c2-nome"><i>${c.ini}</i>${esc(c.nome)}${c.queima ? ' 🔥' : ''}</span>${b('topo', m.topo)}${b('base', m.base)}</div>`;
+  };
+  return `<div class="turno2">${cartas.map(bloco).join('')}</div>`;
 }
 
 /** Janela para escolher qual carta usada se perde no descanso longo. */
@@ -567,12 +706,13 @@ function dockHtml() {
   const etiquetas = [
     T.bonusItem && T.bonusItem.atq ? `<span class="tag ouro">🪨 +${T.bonusItem.atq} dano</span>` : '',
     T.escudoHeroi ? `<span class="tag">🛡️ escudo ${T.escudoHeroi}</span>` : '',
-    ...T.efeitos.map(ef => `<span class="tag efeito">${ef.tipo === 'gelo' ? '❄️ gelo' : '☠️ veneno'} (${ef.turnos})</span>`),
+    ...T.efeitos.map(ef => CONDICAO_POR_TIPO[ef.tipo] ? `<span class="tag efeito" title="${esc(CONDICAO_POR_TIPO[ef.tipo].desc)}">${CONDICAO_POR_TIPO[ef.tipo].icone} ${CONDICAO_POR_TIPO[ef.tipo].nome}</span>` : `<span class="tag efeito">${ef.tipo === 'gelo' ? '❄️ gelo' : '☠️ veneno'} (${ef.turnos})</span>`),
+    ...Object.keys(ELEMENTOS).filter(k => (T.elementos[k] || 0) > 0).map(k => `<span class="tag elem ${T.elementos[k] === 1 ? 'fraco' : ''}" title="${ELEMENTOS[k].nome} disponível para cartas que o gastam">${ELEMENTOS[k].icone}</span>`),
   ].join('');
   const ult = T.log[T.log.length - 1];
   const barras = `<div class="hud-heroi">
       <div class="hh-barras">${miniIcone(P.classe, 26)}<span class="vida-num ${P.hp <= d.hpMax * 0.34 ? 'baixa' : ''}">❤️ <b>${P.hp}</b><small>/${d.hpMax}</small></span><span class="ouro-mini">🪙 ${P.gold}</span></div>
-      <div class="pips">${(T.fase === 'heroi' ? `<span class="${T.movRest > 0 ? 'on' : ''}">👣 ${T.movRest}</span><span class="${T.acaoUsada || !c.atq ? '' : 'on'}">${!c.atq ? '⚔️ sem ataque' : T.acaoUsada ? '⚔️ ataque usado' : `⚔️ dano ${danoDoHeroi(T, P)}`}</span>` : '')}${T.cartaHeroi ? `<span class="on carta-atual">🃏 ${esc(T.cartaHeroi.nome)}</span>` : ''}${etiquetas}<button class="tag baralho-tag" data-a="tat-gaveta" title="Seu baralho de modificadores">🎴 ${T.exp.baralhos.heroi.compra.length}/${T.exp.baralhos.heroi.todas.length}</button>
+      <div class="pips">${(T.fase === 'heroi' ? `<span class="${T.movRest > 0 ? 'on' : ''}">👣 ${T.movRest}</span><span class="${T.acaoUsada || !c.atq ? '' : 'on'}">${!c.atq ? (T.modo2 && !T.acaoAtiva && T.pendentes.length ? '👆 escolha uma metade' : '⚔️ sem ataque') : T.acaoUsada ? '⚔️ ataque usado' : `⚔️ dano ${danoDoHeroi(T, P)}`}</span>` : '')}${T.cartaHeroi && !T.modo2 ? `<span class="on carta-atual">🃏 ${esc(T.cartaHeroi.nome)}</span>` : ''}${etiquetas}<button class="tag baralho-tag" data-a="tat-gaveta" title="Seu baralho de modificadores">🎴 ${T.exp.baralhos.heroi.compra.length}/${T.exp.baralhos.heroi.todas.length}</button>
         <span class="cen-tag">${DIFICULDADES[T.exp.difId].icone} Nv ${T.exp.nivelCen}</span></div>
     </div>`;
   const tick = ult ? `<div class="tick l-${ult.cls}">${esc(ult.msg)}</div>` : '';
@@ -582,7 +722,7 @@ function dockHtml() {
   if (T.fim === 'derrota') return tick + barras;
   if (OCUPADO || T.fase === 'inimigos') return tick + cartasLinhaHtml() + barras + '<div class="aguarde">⏳ Os inimigos estão agindo…</div>';
   if (T.fase === 'escolha') return tick + barras + (SUB === 'itens' ? acoesHtml() : maoHtml());
-  return tick + cartasLinhaHtml() + barras + acoesHtml();
+  return tick + cartasLinhaHtml() + barras + turno2Html() + acoesHtml();
 }
 
 function acoesHtml() {
@@ -605,7 +745,7 @@ function acoesHtml() {
   if (T.limpa) return `<div class="acoes-linha">${bt('tat-itens', '🎒', `Itens ${P.equip.mochila.length + equipamentosUsaveis(P).filter(q => !T.exp.equipGasto[q.chave]).length}`)}${bt('tat-fim', '⏭️', 'Encerrar', '', 'fim-turno')}</div>`;
   const c = cartaAtual(T);
   const podeAtacar = !!c.atq && !T.acaoUsada;
-  return `<div class="acoes-linha">${bt('tat-atacar', '⚔️', c.atq ? `Atacar ${danoDoHeroi(T, P)}` : 'Sem ataque', podeAtacar ? '' : 'disabled')}${bt('tat-itens', '🎒', `Itens ${P.equip.mochila.length + equipamentosUsaveis(P).filter(q => !T.exp.equipGasto[q.chave]).length}`)}${bt('tat-fim', '⏭️', 'Encerrar', '', 'fim-turno')}</div>`;
+  return `<div class="acoes-linha">${bt('tat-atacar', '⚔️', c.atq ? `Atacar ${danoDoHeroi(T, P)}` : 'Sem ataque', podeAtacar ? '' : 'disabled')}${T.ultimoMov ? bt('tat-desfazer', '↩️', 'Desfazer') : ''}${bt('tat-itens', '🎒', `Itens ${P.equip.mochila.length + equipamentosUsaveis(P).filter(q => !T.exp.equipGasto[q.chave]).length}`)}${bt('tat-fim', '⏭️', 'Encerrar', '', 'fim-turno')}</div>`;
 }
 
 function atualizarHud() {
@@ -629,6 +769,7 @@ function atualizarHud() {
 function derrotaHtml() {
   const perdidas = T.exp.moedasColetadas;
   return `<div class="fim"><h3>💀 Você caiu</h3><p>Os deuses te trazem de volta, mas perdem 20% do seu ouro.${perdidas ? ` As ${perdidas} moedas que você carregava ficaram para trás.` : ''}</p>
+    ${T.instante && T.exp.rebobinar > 0 ? `<button class="btn" data-a="tat-rebobinar">⏪ Tentar esta rodada de novo <small>(1 chance por cenário)</small></button>` : ''}
     <button class="btn grande" data-a="bat-fim">Despertar</button></div>`;
 }
 
@@ -666,14 +807,14 @@ function depoisDaAcao(ok) {
   mostrarFxT();
   atualizarTudo();
   if (T.fim === 'porta') { entrarPorta(); return; }
-  if (T.fim === 'fugiu') { toast('Você escapou! 🚪'); setTimeout(() => { if (T && T.fim === 'fugiu') { T = null; telaReino(); } }, 500); return; }
+  if (T.fim === 'fugiu') { toast('Você escapou! 🚪'); limparBatalhaSalva(); setTimeout(() => { if (T && T.fim === 'fugiu') { T = null; telaReino(); } }, 500); return; }
   conferirAutoFim();
 }
 
 /** Sem movimento e sem ação, não sobra nada a fazer: encerra o turno sozinho. */
 function conferirAutoFim() {
   const t = T;
-  if (t && t.fase === 'heroi' && !t.fim && !OCUPADO && (t.acaoUsada || t.limpa) && t.movRest === 0) {
+  if (t && t.fase === 'heroi' && !t.fim && !OCUPADO && (t.acaoUsada || t.limpa) && t.movRest === 0 && !(t.pendentes && t.pendentes.length)) {
     setTimeout(() => { if (T === t && t.fase === 'heroi' && !t.fim && !OCUPADO) encerrarTurno(); }, 600);
   }
 }
@@ -697,6 +838,10 @@ function irPara(c, r) {
   if (T.fim) { depoisDaAcao(true); return true; }
   if (T.bau && !T.bau.aberto && T.bau.c === T.heroi.c && T.bau.r === T.heroi.r) toast('🧰 Termine o turno aqui para abrir o baú.');
   else if (T.moedas.has(chave(T.heroi.c, T.heroi.r))) toast('🪙 Termine o turno aqui (⏭️ Encerrar) para pegar as moedas.');
+  else if (T.chave && !T.chave.pega && T.chave.c === T.heroi.c && T.chave.r === T.heroi.r) toast('🔑 Termine o turno aqui (⏭️ Encerrar) para pegar a chave.');
+  else if (T.alavanca && !T.alavanca.usada && T.alavanca.c === T.heroi.c && T.alavanca.r === T.heroi.r) toast('🕹️ Termine o turno aqui (⏭️ Encerrar) para puxar a alavanca.');
+  else if (T.prisioneiro && !T.prisioneiro.solto && T.prisioneiro.c === T.heroi.c && T.prisioneiro.r === T.heroi.r) toast('🔓 Termine o turno aqui (⏭️ Encerrar) para libertar o prisioneiro.');
+  else if (T.log.length && T.log[T.log.length - 1].msg.startsWith('🔒')) toast(T.log[T.log.length - 1].msg);
   conferirAutoFim();
   return true;
 }
@@ -705,8 +850,8 @@ function irPara(c, r) {
 function entrarPorta() {
   const t = document.getElementById('toast'); if (t) t.classList.remove('on');
   const prox = tProximaEtapa(T, P);
-  salvar();
   T = null; MODO = null; OCUPADO = false;
+  salvar(); limparBatalhaSalva();
   const rec = prox.recuperou;
   const folego = rec.hp ? ` Você recupera o fôlego (+${rec.hp} vida).` : '';
   const paginas = [];
@@ -718,7 +863,7 @@ function entrarPorta() {
   } else {
     paginas.push({ icone: '🚪', texto: `Você atravessa a porta. Etapa ${prox.etapa} de ${prox.totalEtapas}: ${prox.nomeSala}. ${combatentes(prox).length} inimigos!${folego}` });
   }
-  historia(paginas, () => { T = prox; RES = null; SUB = 'main'; ARM_AVISO = null; ATOR_TIPO = null; telaTatica(); });
+  historia(paginas, () => { T = prox; RES = null; SUB = 'main'; ARM_AVISO = null; ATOR_TIPO = null; aplicarProxEfeito(T, P); salvar(); telaTatica(); });
 }
 
 function executar(acao, uid) {
@@ -768,7 +913,7 @@ async function encerrarTurno() {
 /** Fim do cenário: recompensa aleatória, história do chefe (na 1ª vez), relíquia e, no cenário 20, o final do jogo. */
 function fimBatalha() {
   const t = T, res = RES;
-  T = null; MODO = null;
+  T = null; MODO = null; limparBatalhaSalva();
   if (t.fim === 'derrota') { penalidadeDerrota(P); salvar(); telaReino(); toast('Você acordou no acampamento.'); return; }
   if (!(t.objetivoCumprido && t.ultimaEtapa)) { telaReino(); return; }   // saiu sem cumprir o objetivo
   const rec = concluirCenario(t, P);
@@ -777,7 +922,7 @@ function fimBatalha() {
   const paginas = [];
   const chefe = t.chefeId ? INIMIGOS[t.chefeId] : null;
   if (chefe && res && res.primeira) {
-    for (const f of chefe.falaDepois) paginas.push(f);
+    for (const f of (typeof paginasDaCena === 'function' ? paginasDaCena(t.chefeId, chefe.falaDepois, P.flags) : chefe.falaDepois)) paginas.push(f);
     if (res.itens.includes(chefe.reliquia)) paginas.push({ icone: ITENS[chefe.reliquia].icone, texto: `Você recebeu a relíquia lendária: ${ITENS[chefe.reliquia].nome}!` });
   }
   const premio = rec.tipo === 'gold' ? `+${rec.gold} moedas de ouro` : rec.tipo === 'xp' ? `+${rec.xp} de XP${rec.subidas.length ? ` (você chegou ao nível ${rec.subidas[rec.subidas.length - 1].nivel}!)` : ''}` : `o item ${ITENS[rec.id].nome} ${ITENS[rec.id].icone}`;
@@ -786,11 +931,13 @@ function fimBatalha() {
   for (const m of rec.marcos || []) paginas.push({ icone: '🎴', texto: `Conquista: ${m.marco.nome}! A carta ${CARTAS_MOD[m.marco.carta].rotulo} (${CARTAS_MOD[m.marco.carta].nome}) entrou no seu baralho de ataque${m.trocou ? `, no lugar de uma carta ${CARTAS_MOD[m.trocou].rotulo}` : ''}.` });
   const feitos = Object.keys(P.cenarios).length;
   if (rec.primeira && feitos % 5 === 0 && feitos < 20) paginas.push({ icone: '🛒', texto: `Os mercadores receberam equipamentos melhores (nível ${tierDaLoja(P)})! Visite a loja de qualquer reino.` });
-  historia(paginas, () => {
-    if (c.id === CENARIOS.length) { P.finalizado = true; salvar(); historia(HISTORIA_FINAL, telaTitulo); }
+  const seguir = () => {
+    if (c.id === CENARIOS.length) { P.finalizado = true; salvar(); historia(typeof finalDoJogo === 'function' ? finalDoJogo(P.flags) : HISTORIA_FINAL, telaTitulo); }
     else if (chefe && res && res.primeira && P.fragmentos.length >= 4) historia([{ icone: '🌌', texto: 'O Abismo do Caos está aberto. Volte ao mapa dos reinos quando estiver pronto para o confronto final.' }], telaReino);
     else telaReino();
-  });
+  };
+  const ev = c.id !== CENARIOS.length ? eventoDoCenario(P, c.id) : null;
+  historia(paginas, () => (ev ? telaEvento(ev, seguir) : seguir()));
 }
 
 /* ---------- personagem e inventário (janelas) ---------- */
@@ -828,6 +975,7 @@ function modalPersonagem() {
     <h3>🎴 Baralho de ataque <small>${P.baralho.length}/${BARALHO_MAX} cartas</small></h3>
     <p class="dica-mod">Cada ataque seu vira uma destas cartas, sozinha: +N soma dano, −N tira, ×2 dobra, ✖ falha. Só quando sai ×2 ou ✖ o baralho é embaralhado de novo. Conquistas colocam cartas melhores aqui (com 15 cartas, a nova toma o lugar da pior).</p>
     ${baralhoChips(null, P.baralho)}
+    ${Object.keys(P.eventosVistos || {}).length ? `<h3>📖 Fios da história</h3><p class="dica-mod">Suas escolhas pesam no destino: 🐦‍⬛ Munin <b>${P.flags.munin || 0}</b> · 🐦 Hugin <b>${P.flags.hugin || 0}</b> · 🌀 Pacto do Caos <b>${P.flags.pacto || 0}</b>. Elas mudam as cenas dos chefes e o final do jogo.</p>` : ''}
     <h3>🏅 Conquistas <small>${MARCOS.filter(m => P.marcos[m.id]).length}/${MARCOS.length}</small></h3>
     <ul class="marcos">${MARCOS.map(m => { const feito = !!P.marcos[m.id], v = Math.min(m.meta, P.stats[m.stat] || 0); return `<li class="${feito ? 'feito' : ''}"><span>${feito ? '✅' : '⬜'} ${esc(m.nome)}</span><b class="mod-pq ${CARTAS_MOD[m.carta].tipo}">${CARTAS_MOD[m.carta].rotulo}</b><small>${feito ? 'recebida' : `${v}/${m.meta}`}</small></li>`; }).join('')}</ul>`);
 }
@@ -895,7 +1043,7 @@ const ACOES = {
   classe(el) { CRIAR.classe = el.dataset.id; telaCriar(); },
   comecar() {
     const nome = (document.getElementById('nome').value || '').trim() || 'Herói';
-    P = novoJogador(nome, CRIAR.classe);
+    P = novoJogador(nome, CRIAR.classe); limparBatalhaSalva();
     P.dificuldade = 'facil';   // o tutorial começa na dificuldade Fácil (dá para trocar no mapa)
     salvar();
     historia(HISTORIA_PROLOGO, telaMapa);
@@ -958,6 +1106,9 @@ const ACOES = {
     if (temArmadilha(T, c, r)) { const def = ARMADILHAS[T.tipoArm]; toast(`${def.icone} ${def.nome}: ${def.desc}`); return; }
     if (T.bau && T.bau.c === c && T.bau.r === r) toast(T.bau.aberto ? '🧰 O baú já foi aberto.' : '🧰 Baú do tesouro: termine o turno parado em cima dele.');
     else if (T.moedas.has(chave(c, r))) toast(`🪙 ${T.moedas.get(chave(c, r)).valor} moedas: termine o turno em cima para pegar.`);
+    else if (T.chave && T.chave.c === c && T.chave.r === r) toast(T.chave.pega ? '🔑 Você já pegou a chave.' : '🔑 Chave da porta: termine o turno parado em cima dela.');
+    else if (T.alavanca && T.alavanca.c === c && T.alavanca.r === r) toast(T.alavanca.usada ? '🕹️ A alavanca já foi puxada.' : '🕹️ Alavanca: termine o turno em cima para desarmar as armadilhas.');
+    else if (T.prisioneiro && T.prisioneiro.c === c && T.prisioneiro.r === r) toast(T.prisioneiro.solto ? '🔓 Ele já foi libertado.' : `🔓 ${T.prisioneiro.nome}: termine o turno em cima dele para libertá-lo.`);
   },
   'tat-limpa-ok'() { if (RES) RES.visto = true; atualizarHud(); },
   'tat-atacar'() {
@@ -968,18 +1119,54 @@ const ACOES = {
     if (c.alvo === 'ao-redor') { executar({ tipo: 'atacar' }); return; }
     MODO = { tipo: 'atacar' }; atualizarTudo();
   },
+  'bat-continuar'() { continuarBatalha(); },
+  'bat-descartar'() { confirmar('Descartar a batalha guardada? Você perde o progresso dela (o herói fica como está).', () => { limparBatalhaSalva(); fecharModal(); if (REINO) telaReino(); else telaMapa(); }); },
+  'tat-desfazer'() { if (T && !OCUPADO && tDesfazerMover(T)) { MODO = null; salvar(); atualizarTudo(); garantirVisivel(T.heroi); } },
+  'tat-rebobinar'() {
+    if (!T || OCUPADO) return;
+    if (!T.instante || T.exp.rebobinar <= 0) { toast('Não há mais rodadas para rebobinar neste cenário.'); return; }
+    confirmar('Voltar ao começo desta rodada? Você pode fazer isso só 1 vez por cenário, e as cartas sorteadas mudam.', () => {
+      fecharModal();
+      const N = tRebobinar(T, P);
+      if (!N) { toast('Não dá para rebobinar agora.'); return; }
+      T = N; RES = null; SUB = 'main'; MODO = null; GAVETA = false; limparBatalhaSalva(); salvar();
+      telaTatica(); toast('⏪ Rodada rebobinada!');
+    });
+  },
+  'ev-escolher'(el) {
+    if (!EVENTO || EVENTO.feito) return;
+    const i = +el.dataset.i, res = aplicarEvento(P, EVENTO.ev, i);
+    if (!res) return;
+    EVENTO.feito = { i, res }; salvar(); desenharEvento();
+  },
+  'ev-continuar'() { if (EVENTO && EVENTO.feito) { const d = EVENTO.depois; EVENTO = null; d(); } },
   'tat-carta'(el) {
     if (!T || OCUPADO || T.fase !== 'escolha') return;
-    CARTA_SEL = CARTA_SEL === el.dataset.id ? null : el.dataset.id;     // 2º toque na mesma carta desmarca
+    const id = el.dataset.id;
+    if (id === 'descanso') { CARTA_SEL = CARTA_SEL === 'descanso' ? null : 'descanso'; CARTAS_SEL = []; atualizarHud(); return; }
+    CARTA_SEL = null;
+    if (CARTAS_SEL.includes(id)) CARTAS_SEL = CARTAS_SEL.filter(x => x !== id);       // 2º toque na mesma carta desmarca
+    else if (CARTAS_SEL.length < 2) CARTAS_SEL.push(id);
+    else CARTAS_SEL = [CARTAS_SEL[0], id];
     atualizarHud();
   },
+  'tat-trocar'() { if (CARTAS_SEL.length === 2) { CARTAS_SEL.reverse(); atualizarHud(); } },
   'tat-jogar'() {
-    if (!T || OCUPADO || T.fase !== 'escolha' || !CARTA_SEL) return;
+    if (!T || OCUPADO || T.fase !== 'escolha') return;
     if (CARTA_SEL === 'descanso') {                  // descanso longo: primeiro você escolhe qual carta usada se perde
       if (T.descarte.length < 2) { toast('Para descansar você precisa de pelo menos 2 cartas usadas.'); return; }
       ESCOLHENDO_PERDA = true; atualizarHud(); return;
     }
-    jogarCartaEscolhida(CARTA_SEL);
+    const precisa = Math.min(2, T.mao.length);
+    if (CARTAS_SEL.length !== precisa || !precisa) { toast('Escolha 2 cartas: use a metade de cima de uma e a de baixo da outra.'); return; }
+    jogarCartaEscolhida(CARTAS_SEL[0], undefined, CARTAS_SEL[1]);
+  },
+  'tat-metade'(el) {
+    if (!T || OCUPADO) return;
+    const ok = tAtivarMetade(T, P, el.dataset.id, el.dataset.q);
+    MODO = null;
+    if (!ok) { const u = T.log[T.log.length - 1]; if (u && u.cls === 'erro') toast(u.msg); }
+    depoisDaAcao(ok);
   },
   'tat-perder'(el) { if (ESCOLHENDO_PERDA) { ESCOLHENDO_PERDA = false; jogarCartaEscolhida('descanso', el.dataset.id); } },
   'tat-perder-cancelar'() { ESCOLHENDO_PERDA = false; atualizarHud(); },
@@ -987,7 +1174,7 @@ const ACOES = {
     if (!T || OCUPADO || T.fase !== 'escolha') return;
     const perdida = tDescansoRapido(T, P);
     if (!perdida) { toast(T.log[T.log.length - 1].msg); return; }
-    CARTA_SEL = null; toast(`⚡ A carta "${perdida.nome}" se perdeu. As outras voltaram para a sua mão: escolha a carta da rodada!`);
+    CARTA_SEL = null; CARTAS_SEL = []; toast(`⚡ A carta "${perdida.nome}" se perdeu. As outras voltaram para a sua mão: escolha a carta da rodada!`);
     salvar(); atualizarTudo();
   },
   'tat-gaveta'() { GAVETA = !GAVETA; atualizarHud(); },

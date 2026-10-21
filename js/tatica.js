@@ -141,6 +141,7 @@ function criarInimigoT(id, esc, uid, pos, ehChefe, exp) {
     xp: ganho(b.xp), moedas: b.gold > 0 ? (ehChefe ? Math.max(2, Math.round(b.gold / 5)) : Math.max(1, Math.round(b.gold / 3))) : 0,   // quantas moedas ele solta
     drops: b.drops || [], reliquia: b.reliquia, fragmento: b.fragmento,
     c: pos.c, r: pos.r, vivo: true, efeitos: [], bonusAtq: 0, escudo: 0,
+    jeito: ehChefe ? null : (JEITO_IA[id] || null), casa: { c: pos.c, r: pos.r }, dorme: !ehChefe && JEITO_IA[id] === 'adormecido',
   };
 }
 
@@ -164,6 +165,7 @@ function criarExpedicao(cenario, p, difId = DIFICULDADE_PADRAO) {
     baralhos: { heroi: novoBaralhoMod(p.baralho), inim: novoBaralhoMod(baralhoInimigos(difId)) },   // a sorte dos ataques (o cenário todo usa os mesmos)
     equipGasto: {},                                                                                    // equipamentos já usados neste cenário (1 uso por cenário)
     moedasColetadas: 0,                                                                                // moedas saqueadas; viram ouro no fim do cenário
+    rebobinar: 1,                                                                                      // quantas vezes dá para voltar ao começo de uma rodada
   };
 }
 
@@ -258,6 +260,8 @@ function criarTatica(exp, p) {
     rodada: 1, forcaFila: [], escolhaForca: false, fase: 'escolha', movRest: 0, acaoUsada: false, bonusItem: { atq: 0, alc: 0 }, efeitos: [],
     baralhos: {}, cartas: {}, fila: [], fim: null, log: [], fx: [], modFx: [],
     mao: null, descarte: null, cartaHeroi: null, escudoHeroi: 0, heroiJogou: false,
+    elementos: {}, pendentes: [], acaoAtiva: null, modo2: false, ultimoMov: null,
+    ondas: 0, tamOnda: 0, terreno: !!etapa.terreno, resistir: 0, resistido: false, chave: null, alavanca: null, prisioneiro: null,
   };
   // as cartas do herói acompanham o cenário inteiro (a mão e o descarte passam de uma etapa para a outra)
   if (!exp.cartasHeroi) exp.cartasHeroi = { mao: maoDoHeroi(p), descarte: [] };
@@ -273,6 +277,21 @@ function criarTatica(exp, p) {
       if (pos) { postas.push(pos); T.inim.push(criarEstrutura(reino.id, T.inim.length + 1, pos, exp)); }
     }
   }
+  // extras da sala (veja cenarios.js): ondas, chave, alavanca, prisioneiro, resistir
+  if (etapa.ondas && !ehChefe) { T.ondas = etapa.ondas - 1; T.tamOnda = lista.length; }
+  if (!temProxima && exp.cenario.objetivo === 'resistir') T.resistir = exp.cenario.rodadas || 6;
+  if (etapa.chave && T.porta) {
+    const pos = escolherHex(T, { minDistHeroi: 4, minDistOutros: 2 });
+    if (pos) { T.chave = { c: pos.c, r: pos.r, pega: false }; T.porta.trancada = true; }
+  }
+  if (etapa.alavanca) {
+    const pos = escolherHex(T, { minDistHeroi: 3, minDistOutros: 2, evitar: T.chave ? [T.chave] : [] });
+    if (pos) T.alavanca = { c: pos.c, r: pos.r, usada: false };
+  }
+  if (!temProxima && exp.cenario.objetivo === 'resgatar') {
+    const pos = escolherHex(T, { minDistHeroi: 6, minDistOutros: 2, evitar: T.alavanca ? [T.alavanca] : [] }) || escolherHex(T, { minDistHeroi: 4, minDistOutros: 1 });
+    if (pos) T.prisioneiro = { c: pos.c, r: pos.r, solto: false, ...PRISIONEIROS[reino.id] };
+  }
   // um baú por cenário, na última etapa (em "bau" é o objetivo; nos outros é um bônus)
   if (!temProxima) {
     const pos = escolherHex(T, { minDistHeroi: 7 });
@@ -283,10 +302,61 @@ function criarTatica(exp, p) {
   logar(T, chefe ? `${chefe.icone} ${chefe.nome} bloqueia o caminho!` : `${inim.filter(e => !e.estrutura).map(e => e.icone).join(' ')} cercam você!`, 'info');
   if (armadilhas.size) { const def = ARMADILHAS[reino.armadilha]; logar(T, `${def.icone} Cuidado: ${armadilhas.size} armadilhas no chão (${def.nome.toLowerCase()}). ${def.desc}`, 'aviso'); }
   conferirExaustao(T);
+  tirarFoto(T, p);
   return T;                      // as cartas dos monstros só viram DEPOIS que você escolhe a sua (veja tEscolherCarta)
 }
 
 function logar(T, msg, cls = '') { T.log.push({ msg, cls }); }
+
+/* ---------- Rebobinar a rodada ---------- */
+/** Guarda uma "foto" do começo da rodada (a batalha inteira + vida, ouro e mochila do herói). */
+function tirarFoto(T, p) {
+  if (typeof structuredClone !== 'function' || !p) return;
+  T.exp.jogador = p;                                   // para o fim da rodada saber de quem é a foto
+  const { instante, ...resto } = T;
+  const { jogador, ...exp } = T.exp;                    // o herói não entra na cópia
+  try {
+    T.instante = structuredClone({ T: { ...resto, exp }, hp: p.hp, gold: p.gold, mochila: p.equip.mochila.slice(), inv: { ...p.inv } });
+  } catch (e) { T.instante = null; }
+}
+/** Volta ao começo da rodada atual (1 vez por cenário; vale também depois de cair). Devolve a nova batalha ou null.
+ *  Os baralhos (dos monstros e de modificadores) são embaralhados de novo: o futuro não repete igual. */
+function tRebobinar(T, p) {
+  if (!T.instante || T.exp.rebobinar <= 0 || T.fim === 'vitoria' || T.fim === 'porta' || T.fim === 'fugiu' || T.limpa) return null;
+  const f = structuredClone(T.instante);
+  const N = f.T;
+  N.exp.jogador = p;
+  N.exp.rebobinar = T.exp.rebobinar - 1;
+  N.exp.moedasColetadas = N.exp.moedasColetadas || 0;
+  N.exp.cartasHeroi = N.exp.cartasHeroi;
+  N.mao = N.exp.cartasHeroi.mao; N.descarte = N.exp.cartasHeroi.descarte; N.perdidas = N.exp.cartasHeroi.perdidas;
+  p.hp = f.hp; p.gold = f.gold; p.equip.mochila = f.mochila; p.inv = f.inv;
+  for (const b of Object.values(N.baralhos)) { b.cartas = embaralhar(b.cartas); b.i = 0; }
+  for (const k of ['heroi', 'inim']) { const b = N.exp.baralhos[k]; b.compra = embaralhar(b.compra); }
+  N.fim = null; N.fx = []; N.modFx = []; N.fila = []; N.cartas = {};
+  logar(N, '⏪ Você voltou ao começo da rodada. (Esta chance só vale 1 vez por cenário.)', 'aviso');
+  tirarFoto(N, p);
+  return N;
+}
+
+/* ---------- Salvar a batalha no meio (continuar depois) ---------- */
+/** Transforma a batalha em texto (Maps viram listas). Fica de fora o que é só tela ou cópia. */
+function serializarBatalha(T) {
+  const { instante, fx, modFx, ...resto } = T;
+  const exp = { ...T.exp }; delete exp.jogador; delete exp.cenario; delete exp.etapas; delete exp.dif;
+  exp.cenarioId = T.exp.cenario.id;
+  return JSON.stringify({ ...resto, exp, mao: undefined, descarte: undefined, perdidas: undefined }, (k, v) => (v instanceof Map ? { __m: [...v] } : v));
+}
+/** Faz o caminho de volta: devolve a batalha pronta para jogar. */
+function restaurarBatalha(texto) {
+  const T = JSON.parse(texto, (k, v) => (v && typeof v === 'object' && v.__m ? new Map(v.__m) : v));
+  const exp = T.exp, cen = cenarioPorId(exp.cenarioId);
+  exp.cenario = cen; exp.etapas = cen.etapas; exp.dif = DIFICULDADES[exp.difId] || DIFICULDADES[DIFICULDADE_PADRAO];
+  delete exp.cenarioId;
+  T.mao = exp.cartasHeroi.mao; T.descarte = exp.cartasHeroi.descarte; T.perdidas = exp.cartasHeroi.perdidas;
+  T.fx = []; T.modFx = []; T.instante = null;
+  return T;
+}
 
 /* ---------- Cartas dos inimigos ---------- */
 /** Vira a carta do topo do baralho de cada tipo de inimigo vivo. Todos do mesmo tipo fazem a mesma coisa. */
@@ -325,7 +395,27 @@ function tAlcance(T) {
 function alvosEm(T, origem, alcance) {
   return vivos(T).filter(e => dist(origem, e) <= alcance && (alcance <= 1 || linhaDeVisao(T.g, origem, e)));
 }
-function cartaAtual(T) { return (T && !T.livre && T.cartaHeroi) || {}; }
+/** A ação que vale agora: no modo de duas cartas é a METADE escolhida; com uma carta só (última da mão) é a carta inteira. */
+function cartaAtual(T) {
+  if (!T || T.livre) return {};
+  return (T.modo2 ? T.acaoAtiva : T.cartaHeroi) || {};
+}
+const temCond = (lista, tipo) => lista.some(x => x.tipo === tipo);
+/** Aplica uma condição (chave de CONDICOES, ex. 'atordoar') num alvo: 'heroi' ou um inimigo. */
+function aplicarCond(T, alvo, chaveCond) {
+  const def = CONDICOES[chaveCond];
+  if (!def) return;
+  const heroi = alvo === 'heroi', lista = heroi ? T.efeitos : alvo.efeitos;
+  if (alvo !== 'heroi' && (alvo.estrutura || (alvo.chefe && chaveCond === 'atordoar'))) return;   // estruturas não sentem; chefes resistem ao atordoamento
+  if (!lista.some(x => x.tipo === def.tipo)) lista.push({ tipo: def.tipo, turnos: def.tipo === 'ferido' ? 99 : 1, dano: def.tipo === 'ferido' ? 1 : 0, visto: false });
+  T.fx.push({ alvo: heroi ? 'heroi' : alvo.uid, v: 0, texto: def.icone, forte: true });
+  logar(T, `${def.icone} ${heroi ? 'Você fica' : alvo.nome + ' fica'} ${def.nome.toLowerCase()}: ${def.desc}.`, heroi ? 'aviso' : 'dano');
+}
+/** Curou? Então a ferida fecha. */
+function limparFerida(T) { if (T) T.efeitos = T.efeitos.filter(x => x.tipo !== 'ferido'); }
+/** Fim do turno de quem agiu: as condições de um turno só (atordoado, imobilizado, desarmado, cego) que já valiam neste turno acabam. */
+function expirarConds(lista) { return lista.filter(x => !(x.visto && x.tipo !== 'ferido' && x.tipo !== 'gelo' && x.tipo !== 'veneno')); }
+function marcarConds(lista) { for (const x of lista) x.visto = true; }
 /** Alcance do ataque da carta (1 = corpo a corpo). Armas de longo alcance somam quando a carta já é à distância. */
 function alcanceDa(p, T) {
   const c = cartaAtual(T), base = c.alc || 1;
@@ -352,6 +442,8 @@ function soltarMoeda(T, e) {
 /** Quanto ouro vale cada moeda no cenário: 2 até o cenário 10, 3 do 11 em diante. */
 /** Vida que o descanso longo devolve. */
 const DESCANSO_CURA = 3;
+/** Quantas cartas o descanso LONGO faz perder (1 = você escolhe qual). */
+const DESCANSO_PERDE = 1;
 const valorDaMoeda = cenarioId => (cenarioId <= 10 ? 2 : 3);
 
 function sortearEquipamento(reino, p) {
@@ -360,15 +452,41 @@ function sortearEquipamento(reino, p) {
   return pool[Math.floor(Math.random() * pool.length)];
 }
 
-/** No FIM do turno, se o herói está parado em cima de moedas, pega todas (igual ao baú: precisa terminar o turno ali). */
+/** No FIM do turno, o herói pega o que estiver sob os pés: moedas, a chave 🔑, a alavanca 🕹️ ou o prisioneiro 🔓 (igual ao baú: precisa terminar o turno ali). */
 function lootarAqui(T, p) {
   const k = chave(T.heroi.c, T.heroi.r);
   const m = T.moedas.get(k);
-  if (!m) return;
-  T.moedas.delete(k);
-  T.exp.moedasColetadas += m.valor;
-  T.fx.push({ alvo: 'heroi', v: 0, texto: `+${m.valor} 🪙`, cura: true });
-  logar(T, `🪙 Você pega ${m.valor} ${m.valor > 1 ? 'moedas' : 'moeda'} (${T.exp.moedasColetadas} no total; viram ouro no fim do cenário).`, 'cura');
+  if (m) {
+    T.moedas.delete(k);
+    T.exp.moedasColetadas += m.valor;
+    T.fx.push({ alvo: 'heroi', v: 0, texto: `+${m.valor} 🪙`, cura: true });
+    logar(T, `🪙 Você pega ${m.valor} ${m.valor > 1 ? 'moedas' : 'moeda'} (${T.exp.moedasColetadas} no total; viram ouro no fim do cenário).`, 'cura');
+  }
+  const aqui = o => o && o.c === T.heroi.c && o.r === T.heroi.r;
+  if (aqui(T.chave) && !T.chave.pega) {
+    T.chave.pega = true;
+    T.fx.push({ alvo: 'heroi', v: 0, texto: '🔑', cura: true });
+    logar(T, '🔑 Você pegou a chave! A porta trancada agora abre para você.', 'cura');
+  }
+  if (aqui(T.alavanca) && !T.alavanca.usada) {
+    T.alavanca.usada = true;
+    const quantas = T.armadilhas.size;
+    T.armadilhas.clear(); T.terreno = false;
+    let soltas = 0;
+    for (const v of vizinhos(T.g, T.heroi.c, T.heroi.r)) {
+      if (soltas >= 2) break;
+      if (ocupado(T, v.c, v.r) || T.moedas.has(chave(v.c, v.r))) continue;
+      T.moedas.set(chave(v.c, v.r), { valor: 1 }); soltas++;
+    }
+    T.fx.push({ alvo: 'heroi', v: 0, texto: '🕹️', cura: true });
+    logar(T, `🕹️ Você puxa a alavanca! ${quantas ? `${quantas} armadilhas se desarmam` : 'O chão para de rachar'}${soltas ? ` e um compartimento solta ${soltas} ${soltas > 1 ? 'moedas' : 'moeda'}` : ''}.`, 'cura');
+  }
+  if (aqui(T.prisioneiro) && !T.prisioneiro.solto) {
+    T.prisioneiro.solto = true;
+    T.fx.push({ alvo: 'heroi', v: 0, texto: '🔓', cura: true });
+    logar(T, `🔓 Você liberta ${T.prisioneiro.nome}! Ele agradece e foge para a saída.`, 'cura');
+    checarFim(T);
+  }
 }
 
 function abrirBau(T, p) {
@@ -397,7 +515,15 @@ function checarFim(T) {
   else if (T.objetivo === 'matar_todos') cumprido = resto.length === 0;
   else if (T.objetivo === 'chefe') cumprido = !T.inim.some(e => e.chefe && e.vivo);
   else if (T.objetivo === 'destruir') cumprido = estruturas.length === 0;
+  else if (T.objetivo === 'resgatar') cumprido = !!(T.prisioneiro && T.prisioneiro.solto);
+  else if (T.objetivo === 'resistir') cumprido = T.resistido;
   else cumprido = !!(T.bau && T.bau.aberto);                                // 'bau'
+  // ondas: a sala esvaziou, mas ainda vêm mais inimigos
+  if (T.ondas > 0 && resto.length === 0 && (!cumprido || T.objetivo === 'matar_todos' || !T.ultimaEtapa)) {
+    T.ondas--;
+    chamarOnda(T, T.tamOnda, `🌊 Mais inimigos chegam! ${T.ondas > 0 ? `(ainda vêm ${T.ondas} ${T.ondas > 1 ? 'levas' : 'leva'})` : '(a última leva)'}`);
+    return;
+  }
   if (!cumprido) return;
   for (const e of T.inim) if (e.vivo) { e.vivo = false; e.recuou = true; }
   T.objetivoCumprido = true;
@@ -406,7 +532,55 @@ function checarFim(T) {
   if (T.ultimaEtapa) {            // última sala: cumpriu o objetivo, o cenário termina na hora (o que não foi pego se perde)
     T.fim = 'vitoria';
     logar(T, '🏆 Objetivo cumprido! O cenário termina agora.', 'info');
-  } else logar(T, '✅ Sala limpa! Pegue as moedas e o baú e ande até a porta 🚪. O que ficar para trás se perde!', 'info');
+  } else logar(T, `✅ Sala limpa! Pegue as moedas${T.chave && !T.chave.pega ? ', a chave 🔑' : ''} e o baú e ande até a porta 🚪. O que ficar para trás se perde!`, 'info');
+}
+
+/** O hexágono que cumpre o objetivo quando o herói termina o turno em cima dele (baú ou prisioneiro), ou null. */
+function alvoDeObjetivo(T) {
+  if (!T.ultimaEtapa || T.limpa || T.fim) return null;
+  if (T.objetivo === 'bau' && T.bau && !T.bau.aberto) return T.bau;
+  if (T.objetivo === 'resgatar' && T.prisioneiro && !T.prisioneiro.solto) return T.prisioneiro;
+  return null;
+}
+
+/** Faz chegarem `n` inimigos novos do reino, em hexágonos livres longe do herói. */
+function chamarOnda(T, n, msg) {
+  const reino = REINOS.find(r => r.id === T.reinoId), pool = reino.inimigos;
+  const esc = ESCALA_GRUPO[Math.max(2, Math.min(5, n))] || ESCALA_ADD;
+  const livres = [];
+  for (let r = 0; r < T.g.rows; r++) for (let c = 0; c < T.g.cols; c++) {
+    if (T.g.cel[r][c] !== '.' || T.armadilhas.has(chave(c, r)) || ocupado(T, c, r)) continue;
+    const d = dist({ c, r }, T.heroi);
+    if (d >= 4) livres.push({ c, r, d });
+  }
+  livres.sort((a, b) => b.d - a.d || Math.random() - 0.5);
+  const topo = livres.slice(0, Math.max(n * 3, 6)), novos = [];
+  let uid = Math.max(0, ...T.inim.map(e => e.uid));
+  for (let i = 0; i < n && topo.length; i++) {
+    const pos = topo.splice(Math.floor(Math.random() * topo.length), 1)[0];
+    const e = criarInimigoT(pool[Math.floor(Math.random() * pool.length)], esc, ++uid, pos, false, T.exp);
+    T.inim.push(e); novos.push(e.uid);
+  }
+  T.chegada = novos;
+  if (msg) logar(T, msg, 'aviso');
+  return novos;
+}
+
+/** O chão racha: `n` armadilhas novas aparecem em hexágonos livres. */
+function racharChao(T, n) {
+  if (!T.tipoArm) return;
+  const livres = [];
+  for (let r = 0; r < T.g.rows; r++) for (let c = 0; c < T.g.cols; c++) {
+    if (T.g.cel[r][c] !== '.' || T.armadilhas.has(chave(c, r)) || ocupado(T, c, r) || T.moedas.has(chave(c, r))) continue;
+    if ((T.bau && T.bau.c === c && T.bau.r === r) || (T.porta && T.porta.c === c && T.porta.r === r) || (T.chave && T.chave.c === c && T.chave.r === r) || (T.alavanca && T.alavanca.c === c && T.alavanca.r === r) || (T.prisioneiro && T.prisioneiro.c === c && T.prisioneiro.r === r)) continue;
+    if (dist({ c, r }, T.heroi) < 2 || (c === T.saida.c && r === T.saida.r)) continue;
+    livres.push({ c, r });
+  }
+  for (let i = 0; i < n && livres.length; i++) {
+    const p = livres.splice(Math.floor(Math.random() * livres.length), 1)[0];
+    T.armadilhas.set(chave(p.c, p.r), { tipo: T.tipoArm });
+  }
+  logar(T, `⚠️ O chão racha! Surgiram ${ARMADILHAS[T.tipoArm].icone} novas armadilhas no mapa.`, 'aviso');
 }
 
 function verificarMortes(T) {
@@ -519,6 +693,7 @@ function tMover(T, p, c, r) {
   const nos = bfs(T.g, T.heroi, T.movRest, (cc, rr) => !!inimigoEm(T, cc, rr), (cc, rr) => temArmadilha(T, cc, rr));
   const alvo = nos.get(chave(c, r));
   if (!alvo || alvo.d === 0) return false;
+  const antes = { c: T.heroi.c, r: T.heroi.r, movRest: T.movRest, trapN: T.armadilhas.size };
   for (const passo of caminhoAte(alvo)) {
     T.heroi = { c: passo.c, r: passo.r };
     T.movRest -= 1;
@@ -527,9 +702,22 @@ function tMover(T, p, c, r) {
     if (res && res.parou) break;  // paralisado: o movimento acaba aqui
   }
   if (T.limpa && T.porta && T.porta.acessivel && T.heroi.c === T.porta.c && T.heroi.r === T.porta.r) {      // chegou na porta: ela se abre
-    T.porta.aberta = true; T.fim = 'porta'; return true;
+    if (T.chave && !T.chave.pega) logar(T, '🔒 A porta está trancada! Pegue a chave 🔑 (termine o turno em cima dela) e volte.', 'aviso');
+    else { T.porta.aberta = true; T.fim = 'porta'; return true; }
   }
   T.movRest = 0;                  // o movimento é usado UMA vez só: o que sobrou da carta se perde
+  T.ultimoMov = T.armadilhas.size === antes.trapN ? antes : null;     // só dá para desfazer se nada aconteceu no caminho
+  return true;
+}
+
+/** Desfaz o último movimento (só se não pisou em armadilha, não atacou e não encerrou o turno). */
+function tDesfazerMover(T) {
+  const u = T.ultimoMov;
+  if (!u || T.fase !== 'heroi' || T.fim || T.forcaFila.length || ocupado(T, u.c, u.r)) return false;
+  T.heroi = { c: u.c, r: u.r };
+  T.movRest = u.movRest;
+  T.ultimoMov = null;
+  logar(T, '↩️ Você desfez o movimento.', 'info');
   return true;
 }
 
@@ -559,6 +747,7 @@ function sacarParaAtaque(T, quem, base, nome, desv = false) {
 function golpeT(T, alvo, ataque) {
   const dano = Math.max(1, ataque - alvo.def - (alvo.escudo || 0));
   alvo.hp = Math.max(0, alvo.hp - dano);
+  if (alvo.dorme) { alvo.dorme = false; logar(T, `😠 ${alvo.nome} acordou!`, 'aviso'); }
   T.fx.push({ alvo: alvo.uid, v: dano });
   return dano;
 }
@@ -584,7 +773,9 @@ function tAtacar(T, p, uid) {
     if (!principal) { logar(T, 'Esse inimigo está fora de alcance.', 'erro'); return false; }
     alvos = c.alvo === 'vizinhos' ? vivos(T).filter(e => e === principal || dist(e, principal) === 1) : [principal];
   }
-  const emDesv = (c.alc || 1) > 1 && combatentes(T).some(e => dist(e, T.heroi) === 1);     // à distância, com um monstro colado em você
+  if (temCond(T.efeitos, 'desarmado')) { logar(T, '⛓️ Você está desarmado: não pode atacar neste turno.', 'erro'); return false; }
+  T.ultimoMov = null;
+  const emDesv = ((c.alc || 1) > 1 && combatentes(T).some(e => dist(e, T.heroi) === 1)) || temCond(T.efeitos, 'cego');     // à distância com um monstro colado em você, ou cego
   const ataque = sacarParaAtaque(T, 'heroi', danoDoHeroi(T, p), 'você', emDesv);    // a carta de modificador vira sozinha
   if (ataque === 0) {                                                       // bloqueio: o ataque inteiro se perde
     T.acaoUsada = true;
@@ -595,6 +786,7 @@ function tAtacar(T, p, uid) {
   for (const alvo of alvos) total += golpeT(T, alvo, ataque);
   logar(T, `⚔️ ${c.nome}: ${total} de dano${alvos.length > 1 ? ` em ${alvos.length} inimigos` : ` em ${alvos[0].nome}`}.`, 'dano');
   T.acaoUsada = true;
+  if (c.cond) for (const alvo of alvos) if (alvo.hp > 0) aplicarCond(T, alvo, c.cond);
   if (c.dreno && total > 0) {
     const cura = Math.min(derivados(p).hpMax - p.hp, Math.max(1, Math.floor(total / 2)));
     if (cura > 0) { p.hp += cura; logar(T, `🩸 Você rouba ${cura} de vida.`, 'cura'); T.fx.push({ alvo: 'heroi', v: cura, cura: true }); }
@@ -669,6 +861,7 @@ const temEfeito = (lista, tipo) => lista.some(x => x.tipo === tipo);
 /** Movimento do turno: movimento da carta + bônus (botas, destreza); o gelo tira 1, mas nunca fica abaixo de 1 se a carta anda. */
 function movEfetivo(movCarta, bonus, efeitos) {
   if (!(movCarta > 0)) return 0;
+  if (temEfeito(efeitos, 'imobilizado')) return 0;
   return Math.max(1, movCarta + bonus - (temEfeito(efeitos, 'gelo') ? 1 : 0));
 }
 
@@ -730,21 +923,22 @@ function passarEfeitos(T, p) {
   const tick = (efeitos, aplicar) => {
     for (const ef of efeitos) {
       if (ef.tipo === 'veneno') aplicar(ef.dano);
-      ef.turnos--;
+      if (ef.tipo === 'ferido') { aplicar(ef.dano || 1, true); continue; }
+      if (ef.tipo === 'veneno' || ef.tipo === 'gelo') ef.turnos--;
     }
     return efeitos.filter(ef => ef.turnos > 0);
   };
-  T.efeitos = tick(T.efeitos, (v) => {
+  T.efeitos = tick(T.efeitos, (v, ferida) => {
     p.hp = Math.max(0, p.hp - v);
     T.fx.push({ alvo: 'heroi', v, forte: true });
-    logar(T, `☠️ O veneno causa ${v} de dano em você.`, 'inimigo');
+    logar(T, ferida ? `🩸 A ferida sangra: ${v} de dano em você.` : `☠️ O veneno causa ${v} de dano em você.`, 'inimigo');
   });
   if (p.hp <= 0) { T.fim = 'derrota'; logar(T, 'Sua visão escurece...', 'erro'); return; }
   for (const e of vivos(T)) {
-    e.efeitos = tick(e.efeitos, (v) => {
+    e.efeitos = tick(e.efeitos, (v, ferida) => {
       e.hp = Math.max(0, e.hp - v);
       T.fx.push({ alvo: e.uid, v, forte: true });
-      logar(T, `☠️ O veneno causa ${v} de dano em ${e.nome}.`, 'dano');
+      logar(T, ferida ? `🩸 ${e.nome} sangra: ${v} de dano.` : `☠️ O veneno causa ${v} de dano em ${e.nome}.`, 'dano');
     });
   }
   verificarMortes(T);
@@ -766,9 +960,9 @@ function ordemDaRodada(T, iniPrevia = null) {   // iniPrevia: mostra onde o her�
 }
 
 /** O herói escolhe a carta da rodada (índice/ id da carta na mão, ou 'descanso'). Monta a fila e começa a rodada. */
-function tEscolherCarta(T, p, id, perder) {
+function tEscolherCarta(T, p, id, perder, id2) {
   if (T.fase !== 'escolha' || T.fim || T.livre) return false;
-  let carta;
+  let carta, carta2 = null;
   if (id === 'descanso') {          // descanso LONGO: iniciativa 99, cura 3 e você escolhe qual carta usada se perde
     if (T.descarte.length < 2) { logar(T, 'Para descansar você precisa de pelo menos 2 cartas usadas.', 'erro'); return false; }
     if (!T.descarte.some(c => c.id === perder)) { logar(T, 'Escolha qual carta usada vai se perder.', 'erro'); return false; }
@@ -777,12 +971,23 @@ function tEscolherCarta(T, p, id, perder) {
   else {
     const i = T.mao.findIndex(c => c.id === id);
     if (i < 0) { logar(T, 'Essa carta não está na sua mão.', 'erro'); return false; }
+    if (id2 !== undefined && id2 !== null) {          // DUAS cartas: a primeira dá a iniciativa; você usa uma metade de cada
+      const j = T.mao.findIndex(c => c.id === id2);
+      if (j < 0 || id2 === id) { logar(T, 'A segunda carta não está na sua mão.', 'erro'); return false; }
+    }
     carta = T.mao.splice(i, 1)[0];
-    T.descarte.push(carta);
+    if (id2 !== undefined && id2 !== null) carta2 = T.mao.splice(T.mao.findIndex(c => c.id === id2), 1)[0];
+    for (const c of [carta, carta2]) if (c) (c.queima ? T.perdidas : T.descarte).push(c);      // carta que queima some para sempre (neste cenário)
   }
   T.cartaHeroi = carta;
-  T.escudoHeroi = (carta.escudo || 0) + (carta.descanso ? 0 : derivados(p).esc);
-  logar(T, carta.descanso ? '💤 Você decide descansar (iniciativa 99).' : `🃏 Você joga "${carta.nome}" (iniciativa ${carta.ini}).`, 'info');
+  T.modo2 = !!carta2;
+  T.pendentes = carta2 ? [carta, carta2] : [];
+  T.cartasTurno = carta2 ? [carta, carta2] : [];
+  T.usadas = {};
+  T.acaoAtiva = null;
+  T.escudoHeroi = carta2 ? 0 : (carta.escudo || 0) + (carta.descanso ? 0 : derivados(p).esc);
+  logar(T, carta.descanso ? '💤 Você decide descansar (iniciativa 99).' : carta2 ? `🃏 Você joga "${carta.nome}" e "${carta2.nome}" (iniciativa ${carta.ini}).` : `🃏 Você joga "${carta.nome}" (iniciativa ${carta.ini}).`, 'info');
+  if (!carta2 && carta.queima) logar(T, `🔥 "${carta.nome}" queimou: não volta mais neste cenário.`, 'aviso');
   revelarCartas(T, true);         // agora os monstros viram as cartas deles (você escolheu primeiro, às cegas)
   T.fila = ordemDaRodada(T).map(x => (x.tipo === 'heroi' ? 'heroi' : x.uid));
   continuarRodada(T, p);
@@ -799,25 +1004,74 @@ function continuarRodada(T, p) {
 function iniciarTurnoHeroi(T, p) {
   const d = derivados(p), c = T.cartaHeroi || {};
   T.fase = 'heroi';
-  T.acaoUsada = !c.atq && !c.descanso ? true : false;      // carta sem ataque: não há ação para usar
+  T.ultimoMov = null;
+  marcarConds(T.efeitos);                                   // as condições que já estavam aí valem neste turno
+  if (temCond(T.efeitos, 'atordoado') && T.modo2) { T.pendentes = T.pendentes.slice(0, 1); logar(T, '💫 Você está atordoado: só uma das cartas vale neste turno.', 'aviso'); }
   T.bonusItem = { atq: 0, alc: 0 };
+  if (T.modo2) {                                            // duas cartas: nada acontece até você escolher uma metade
+    T.acaoUsada = true; T.movRest = 0; T.acaoAtiva = null;
+    return;
+  }
+  T.acaoUsada = !c.atq && !c.descanso ? true : false;      // carta sem ataque: não há ação para usar
   T.movRest = movEfetivo(c.mov, d.mov, T.efeitos);
   if (c.descanso) {
     const hp0 = p.hp;
     p.hp = Math.min(d.hpMax, p.hp + DESCANSO_CURA);
-    const i = T.descarte.findIndex(x => x.id === c.perder);
+    const i = DESCANSO_PERDE ? T.descarte.findIndex(x => x.id === c.perder) : -1;
     const perdida = i >= 0 ? T.descarte.splice(i, 1)[0] : null;
     if (perdida) T.perdidas.push(perdida);                // a carta escolhida se perde (até o fim do cenário)
     T.mao.push(...T.descarte.splice(0));                  // as outras cartas usadas voltam para a mão
-    T.movRest = 0; T.acaoUsada = true;
+    T.movRest = 0; T.acaoUsada = true; limparFerida(T);
     logar(T, `💤 Você descansa: +${p.hp - hp0} vida. ${perdida ? `A carta "${perdida.nome}" se perdeu;` : ''} as outras cartas voltam para a mão.`, 'cura');
     T.fx.push({ alvo: 'heroi', v: p.hp - hp0, cura: true });
     return;
   }
   if (c.cura) {
     const v = Math.min(d.hpMax - p.hp, c.cura + d.cura);
-    if (v > 0) { p.hp += v; logar(T, `✚ A carta cura ${v} de vida.`, 'cura'); T.fx.push({ alvo: 'heroi', v, cura: true }); }
+    if (v > 0) { p.hp += v; logar(T, `✚ A carta cura ${v} de vida.`, 'cura'); T.fx.push({ alvo: 'heroi', v, cura: true }); limparFerida(T); }
   }
+}
+
+/** Usa UMA metade de uma das duas cartas jogadas ('topo' = ataque/cura, 'base' = movimento/escudo). A outra metade dessa carta se perde. */
+function tAtivarMetade(T, p, cartaId, qual) {
+  if (T.fase !== 'heroi' || T.fim || T.livre || !T.modo2 || T.forcaFila.length) return false;
+  const i = T.pendentes.findIndex(c => c.id === cartaId);
+  if (i < 0) { logar(T, 'Essa carta já foi usada neste turno.', 'erro'); return false; }
+  const carta = T.pendentes[i], h = metadesDaCarta(carta)[qual];
+  if (!h) { logar(T, 'Essa metade da carta não faz nada.', 'erro'); return false; }
+  if (h.custo && h.custo.vida && p.hp <= h.custo.vida) { logar(T, `Você não tem vida para pagar o custo (${h.custo.vida}).`, 'erro'); return false; }
+  const d = derivados(p);
+  const ativa = { ...h, nome: carta.nome, ini: carta.ini };
+  if (h.usaElem && (T.elementos[h.usaElem.elem] || 0) > 0) {            // gasta o elemento e ganha o bônus
+    const u = h.usaElem;
+    T.elementos[u.elem] = 0;
+    if (u.atq) ativa.atq += u.atq;
+    if (u.cond) ativa.cond = u.cond;
+    logar(T, `${ELEMENTOS[u.elem].icone} Você gasta ${ELEMENTOS[u.elem].nome.toLowerCase()}: ${u.atq ? `+${u.atq} de dano` : CONDICOES[u.cond].verbo}!`, 'forte');
+  }
+  T.pendentes.splice(i, 1);
+  T.usadas = { ...(T.usadas || {}), [carta.id]: qual };
+  T.ultimoMov = null;
+  T.acaoAtiva = ativa;
+  T.movRest = h.mov ? movEfetivo(h.mov, d.mov, T.efeitos) : 0;
+  T.acaoUsada = !h.atq;
+  if (h.escudo) T.escudoHeroi += h.escudo;
+  if (h.custo && h.custo.vida) { p.hp -= h.custo.vida; T.fx.push({ alvo: 'heroi', v: h.custo.vida, forte: true }); logar(T, `💔 ${carta.nome} custa ${h.custo.vida} de vida.`, 'aviso'); }
+  if (h.cura) {
+    const v = Math.min(d.hpMax - p.hp, h.cura + d.cura);
+    if (v > 0) { p.hp += v; logar(T, `✚ A carta cura ${v} de vida.`, 'cura'); T.fx.push({ alvo: 'heroi', v, cura: true }); }
+    limparFerida(T);
+  }
+  if (h.elem) { T.elementos[h.elem] = 2; logar(T, `${ELEMENTOS[h.elem].icone} ${ELEMENTOS[h.elem].nome} criado: outra carta pode gastá-lo nesta rodada ou na próxima.`, 'info'); }
+  if (qual === 'base' && h.mov && T.movRest === 0) logar(T, '🕸️ Você está imobilizado: não consegue andar.', 'aviso');
+  if (!h.atq && !h.mov && T.pendentes.length === 0) T.acaoUsada = true;
+  if (temCond(T.efeitos, 'atordoado')) T.pendentes = [];                // atordoado: só uma ação
+  return true;
+}
+
+/** Ainda dá para fazer algo neste turno? (metades por usar, movimento, ataque) */
+function turnoTemAcao(T) {
+  return !!(T.pendentes && T.pendentes.length) || T.movRest > 0 || !T.acaoUsada;
 }
 
 /** Descanso RÁPIDO (antes de escolher a carta): uma carta usada, sorteada, se perde; as outras voltam para a mão e você joga na mesma rodada. */
@@ -840,11 +1094,14 @@ const maoVazia = T => !T.mao || T.mao.length === 0;
 /** Encerra o turno do herói. Se ele estiver parado em cima do baú, abre. Depois os inimigos que faltam agem, na ordem da iniciativa. */
 function tEncerrarTurno(T, p) {
   if (T.fase !== 'heroi' || T.fim || T.livre || T.forcaFila.length) return false;
-  lootarAqui(T, p);                // terminou o turno em cima de moedas: pega
+  lootarAqui(T, p);                // terminou o turno em cima de moedas, chave, alavanca ou prisioneiro: pega
+  if (T.fim) return true;
   if (T.bau && !T.bau.aberto && T.bau.c === T.heroi.c && T.bau.r === T.heroi.r) {
     abrirBau(T, p);                // ficou 1 turno em cima do baú
     if (T.fim) return true;
   }
+  T.efeitos = expirarConds(T.efeitos);
+  T.pendentes = []; T.acaoAtiva = null; T.ultimoMov = null;
   T.fase = 'inimigos';
   T.heroiJogou = true;
   T.fila = T.fila.filter(x => x === 'heroi' || (T.inim.find(e => e.uid === x) || {}).vivo);   // quem morreu no meio sai da fila
@@ -902,10 +1159,11 @@ function moverInimigo(T, p, e, mov, alc, jaPodeAtacar = false) {
   return res;
 }
 
-function atacarHeroi(T, p, d, e, carta) {
-  const mod = carta.atq + e.bonusAtq;
+function atacarHeroi(T, p, d, e, carta, furioso = false) {
+  const aliadosColados = e.jeito === 'bando' ? Math.min(2, combatentes(T).filter(x => x !== e && dist(x, e) === 1).length) : 0;
+  const mod = carta.atq + e.bonusAtq + aliadosColados + (furioso ? 2 : 0);
   const alcE = Math.max(1, e.alc + (carta.alc || 0));
-  const golpe = sacarParaAtaque(T, 'inim', Math.max(1, e.atk + mod), e.nome.split(',')[0], alcE > 1 && dist(e, T.heroi) === 1);   // carta de modificador do monstro
+  const golpe = sacarParaAtaque(T, 'inim', Math.max(1, e.atk + mod), e.nome.split(',')[0], (alcE > 1 && dist(e, T.heroi) === 1) || temCond(e.efeitos, 'cego'));   // carta de modificador do monstro
   if (golpe === 0) {
     logar(T, `💨 ${e.nome} errou o ataque!`, 'info');
     T.fx.push({ alvo: 'heroi', v: 0, texto: '✖ errou', esquiva: true, de: e.uid });
@@ -920,6 +1178,7 @@ function atacarHeroi(T, p, d, e, carta) {
     return;
   }
   T.fx.push({ alvo: 'heroi', v: dano, forte, de: e.uid });
+  if (carta.cond && p.hp - 0 > 0) aplicarCond(T, 'heroi', carta.cond);
   logar(T, forte ? `💢 ${e.nome} usa ${carta.nome}: ${dano} de dano!` : `${e.nome} ataca (${carta.nome}): ${dano} de dano.`, forte ? 'forte' : 'inimigo');
   if (p.hp <= 0) return;
   if (carta.empurrarHeroi) forcarMovimento(T, p, 'heroi', e, carta.empurrarHeroi, 'empurrar');
@@ -946,30 +1205,95 @@ function apoioDaCarta(T, e, carta) {
   }
 }
 
-/** Faz um inimigo jogar a carta da rodada: apoio, depois andar, depois atacar. */
+/** Hexágono vizinho (a até `mov` passos) que mais AFASTA o inimigo do herói. */
+function fugirDoHeroi(T, p, e, mov) {
+  const ocupadoPorOutro = (c, r) => T.inim.some(x => x.vivo && x !== e && x.c === c && x.r === r);
+  const nos = bfs(T.g, e, mov, (c, r) => (c === T.heroi.c && r === T.heroi.r) || ocupadoPorOutro(c, r), (c, r) => temArmadilha(T, c, r));
+  let melhor = null;
+  for (const n of nos.values()) {
+    if (n.d === 0 || temArmadilha(T, n.c, n.r)) continue;
+    const s = dist(n, T.heroi) * 10 - n.d;
+    if (!melhor || s > melhor.s) melhor = { n, s };
+  }
+  if (!melhor || dist(melhor.n, T.heroi) <= dist(e, T.heroi)) return false;
+  e.c = melhor.n.c; e.r = melhor.n.r;
+  return true;
+}
+
+/** Anda `mov` passos em direção a `alvo` (um aliado ferido, por exemplo), sem pisar em armadilha. */
+function andarAte(T, e, alvo, mov) {
+  const ocupadoPorOutro = (c, r) => T.inim.some(x => x.vivo && x !== e && x.c === c && x.r === r) || (c === T.heroi.c && r === T.heroi.r);
+  const nos = bfs(T.g, e, mov, ocupadoPorOutro, (c, r) => temArmadilha(T, c, r));
+  let melhor = null;
+  for (const n of nos.values()) {
+    if (n.d === 0 || temArmadilha(T, n.c, n.r)) continue;
+    const s = dist(n, alvo);
+    if (!melhor || s < melhor.s || (s === melhor.s && n.d < melhor.n.d)) melhor = { n, s };
+  }
+  if (!melhor || melhor.s >= dist(e, alvo)) return false;
+  e.c = melhor.n.c; e.r = melhor.n.r;
+  return true;
+}
+
+/** Faz um inimigo jogar a carta da rodada: apoio, depois andar, depois atacar. O "jeito" dele muda como ele se comporta. */
 function agirInimigo(T, p, d, e) {
   const carta = T.cartas[e.tipo];
+  marcarConds(e.efeitos);                                          // condições que já estavam nele valem neste turno
+  const fim = () => { e.efeitos = expirarConds(e.efeitos); };
+  // dorminhoco: acorda se o herói chegar perto
+  if (e.dorme && dist(e, T.heroi) <= 3) { e.dorme = false; logar(T, `😠 ${e.nome} acordou com a sua chegada!`, 'aviso'); }
+  if (e.dorme) { logar(T, `😴 ${e.nome} continua dormindo.`, 'info'); return; }
+  if (temCond(e.efeitos, 'atordoado')) { logar(T, `💫 ${e.nome} está atordoado e perde o turno.`, 'dano'); fim(); return; }
+  const furioso = e.jeito === 'berserker' && e.hp < e.hpMax * 0.5;
+  const covarde = e.jeito === 'covarde' && e.hp < e.hpMax * 0.4;
   apoioDaCarta(T, e, carta);
   const alc = Math.max(1, e.alc + (carta.alc || 0));
   let paralisado = false;
-  if (carta.mov !== undefined) {
-    const mov = Math.max(1, e.mov + carta.mov - (temEfeito(e.efeitos, 'gelo') ? 1 : 0));
-    const colado = alc > 1 && dist(e, T.heroi) === 1;         // atirador colado no herói tenta se afastar (desvantagem)
-    if (!podeAtacarHeroi(T, e, e, alc) || carta.atq === undefined || colado) paralisado = moverInimigo(T, p, e, mov, alc, podeAtacarHeroi(T, e, e, alc) && carta.atq !== undefined).parou;
+  const imob = temCond(e.efeitos, 'imobilizado'), desarm = temCond(e.efeitos, 'desarmado');
+  if (covarde && carta.mov !== undefined && !imob) {                // covarde ferido: foge em vez de lutar
+    const mov = Math.max(1, e.mov + carta.mov);
+    if (fugirDoHeroi(T, p, e, mov)) { logar(T, `🐔 ${e.nome} foge de você!`, 'info'); dispararArmadilha(T, p, e, e.c, e.r); fim(); return; }
   }
-  if (e.vivo && !paralisado && !T.fim && carta.atq !== undefined && podeAtacarHeroi(T, e, e, alc)) atacarHeroi(T, p, d, e, carta);
+  const ferido = e.jeito === 'curandeiro' ? combatentes(T).filter(x => x !== e && x.hp < x.hpMax && dist(x, e) > 1).sort((a, b) => (a.hp / a.hpMax) - (b.hp / b.hpMax))[0] : null;
+  if (ferido && !imob && carta.mov !== undefined && !podeAtacarHeroi(T, e, e, alc)) {      // curandeiro: vai até o aliado ferido
+    if (andarAte(T, e, ferido, Math.max(1, e.mov + carta.mov))) { logar(T, `💚 ${e.nome} corre até ${ferido.nome} para ajudar.`, 'info'); dispararArmadilha(T, p, e, e.c, e.r); }
+    fim(); return;
+  }
+  if (carta.mov !== undefined && !imob) {
+    const mov = Math.max(1, e.mov + carta.mov + (furioso ? 1 : 0) - (temEfeito(e.efeitos, 'gelo') ? 1 : 0));
+    const colado = alc > 1 && dist(e, T.heroi) === 1;         // atirador colado no herói tenta se afastar (desvantagem)
+    const guardiao = e.jeito === 'guardiao';
+    if (guardiao && dist(e.casa, T.heroi) > 3 + (alc - 1) && !podeAtacarHeroi(T, e, e, alc)) {      // guardião: o herói está longe do posto dele
+      if (dist(e, e.casa) > 0) andarAte(T, e, e.casa, mov);
+    } else if (!podeAtacarHeroi(T, e, e, alc) || carta.atq === undefined || colado) {
+      const antes = { c: e.c, r: e.r };
+      paralisado = moverInimigo(T, p, e, mov, alc, podeAtacarHeroi(T, e, e, alc) && carta.atq !== undefined).parou;
+      if (guardiao && dist(e, e.casa) > 3) { e.c = antes.c; e.r = antes.r; }             // não passa do limite do posto
+    }
+  }
+  if (e.vivo && !paralisado && !T.fim && carta.atq !== undefined && !desarm && podeAtacarHeroi(T, e, e, alc)) atacarHeroi(T, p, d, e, carta, furioso);
+  if (desarm && carta.atq !== undefined) logar(T, `⛓️ ${e.nome} está desarmado e não consegue atacar.`, 'dano');
+  fim();
 }
 
 function finalizarRodada(T, p) {
   passarEfeitos(T, p);          // veneno e duração dos efeitos
   if (T.fim) return;            // morreu de veneno, ou o veneno cumpriu o objetivo
+  if (T.resistir) {
+    if (T.rodada >= T.resistir) { T.resistido = true; checarFim(T); if (T.fim) return; }
+    else if (T.rodada % 2 === 0 && combatentes(T).length < 6) chamarOnda(T, 2, '🌊 Reforços chegam! Resista!');
+  }
   T.rodada++;
+  if (T.terreno && T.rodada > 1 && (T.rodada - 1) % 3 === 0) racharChao(T, 2);
+  for (const k of Object.keys(T.elementos)) if (T.elementos[k] > 0) T.elementos[k]--;       // os elementos esmaecem
+  T.pendentes = []; T.acaoAtiva = null; T.modo2 = false; T.ultimoMov = null;
   T.fase = 'escolha';           // nova rodada: primeiro você escolhe a sua carta de iniciativa
   T.cartaHeroi = null; T.escudoHeroi = 0; T.fila = []; T.heroiJogou = false; T.bonusItem = { atq: 0, alc: 0 };
   T.movRest = 0; T.acaoUsada = false;
   T.cartas = {}; T.rapidoUsado = false;     // as cartas dos monstros ficam ocultas até você escolher a sua
   for (const e of T.inim) { e.bonusAtq = 0; e.escudo = 0; }   // fortalecer e escudo duram só a rodada
   conferirExaustao(T);
+  if (!T.fim) tirarFoto(T, T.exp.jogador);
 }
 /** Sem cartas na mão e com menos de 2 no descarte: não dá mais para jogar nem descansar. O herói desmaia. */
 function conferirExaustao(T) {
@@ -1030,8 +1354,11 @@ function tProximaEtapa(T, p) {
   const d = derivados(p);
   const hp0 = p.hp;
   p.hp = Math.min(d.hpMax, p.hp + Math.max(1, Math.round(d.hpMax * exp.dif.porta)));
+  const ch = exp.cartasHeroi;
+  const devolvidas = ch ? ch.descarte.length : 0;
+  if (ch) ch.mao.push(...ch.descarte.splice(0));        // atravessar a porta é um respiro: as cartas usadas voltam (as perdidas, não)
   const N = criarTatica(exp, p);
-  N.recuperou = { hp: p.hp - hp0 };
+  N.recuperou = { hp: p.hp - hp0, cartas: devolvidas };
   if (N.recuperou.hp) logar(N, `Você recupera o fôlego: +${N.recuperou.hp} vida.`, 'cura');
   return N;
 }
@@ -1053,6 +1380,12 @@ function aplicarVitoriaT(T, p) {
     const b = INIMIGOS[T.chefeId];
     if (b.reliquia) itens.push(b.reliquia);
     if (b.fragmento) p.fragmentos.push(b.fragmento);
+  }
+  if (T.prisioneiro && T.prisioneiro.solto && !T.resgatePago) {         // o prisioneiro libertado agradece
+    T.resgatePago = true;
+    const reino = REINOS.find(r => r.id === T.reinoId), ag = reino.consumiveis[Math.floor(Math.random() * reino.consumiveis.length)];
+    itens.push(ag);
+    p.flags = p.flags || {}; p.flags.resgates = (p.flags.resgates || 0) + 1;
   }
   for (const id of itens) darItem(p, id);
   const abates = T.mortos.filter(e => !e.estrutura).length;

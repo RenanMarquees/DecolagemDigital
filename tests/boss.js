@@ -33,7 +33,16 @@ const ROBO = require('./robo');
   await page.evaluate(() => { BALANCO.forca = 0.15; window.ROBO_INVENCIVEL = true; });   // o teste confere o fluxo da campanha, não a dificuldade: inimigos fracos para o robô nunca cair
   const click = s => page.click(s);
   const estado = () => page.evaluate(() => JSON.parse(localStorage.getItem(SAVE_KEY)));
-  const passarHistoria = async () => { let n = 0; while (await page.$('[data-a=hist-prox]')) { n++; await click('[data-a=hist-prox]'); } return n; };
+  const passarHistoria = async () => {      // páginas de história e eventos de escolha (sempre a 1ª opção)
+    let n = 0;
+    for (let g = 0; g < 60; g++) {
+      if (await page.$('[data-a=hist-prox]')) { n++; await click('[data-a=hist-prox]'); }
+      else if (await page.$('[data-a=ev-escolher]')) { n++; await click('[data-a=ev-escolher] >> nth=0'); }
+      else if (await page.$('[data-a=ev-continuar]')) { await click('[data-a=ev-continuar]'); }
+      else break;
+    }
+    return n;
+  };
 
   async function jogarCenario(cen) {
     if (await page.$('[data-a=mapa]')) await click('[data-a=mapa]');

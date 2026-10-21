@@ -15,19 +15,42 @@ module.exports = `window.robo = async function (maxIter = 400) {
     if (T.fase === 'escolha' && !OCUPADO) {      // escolhe a carta da rodada: a que anda e ataca (na sala limpa: a que mais anda)
       if (window.ROBO_INVENCIVEL && P.hp < derivados(P).hpMax) P.hp = derivados(P).hpMax;   // só nos testes de fluxo (boss.js): o robô não precisa sobreviver, só andar pela campanha
       if (T.descarte.length >= 2 && !T.rapidoUsado && (T.mao.length <= 1 || (!window.ROBO_INVENCIVEL && P.hp < derivados(P).hpMax * 0.4))) ACOES['tat-rapido']();   // descanso rápido: a mão acabando
-      const mao = T.limpa ? [...T.mao].sort((a, b) => (b.mov || 0) - (a.mov || 0)) : [...T.mao].sort((a, b) => ((b.atq ? 2 : 0) + (b.mov ? 1 : 0)) - ((a.atq ? 2 : 0) + (a.mov ? 1 : 0)) || a.ini - b.ini);
+      const mao = [...T.mao];
       if (!mao.length) { await new Promise(r => setTimeout(r, 5)); continue; }
-      ACOES['tat-carta']({ dataset: { id: mao[0].id } });
+      const m = c => metadesDaCarta(c), usa = (c, f) => (c ? f(m(c)) : 0);
+      const pontosAtq = c => usa(c, x => (x.topo && x.topo.atq) || 0) * 3 + (c.queima ? -2 : 0), pontosMov = c => usa(c, x => (x.base && x.base.mov) || 0);
+      const porAtq = [...mao].sort((a, b) => pontosAtq(b) - pontosAtq(a) || a.ini - b.ini);
+      const porMov = [...mao].sort((a, b) => pontosMov(b) - pontosMov(a) || a.ini - b.ini);
+      const precisa = Math.min(2, mao.length);
+      let a = T.limpa ? porMov[0] : porAtq[0], b = (T.limpa ? porMov : porMov).find(c => c !== a);
+      if (precisa === 2 && !b) b = mao.find(c => c !== a);
+      ACOES['tat-carta']({ dataset: { id: a.id } });
+      if (precisa === 2) ACOES['tat-carta']({ dataset: { id: b.id } });
       ACOES['tat-jogar']();
       continue;
     }
     if (T.fase !== 'heroi' || OCUPADO) { await new Promise(r => setTimeout(r, 5)); continue; }
+    if (T.modo2 && T.pendentes.length && T.acaoUsada && T.movRest === 0 && !T.forcaFila.length) {          // duas cartas: escolhe a próxima metade a usar
+      const alvosVivos = combatentes(T).length ? combatentes(T) : vivos(T);
+      let melhor = null;
+      for (const c of T.pendentes) {
+        const mm = metadesDaCarta(c);
+        const perto = mm.topo && mm.topo.atq && alvosVivos.some(e => dist(e, T.heroi) <= (mm.topo.alc || 1));
+        const nota = T.limpa ? ((mm.base && mm.base.mov) || 0) : perto ? 100 + mm.topo.atq : ((mm.base && mm.base.mov) || 0) * 2 + (mm.topo && mm.topo.cura && P.hp < derivados(P).hpMax * 0.6 ? 30 : 0);
+        const q = T.limpa ? 'base' : perto ? 'topo' : ((mm.base && mm.base.mov) ? 'base' : (mm.topo ? 'topo' : 'base'));
+        if ((q === 'base' ? mm.base : mm.topo) && (!melhor || nota > melhor.nota)) melhor = { c, q, nota };
+      }
+      if (!melhor) { await fim(); continue; }
+      ACOES['tat-metade']({ dataset: { id: melhor.c.id, q: melhor.q } });
+      continue;
+    }
     const pf = pendenciaForca(T);       // empurrar/puxar: escolhe o melhor lugar (como o jogador faria)
     if (pf) { const op = melhorOpcaoForca(T, pf.opcoes, pf.alvo, T.heroi, pf.modo); ACOES.hex({ dataset: { c: op.c, r: op.r } }); continue; }
     if (T.limpa) {      // sala limpa: pega as moedas e o baú (sem pisar em armadilhas) e vai à porta (ou à entrada, na última sala)
-      if (T.bau && !T.bau.aberto && T.heroi.c === T.bau.c && T.heroi.r === T.bau.r) { await fim(); continue; }
+      if ((T.bau && !T.bau.aberto && T.heroi.c === T.bau.c && T.heroi.r === T.bau.r) || (T.chave && !T.chave.pega && T.heroi.c === T.chave.c && T.heroi.r === T.chave.r)) { await fim(); continue; }
       const loot = [...T.moedas.keys()].map(k => { const [c, r] = k.split(',').map(Number); return { c, r }; }).filter(a => !T.armadilhas.has(chave(a.c, a.r)));
       if (T.bau && !T.bau.aberto) loot.push({ c: T.bau.c, r: T.bau.r });
+      if (T.chave && !T.chave.pega) loot.push({ c: T.chave.c, r: T.chave.r });
       const meta = loot.length ? loot : [T.ultimaEtapa ? T.saida : T.porta];
       const campo = campoAte(meta), atual = campo.get(chave(T.heroi.c, T.heroi.r)) ?? 999;
       let melhor = null;
@@ -39,10 +62,10 @@ module.exports = `window.robo = async function (maxIter = 400) {
       await fim(); continue;
     }
     const fraco = P.hp < derivados(P).hpMax * 0.5 && combatentes(T).length > 0;   // machucado: luta antes de correr para o baú
-    const irBau = T.objetivo === 'bau' && T.ultimaEtapa && T.bau && !T.bau.aberto && !fraco;
-    if (irBau && T.heroi.c === T.bau.c && T.heroi.r === T.bau.r) { await fim(); continue; }
+    const alvoObj = alvoDeObjetivo(T), irBau = !!alvoObj && !fraco;
+    if (irBau && T.heroi.c === alvoObj.c && T.heroi.r === alvoObj.r) { await fim(); continue; }
     let alvos;
-    if (irBau) alvos = [T.bau];
+    if (irBau) alvos = [alvoObj];
     else {
       const prefere = T.objetivo === 'destruir' && T.ultimaEtapa ? vivos(T).filter(e => e.estrutura) : combatentes(T);
       alvos = prefere.length ? prefere : vivos(T);

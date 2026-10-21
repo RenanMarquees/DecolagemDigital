@@ -9,9 +9,11 @@ const path = require('path');
 const vm = require('vm');
 
 const ctx = vm.createContext({ Math, console });
-for (const f of ['data.js', 'cartas.js', 'cenarios.js', 'logic.js', 'mapas.js', 'tatica.js']) {
+for (const f of ['data.js', 'cartas.js', 'cenarios.js', 'eventos.js', 'logic.js', 'mapas.js', 'tatica.js']) {
   let src = fs.readFileSync(path.join(__dirname, '..', 'js', f), 'utf8');
   if (f === 'data.js' && process.env.BAL_FPN) src = src.replace(/const FORCA_POR_NIVEL = [\d.]+/, `const FORCA_POR_NIVEL = ${+process.env.BAL_FPN}`);   // experimento
+  if (f === 'cartas.js' && process.env.BAL_MAO) src = src.replace(/const MAO_MAX = \d+/, `const MAO_MAX = ${+process.env.BAL_MAO}`);
+  if (f === 'tatica.js' && process.env.BAL_LONGO) src = src.replace(/const DESCANSO_PERDE = \d+/, `const DESCANSO_PERDE = ${+process.env.BAL_LONGO}`);
   vm.runInContext(src, ctx, { filename: f });
 }
 const FORTE = !!process.env.FORTE;   // FORTE=1: começa com o herói superforte do tests/boss.js
@@ -19,11 +21,11 @@ const FORTE = !!process.env.FORTE;   // FORTE=1: começa com o herói superforte
 const MOTIVOS = {};
 vm.runInContext('var MOTIVOS = {}', ctx);
 const robo = `(function () {
-  const FORTE = ${FORTE};
+  const FORTE = ${FORTE}; const TRACE = ${!!process.env.TRACE};
 
   /* ---- o que o robô quer atacar / alcançar ---- */
   function alvosDoRobo(T) { const l = combatentes(T); return l.length ? l : vivos(T); }
-  const querBau = (T, p) => T.objetivo === 'bau' && T.ultimaEtapa && T.bau && !T.bau.aberto && p.hp >= derivados(p).hpMax * 0.4;
+  const querBau = (T, p) => !!alvoDeObjetivo(T) && p.hp >= derivados(p).hpMax * 0.4;
   function menorDist(pos, lista) { return lista.length ? Math.min(...lista.map(e => dist(pos, e))) : 99; }
 
   // distância a pé até os alvos, contornando obstáculos
@@ -49,24 +51,69 @@ const robo = `(function () {
     if (T.mao.length <= 1 && T.descarte.length >= 3 && !T.rapidoUsado) tDescansoRapido(T, p);    // a mão acabando: volta com as cartas (perde 1 sorteada)
     if (!T.mao.length) return T.descarte.length >= 2 ? ['descanso', cartaMenosUtil(T, p).id] : ['descanso', null];
     if (T.descarte.length >= 2 && ((T.mao.length <= 2 && frac < 0.7) || (T.mao.length <= 3 && frac < 0.35))) return ['descanso', cartaMenosUtil(T, p).id];
-    const perto = menorDist(T.heroi, quem), vizinhosN = quem.filter(e => dist(e, T.heroi) <= 2).length;
-    const bau = querBau(T, p);
+    const perto = menorDist(T.heroi, quem);
+    if (T.mao.length === 1) return [T.mao[0].id];                       // última carta: vale inteira
     let melhor = null;
-    for (const c of T.mao) {
-      let sc = Math.random() * 0.5;
-      const mov = c.mov ? c.mov + d.mov : 0, alc = (c.alc || 1) + ((c.alc || 1) > 1 ? d.alc : 0);
-      const podeAtacar = !bau && c.atq && perto <= mov + alc;
-      if (c.atq) {
-        const dano = c.atq + d.dano;
-        if (podeAtacar) sc += dano * 2 * (c.alvo ? 1.25 : 1) + (c.empurrar || c.puxar ? 1.2 : 0) + (c.dreno ? 1.5 * (1 - frac) : 0);
-      }
-      if (!podeAtacar) sc += 2.4 * mov;
-      sc += (c.escudo || 0) * (0.8 + (1 - frac) * 3) * (vizinhosN ? 1 : 0.4);
-      sc += (c.cura || 0) * 4.5 * (1 - frac);
-      sc -= c.ini * 0.01;
-      if (!melhor || sc > melhor.sc) melhor = { c, sc };
+    for (let i = 0; i < T.mao.length; i++) for (let j = i + 1; j < T.mao.length; j++) {
+      const A = T.mao[i], B = T.mao[j];
+      const sc = valorPar(T, p, A, B) + Math.random() * 0.5 - (A.queima ? 1.5 : 0) - (B.queima ? 1.5 : 0);
+      if (!melhor || sc > melhor.sc) melhor = { A, B, sc };
     }
-    return [melhor.c.id];
+    const lider = melhor.A.ini <= melhor.B.ini ? [melhor.A, melhor.B] : [melhor.B, melhor.A];
+    return [lider[0].id, undefined, lider[1].id];
+  }
+  const alcDe = (h, d) => (h.alc || 1) + ((h.alc || 1) > 1 ? d.alc : 0);
+  /** Quanto vale usar uma metade de cada uma das duas cartas (a melhor combinação de metades). */
+  function valorPar(T, p, A, B) {
+    const d = derivados(p), quem = alvosDoRobo(T), perto = menorDist(T.heroi, quem), frac = p.hp / d.hpMax, bau = querBau(T, p);
+    const colado = quem.some(e => dist(e, T.heroi) <= 2);
+    let best = -1;
+    for (const [qa, qb] of [['topo', 'base'], ['base', 'topo'], ['topo', 'topo'], ['base', 'base']]) {
+      const hs = [metadesDaCarta(A)[qa], metadesDaCarta(B)[qb]].filter(Boolean);
+      let mov = 0;
+      for (const h of hs) if (h.mov) mov += h.mov + d.mov;
+      let sc = 0, podeAtacar = false;
+      for (const h of hs) {
+        if (h.atq && !bau && perto <= mov + alcDe(h, d)) {
+          podeAtacar = true;
+          sc += (h.atq + d.dano) * 2 * (h.alvo ? 1.25 : 1) + (h.empurrar || h.puxar ? 1.2 : 0) + (h.dreno ? 1.5 * (1 - frac) : 0) + (h.cond ? 1.5 : 0) + (h.elem ? 0.5 : 0) + (h.usaElem && T.elementos[h.usaElem.elem] > 0 ? (h.usaElem.atq || 2) * 2 : 0) - (h.custo ? 1.5 : 0);
+        }
+        if (h.cura) sc += h.cura * 4.5 * (1 - frac);
+        if (h.escudo) sc += h.escudo * (0.8 + (1 - frac) * 3) * (colado ? 1 : 0.4);
+      }
+      sc += podeAtacar ? 0.3 * mov : 2.4 * mov;
+      if (sc > best) best = sc;
+    }
+    return best;
+  }
+  /** Escolhe a próxima metade a usar entre as cartas que ainda sobram no turno. */
+  function escolherMetade(T, p) {
+    const d = derivados(p), quem = alvosDoRobo(T), perto = menorDist(T.heroi, quem), frac = p.hp / d.hpMax, bau = querBau(T, p);
+    const movOutros = c => T.pendentes.filter(x => x !== c).reduce((m, x) => Math.max(m, (metadesDaCarta(x).base || {}).mov || 0), 0);
+    let melhor = null;
+    for (const c of T.pendentes) {
+      const m = metadesDaCarta(c);
+      for (const q of ['topo', 'base']) {
+        const h = m[q];
+        if (!h) continue;
+        let sc = Math.random() * 0.3;
+        if (h.atq && !bau) {
+          const alc = alcDe(h, d);
+          if (perto <= alc) sc += 10 + (h.atq + d.dano) * 2 + (h.cond ? 1.5 : 0);
+          else if (perto <= alc + movOutros(c) + d.mov) sc += 0.5;
+        }
+        if (h.mov) {
+          const querAtacar = T.pendentes.some(x => x !== c && (metadesDaCarta(x).topo || {}).atq);
+          const alcOutra = Math.max(1, ...T.pendentes.filter(x => x !== c).map(x => alcDe(metadesDaCarta(x).topo || {}, d)));
+          sc += (querAtacar && perto > alcOutra) ? 8 + h.mov : 1 + h.mov * (perto > 1 ? 1.5 : 0.2);
+          if (bau) sc += 6;
+        }
+        if (h.cura) sc += h.cura * 4.5 * (1 - frac);
+        if (h.escudo) sc += h.escudo * (0.8 + (1 - frac) * 3) * 0.6;
+        if (!melhor || sc > melhor.sc) melhor = { c, q, sc };
+      }
+    }
+    return melhor;
   }
 
   /* ---- itens: usa poções quando está ferido (não gasta a jogada) ---- */
@@ -98,7 +145,7 @@ const robo = `(function () {
   function melhorMovimento(T, p) {
     const c = cartaAtual(T), alc = alcanceDa(p, T);
     const bau = querBau(T, p);
-    const alvos = bau ? [T.bau] : alvosDoRobo(T);
+    const alvos = bau ? [alvoDeObjetivo(T)] : alvosDoRobo(T);
     const cp = campo(T, alvos);
     let melhor = null;
     for (const h of [{ c: T.heroi.c, r: T.heroi.r, custo: 0 }, ...tAlcance(T)]) {
@@ -138,14 +185,21 @@ const robo = `(function () {
 
   function turnoRobo(T, p) {
     if (T.limpa) return turnoLimpa(T, p);
-    if (T.fase === 'escolha') { const [id, perder] = escolherCarta(T, p); tEscolherCarta(T, p, id, perder); }
+    if (T.fase === 'escolha') { const [id, perder, id2] = escolherCarta(T, p); tEscolherCarta(T, p, id, perder, id2); }
+    if (TRACE && T.cartaHeroi) console.log('r' + T.rodada, T.cartaHeroi.nome, T.pendentes.map(c => c.nome).join('+'), 'hp', p.hp, 'inim', combatentes(T).map(e => e.hp + '/' + e.hpMax).join(','), 'mao', T.mao.length);
     while (T.fase === 'inimigos' && !T.fim) tProximoInimigo(T, p);        // inimigos com iniciativa menor agem antes
     if (T.fim || T.fase !== 'heroi') return;
     usarItens(T, p); usarEquipRobo(T, p, false);
-    const alc = alcanceDa(p, T);
     let guard = 0;
-    while (T.fase === 'heroi' && !T.fim && guard++ < 20) {
-      if (querBau(T, p) && T.heroi.c === T.bau.c && T.heroi.r === T.bau.r) break;
+    while (T.fase === 'heroi' && !T.fim && guard++ < 30) {
+      if (querBau(T, p) && T.heroi.c === alvoDeObjetivo(T).c && T.heroi.r === alvoDeObjetivo(T).r) break;
+      if (T.modo2 && T.pendentes.length && T.acaoUsada && T.movRest === 0) {          // próxima metade
+        const m = escolherMetade(T, p);
+        if (!m || !tAtivarMetade(T, p, m.c.id, m.q)) break;
+        usarEquipRobo(T, p, false);
+        continue;
+      }
+      const alc = alcanceDa(p, T);
       if (!querBau(T, p) && !T.acaoUsada && cartaAtual(T).atq) {
         // à distância: se estiver colado, tenta recuar antes de atirar
         if (alc > 1 && T.movRest > 0 && menorDist(T.heroi, alvosDoRobo(T)) <= 1) { const r = recuar(T); if (r && tMover(T, p, r.c, r.r)) continue; }
@@ -156,6 +210,7 @@ const robo = `(function () {
       if (T.acaoUsada && alc > 1 && T.movRest > 0 && !querBau(T, p)) { const r = recuar(T); if (r && tMover(T, p, r.c, r.r)) continue; }
       break;
     }
+    if (TRACE) console.log('   ', T.log.slice(-7).map(l => l.msg).join(' | '));
     if (T.fim) return;
     usarItens(T, p);
     tEncerrarTurno(T, p);
@@ -166,6 +221,7 @@ const robo = `(function () {
   function alvosLimpa(T) {
     const l = [...T.moedas.keys()].map(k => { const [c, r] = k.split(',').map(Number); return { c, r }; }).filter(a => !temArmadilha(T, a.c, a.r));
     if (T.bau && !T.bau.aberto) l.push({ c: T.bau.c, r: T.bau.r });
+    if (T.chave && !T.chave.pega) l.push({ c: T.chave.c, r: T.chave.r });
     return l.length ? l : [T.ultimaEtapa ? T.saida : T.porta];
   }
   function turnoLimpa(T, p) {
@@ -173,13 +229,18 @@ const robo = `(function () {
       if (!T.mao.length || (T.mao.length <= 1 && T.descarte.length >= 3 && !T.rapidoUsado)) { if (T.descarte.length >= 2) tDescansoRapido(T, p); }
       if (T.fase === 'escolha') {
         if (!T.mao.length) tEscolherCarta(T, p, 'descanso', cartaMenosUtil(T, p) && cartaMenosUtil(T, p).id);
-        else tEscolherCarta(T, p, [...T.mao].sort((a, b) => (b.mov || 0) - (a.mov || 0))[0].id);
+        else { const ord = [...T.mao].sort((a, b) => (b.mov || 0) - (a.mov || 0)); tEscolherCarta(T, p, ord[0].id, undefined, ord.length > 1 ? ord[1].id : undefined); }
       }
     }
     while (T.fase === 'inimigos' && !T.fim) tProximoInimigo(T, p);
     let guard = 0;
-    while (T.fase === 'heroi' && !T.fim && guard++ < 20) {
-      if (T.bau && !T.bau.aberto && T.heroi.c === T.bau.c && T.heroi.r === T.bau.r) break;
+    while (T.fase === 'heroi' && !T.fim && guard++ < 30) {
+      if (((T.bau && !T.bau.aberto && T.heroi.c === T.bau.c && T.heroi.r === T.bau.r) || (T.chave && !T.chave.pega && T.heroi.c === T.chave.c && T.heroi.r === T.chave.r))) break;
+      if (T.modo2 && T.pendentes.length && T.acaoUsada && T.movRest === 0) {          // duas cartas: usa a metade de baixo que mais anda
+        const c = [...T.pendentes].sort((a, b) => ((metadesDaCarta(b).base || {}).mov || 0) - ((metadesDaCarta(a).base || {}).mov || 0))[0];
+        if (!tAtivarMetade(T, p, c.id, metadesDaCarta(c).base ? 'base' : 'topo')) break;
+        continue;
+      }
       const alvos = alvosLimpa(T), cp = campo(T, alvos), atual = cp.get(chave(T.heroi.c, T.heroi.r)) ?? 99;
       let melhor = null;
       for (const evita of [true, false]) {
@@ -209,7 +270,7 @@ const robo = `(function () {
       }
       rodadas += T.rodada;
       if (T.fim === 'vitoria') { concluirCenario(T, p); return { resultado: 'vitoria', rodadas }; }
-      if (T.fim !== 'porta') { MOTIVOS[T.log.some(l => /exaustão/.test(l.msg)) ? 'exaustão' : 'vida'] = (MOTIVOS[T.log.some(l => /exaustão/.test(l.msg)) ? 'exaustão' : 'vida'] || 0) + 1; penalidadeDerrota(p); return { resultado: 'derrota', rodadas }; }
+      if (T.fim !== 'porta') { if (T.log.some(l => /exaustão/.test(l.msg))) (MOTIVOS.det = MOTIVOS.det || []).push('c' + cenario.id + ':r' + T.rodada + ':p' + T.perdidas.length + ':m' + T.mao.length + ':d' + T.descarte.length + ':hp' + p.hp); MOTIVOS[T.log.some(l => /exaustão/.test(l.msg)) ? 'exaustão' : 'vida'] = (MOTIVOS[T.log.some(l => /exaustão/.test(l.msg)) ? 'exaustão' : 'vida'] || 0) + 1; penalidadeDerrota(p); return { resultado: 'derrota', rodadas }; }
       T = tProximaEtapa(T, p);
     }
   }
@@ -217,7 +278,7 @@ const robo = `(function () {
   /* ---- preparação do herói entre cenários: pontos, equipamento, loja e mochila ---- */
   const valorItem = it => (it.hp || 0) * 1.6 + (it.atq || 0) * 3 + (it.esc || 0) * 3.2 + (it.mov || 0) * 2.5 + (it.alc || 0) * 1.5 + (it.cura || 0) * 1;
   /** Escolhe as cartas de nível pendentes (a de melhor valor) e monta a melhor mão de 10 (com pelo menos 1 carta de cura). */
-  const valorCarta = c => (c.atq || 0) * 2 + (c.mov || 0) * 0.8 + (c.cura || 0) * 1.5 + (c.escudo || 0) + (c.empurrar || c.puxar ? 1 : 0) + (c.alvo ? 1.5 : 0) + ((c.alc || 1) > 1 ? 0.5 : 0) + (c.dreno ? 1 : 0);
+  const valorCarta = c => (c.atq || 0) * 2 + (c.mov || 0) * 0.8 + (c.cura || 0) * 1.5 + (c.escudo || 0) + (c.empurrar || c.puxar ? 1 : 0) + (c.alvo ? 1.5 : 0) + ((c.alc || 1) > 1 ? 0.5 : 0) + (c.dreno ? 1 : 0) + (c.cond ? 1 : 0) + (c.elem || c.usaElem ? 0.8 : 0) - (c.queima ? 1 : 0) - (c.custo ? 1 : 0);
   function gastarPontos(p) {
     while (p.escolhas.length) {
       const n = p.escolhas[0], [a, b] = cartasDoNivel(p.classe, n);

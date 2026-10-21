@@ -218,6 +218,41 @@ const Cena3D = (() => {
     return g;
   }
 
+  function chaveFeita() {
+    const g = new THREE.Group();
+    const aro = new THREE.Mesh(new THREE.TorusGeometry(0.16, 0.05, 8, 14), mat(0xf5c542, { emissive: 0x6a4a08 })); aro.position.set(0, 0.62, 0); g.add(aro);
+    g.add(em(caixa(0.07, 0.42, 0.06, 0xf5c542, { emissive: 0x6a4a08 }), 0, 0.3, 0));
+    g.add(em(caixa(0.2, 0.06, 0.06, 0xf5c542), 0.1, 0.12, 0)); g.add(em(caixa(0.14, 0.06, 0.06, 0xf5c542), 0.07, 0.24, 0));
+    return g;
+  }
+  function alavancaFeita() {
+    const g = new THREE.Group();
+    g.add(em(caixa(0.7, 0.14, 0.5, 0x6b7280), 0, 0.07, 0));
+    g.add(em(caixa(0.5, 0.1, 0.12, 0x2c3340), 0, 0.17, 0));
+    const braco = new THREE.Group(); braco.position.set(0, 0.2, 0); g.add(braco);
+    braco.add(em(cil(0.04, 0.04, 0.62, 0xb8c0cc, 8), 0, 0.31, 0));
+    braco.add(em(esfera(0.1, 0xe5484d, { emissive: 0x6a1010 }), 0, 0.66, 0));
+    braco.rotation.z = 0.7;
+    return { grupo: g, braco };
+  }
+  function prisioneiroFeito(icone) {
+    const g = new THREE.Group();
+    g.add(em(cil(0.42, 0.46, 0.08, 0x4a4f5c, 14), 0, 0.04, 0));
+    const fig = new THREE.Group(); g.add(fig);
+    fig.add(em(cil(0.1, 0.17, 0.5, 0x8e7cc3, 8), 0, 0.33, 0)); fig.add(em(esfera(0.13, 0xf0cfa4), 0, 0.68, 0));
+    const jaula = new THREE.Group(); g.add(jaula);
+    for (let i = 0; i < 8; i++) { const a = (i / 8) * Math.PI * 2; jaula.add(em(cil(0.022, 0.022, 0.95, 0x2c3340, 5), Math.cos(a) * 0.36, 0.5, Math.sin(a) * 0.36)); }
+    jaula.add(em(cil(0.38, 0.38, 0.05, 0x2c3340, 14), 0, 0.98, 0));
+    const anel = new THREE.Mesh(new THREE.TorusGeometry(0.34, 0.025, 6, 20), mat(0x2c3340)); anel.rotation.x = Math.PI / 2; anel.position.y = 0.5; jaula.add(anel);
+    return { grupo: g, jaula, fig };
+  }
+  function cadeadoFeito() {
+    const g = new THREE.Group();
+    g.add(em(caixa(0.3, 0.24, 0.12, 0xd8a63a, { emissive: 0x3a2a08 }), 0, 0.5, 0.2));
+    const arco = new THREE.Mesh(new THREE.TorusGeometry(0.1, 0.03, 6, 12, Math.PI), mat(0xb8c0cc)); arco.position.set(0, 0.62, 0.2); g.add(arco);
+    return g;
+  }
+
   /* ---------- Criação da cena ---------- */
   function montar(cont, T, opcoes = {}) {
     destruir();
@@ -316,6 +351,25 @@ const Cena3D = (() => {
       anel.rotation.x = -Math.PI / 2; anel.rotation.z = Math.PI / 6; anel.position.set(pb.x, tb.topo + 0.04, pb.z); cena.add(anel);
       E.bau = { ...bf, anel, aberto: false, abre: 0 };
     }
+
+    // chave, alavanca, prisioneiro e cadeado da porta (cada um com um anel pulsante)
+    const anelDe = (pos, topo, cor) => { const a = new THREE.Mesh(new THREE.RingGeometry(0.5, 0.66, 6), new THREE.MeshBasicMaterial({ color: cor, transparent: true, opacity: 0.8, side: THREE.DoubleSide })); a.rotation.x = -Math.PI / 2; a.rotation.z = Math.PI / 6; a.position.set(pos.x, topo + 0.04, pos.z); cena.add(a); return a; };
+    if (T.chave) {
+      const pk = pos3d(T.chave.c, T.chave.r), tk = E.tiles.get(chave(T.chave.c, T.chave.r));
+      const g3 = chaveFeita(); g3.position.set(pk.x, tk.topo + 0.25, pk.z); g3.userData.base = tk.topo + 0.25; cena.add(g3);
+      E.chave = { grupo: g3, anel: anelDe(pk, tk.topo, 0xf5c542), pega: false };
+    }
+    if (T.alavanca) {
+      const pa = pos3d(T.alavanca.c, T.alavanca.r), ta = E.tiles.get(chave(T.alavanca.c, T.alavanca.r));
+      const af = alavancaFeita(); af.grupo.position.set(pa.x, ta.topo, pa.z); cena.add(af.grupo);
+      E.alavanca = { ...af, anel: anelDe(pa, ta.topo, 0xe5484d), usada: false, ang: 0.7 };
+    }
+    if (T.prisioneiro) {
+      const pp2 = pos3d(T.prisioneiro.c, T.prisioneiro.r), tp2 = E.tiles.get(chave(T.prisioneiro.c, T.prisioneiro.r));
+      const pf = prisioneiroFeito(T.prisioneiro.icone); pf.grupo.position.set(pp2.x, tp2.topo, pp2.z); cena.add(pf.grupo);
+      E.prisioneiro = { ...pf, anel: anelDe(pp2, tp2.topo, 0x7fe0a0), solto: false, t: 0 };
+    }
+    if (T.porta && T.porta.trancada && E.porta) { E.porta.cadeado = cadeadoFeito(); E.porta.grupo.add(E.porta.cadeado); }
 
     // cores das bases: cada TIPO de inimigo tem a sua (as cartas na tela usam as mesmas)
     let i = 0;
@@ -566,6 +620,7 @@ const Cena3D = (() => {
     u.dur = Math.min(0.9, 0.22 + d * 0.13);
   }
 
+  const iconeEfeito = ef => (ef.tipo === 'gelo' ? '❄️' : ef.tipo === 'veneno' ? '☠️' : (CONDICAO_POR_TIPO[ef.tipo] || { icone: '❔' }).icone);
   function atualizarStatus(u, icones) {
     const txt = icones.join('');
     if (u.statusTxt === txt) return;
@@ -603,6 +658,11 @@ const Cena3D = (() => {
       E.bau.aberto = T.bau.aberto;
       E.bau.luz.visible = true; E.bau.anel.visible = false;
     }
+    // chave, alavanca, prisioneiro, cadeado
+    if (E.chave && T.chave && E.chave.pega !== T.chave.pega) { E.chave.pega = T.chave.pega; E.chave.grupo.visible = !T.chave.pega; E.chave.anel.visible = !T.chave.pega; }
+    if (E.alavanca && T.alavanca) { E.alavanca.usada = T.alavanca.usada; E.alavanca.anel.visible = !T.alavanca.usada; }
+    if (E.prisioneiro && T.prisioneiro && E.prisioneiro.solto !== T.prisioneiro.solto) { E.prisioneiro.solto = T.prisioneiro.solto; E.prisioneiro.anel.visible = !T.prisioneiro.solto; }
+    if (E.porta && E.porta.cadeado) E.porta.cadeado.visible = !!(T.chave && !T.chave.pega) && !T.porta.aberta;
     // armadilhas
     for (const [k, a] of E.arm) if (!T.armadilhas.has(k)) { E.saindo.push({ obj: a, t: 0, tipo: 'arm' }); E.arm.delete(k); }
     for (const [k, a] of T.armadilhas) {
@@ -628,7 +688,7 @@ const Cena3D = (() => {
     else moverUnid(uh, T.heroi.c, T.heroi.r, false);
     const dh = derivados(P);
     uh.hp = P.hp; uh.hpMax = dh.hpMax;
-    atualizarStatus(uh, [...(T.buff ? ['📣'] : []), ...(T.defendendo ? ['🛡️'] : []), ...T.efeitos.map(ef => (ef.tipo === 'gelo' ? '❄️' : '☠️'))]);
+    atualizarStatus(uh, [...(T.buff ? ['📣'] : []), ...(T.defendendo ? ['🛡️'] : []), ...T.efeitos.map(iconeEfeito)]);
     for (const e of T.inim) {
       let u = E.unid.get(e.uid);
       if (!e.vivo) { if (u && !u.morrendo) u.morrendo = e.recuou ? 0.01 : 0.001; continue; }
@@ -638,7 +698,7 @@ const Cena3D = (() => {
         E.unid.set(e.uid, u); moverUnid(u, e.c, e.r, true);
       } else moverUnid(u, e.c, e.r, false);
       u.hp = e.hp; u.hpMax = e.hpMax;
-      atualizarStatus(u, [...e.efeitos.map(ef => (ef.tipo === 'gelo' ? '❄️' : '☠️')), ...(e.bonusAtq > 0 ? ['💪'] : []), ...(e.escudo > 0 ? ['🛡️'] : [])]);
+      atualizarStatus(u, [...(e.dorme ? ['😴'] : []), ...e.efeitos.map(iconeEfeito), ...(e.bonusAtq > 0 ? ['💪'] : []), ...(e.escudo > 0 ? ['🛡️'] : [])]);
     }
     // para onde cada miniatura olha quando está parada
     const ph = pos3d(T.heroi.c, T.heroi.r);
@@ -728,6 +788,9 @@ const Cena3D = (() => {
     E.mats.alvo.opacity = 0.5 + Math.sin(E.tempo * 6) * 0.14;
     if (E.mats.porta) E.mats.porta.opacity = 0.5 + Math.sin(E.tempo * 4) * 0.15;
     if (E.bau) { E.bau.anel.rotation.z += dt * 0.6; const alvoA = E.bau.aberto ? 1 : 0; E.bau.abre += (alvoA - E.bau.abre) * Math.min(1, dt * 6); E.bau.tampa.rotation.x = -E.bau.abre * 1.9; E.bau.luz.material.opacity = 0.35 + 0.25 * Math.sin(E.tempo * 5); E.bau.luz.visible = E.bau.abre > 0.1; if (!E.bau.aberto) E.bau.grupo.position.y += Math.sin(E.tempo * 2) * 0.0008; }
+    if (E.chave && !E.chave.pega) { E.chave.grupo.position.y = E.chave.grupo.userData.base + Math.sin(E.tempo * 2.2) * 0.1; E.chave.grupo.rotation.y = E.tempo * 1.6; E.chave.anel.rotation.z += dt * 0.6; }
+    if (E.alavanca) { const alvoA = E.alavanca.usada ? -0.7 : 0.7; E.alavanca.ang += (alvoA - E.alavanca.ang) * Math.min(1, dt * 7); E.alavanca.braco.rotation.z = E.alavanca.ang; if (!E.alavanca.usada) E.alavanca.anel.rotation.z += dt * 0.6; }
+    if (E.prisioneiro) { const P2 = E.prisioneiro; if (P2.solto) { P2.t += dt; P2.jaula.visible = P2.t < 0.8; P2.jaula.position.y = P2.t * 1.5; P2.fig.position.y = Math.abs(Math.sin(P2.t * 8)) * 0.18 * Math.max(0, 1 - P2.t / 1.5); } else { P2.anel.rotation.z += dt * 0.6; P2.fig.position.x = Math.sin(E.tempo * 3) * 0.02; } }
     if (E.porta && E.porta.aberta) E.porta.luz.material.opacity = 0.5 + 0.2 * Math.sin(E.tempo * 4);
     for (let i = E.saindo.length - 1; i >= 0; i--) {
       const s = E.saindo[i]; s.t += dt / 0.35;

@@ -31,6 +31,8 @@ function novoJogador(nome, classe) {
     baralho: BARALHO_BASE.slice(),          // cartas de modificador do herói (a sorte dos ataques; melhora com as conquistas)
     stats: { xp: 0, ouro: 0, abates: 0, baus: 0, cenarios: 0, chefes: 0 },   // contagens da campanha para as conquistas
     marcos: {},                             // conquistas já recebidas
+    flags: {},                              // escolhas da história (confiança em Munin/Hugin, pacto...) e coisas já vistas
+    eventosVistos: {},                      // eventos de história já mostrados
   };
   p.hp = derivados(p).hpMax;
   return p;
@@ -225,7 +227,14 @@ function vender(p, id) {
 
 /* ---------- Progresso ---------- */
 /** Um cenário abre quando o anterior foi concluído (o primeiro já nasce aberto). */
-function cenarioDesbloqueado(p, c) { return c.id === 1 || !!p.cenarios[c.id - 1]; }
+/** Valhala segue a ordem (o tutorial depende disso). Nos outros reinos você escolhe a ORDEM dos três primeiros cenários; o do chefe só abre depois deles. */
+function cenarioDesbloqueado(p, c) {
+  if (c.id === 1) return true;
+  const ri = REINOS.findIndex(r => r.id === c.reino), lista = cenariosDoReino(c.reino), pos = lista.indexOf(c);
+  if (ri <= 0) return !!p.cenarios[c.id - 1];
+  if (!reinoDesbloqueado(p, ri)) return false;
+  return pos < lista.length - 1 || lista.slice(0, pos).every(x => !!p.cenarios[x.id]);
+}
 /** Um reino abre quando o último cenário do reino anterior foi concluído. */
 function reinoDesbloqueado(p, i) {
   if (i === 0) return true;
@@ -247,6 +256,8 @@ function migrarSave(p) {
   if (!Array.isArray(p.baralho)) p.baralho = BARALHO_BASE.slice();
   if (!p.stats) p.stats = { xp: 0, ouro: 0, abates: 0, baus: 0, cenarios: Object.keys(p.cenarios).length, chefes: Object.keys(p.derrotados || {}).length };
   if (!p.marcos) p.marcos = {};
+  if (!p.flags) p.flags = {};
+  if (!p.eventosVistos) p.eventosVistos = {};
   REINOS.forEach((r, i) => {
     if (p.derrotados && p.derrotados[r.chefe]) for (let k = 0; k <= i; k++) for (const c of cenariosDoReino(REINOS[k].id)) p.cenarios[c.id] = true;
   });
@@ -269,3 +280,50 @@ function penalidadeDerrota(p) {
 
 /* ---------- Sorteio e fórmulas usadas na batalha (o motor está em tatica.js) ---------- */
 function rand(min, max) { return min + Math.random() * (max - min); }
+
+
+/* ---------- Eventos de história (js/eventos.js) ---------- */
+/** O evento que aparece depois de concluir o cenário `cenarioId` (e ainda não foi visto), ou null. */
+function eventoDoCenario(p, cenarioId) {
+  if (typeof EVENTOS === 'undefined') return null;
+  return EVENTOS.find(e => e.depoisDe === cenarioId && !p.eventosVistos[e.id]) || null;
+}
+/** Aplica a opção `i` do evento: ouro, vida (nunca mata), XP, carta de modificador, item, flags da história e consequência no próximo cenário.
+ *  Devolve um resumo para mostrar na tela: { linhas: [...texto], subidas }. */
+function aplicarEvento(p, ev, i) {
+  const op = ev.opcoes[i];
+  if (!op) return null;
+  const e = op.efeitos || {}, linhas = [];
+  let subidas = [];
+  p.eventosVistos[ev.id] = i + 1;
+  if (e.ouro) { const v = e.ouro > 0 ? e.ouro : -Math.min(p.gold, -e.ouro); ganharOuro(p, v); p.stats.ouro = Math.max(0, p.stats.ouro); linhas.push(`${v > 0 ? '+' : ''}${v} 🪙`); }
+  if (e.vida) {
+    const max = derivados(p).hpMax, novo = Math.max(1, Math.min(max, p.hp + e.vida));
+    linhas.push(`${novo - p.hp > 0 ? '+' : ''}${novo - p.hp} ❤️`); p.hp = novo;
+  }
+  if (e.xp) { subidas = ganharXp(p, e.xp); linhas.push(`+${e.xp} XP`); }
+  if (e.carta) { const r = adicionarCartaMod(p, e.carta); if (r.ok) linhas.push(`🎴 carta ${CARTAS_MOD[e.carta].rotulo} no seu baralho de ataque`); }
+  if (e.item && ITENS[e.item]) { darItem(p, e.item); linhas.push(`${ITENS[e.item].icone} ${ITENS[e.item].nome}`); }
+  if (e.flags) for (const [k, v] of Object.entries(e.flags)) p.flags[k] = typeof v === 'number' ? (p.flags[k] || 0) + v : v;
+  if (e.proximoCenario) {
+    p.proxEfeito = { ...(p.proxEfeito || {}) };
+    for (const [k, v] of Object.entries(e.proximoCenario)) p.proxEfeito[k] = (p.proxEfeito[k] || 0) + v;
+    const pe = e.proximoCenario;
+    linhas.push(`⚠️ no próximo cenário: ${[pe.vidaInicial ? `${pe.vidaInicial} de vida ao começar` : '', pe.armadilhas ? `+${pe.armadilhas} armadilhas` : '', pe.inimigosExtra ? `+${pe.inimigosExtra} inimigo(s)` : ''].filter(Boolean).join(', ')}`);
+  }
+  return { linhas, subidas };
+}
+/** Texto da consequência pendente para o próximo cenário (ou ''). */
+function textoProxEfeito(p) {
+  const pe = p.proxEfeito;
+  if (!pe) return '';
+  return [pe.vidaInicial ? `você começa com ${-pe.vidaInicial} de vida a menos` : '', pe.armadilhas ? `+${pe.armadilhas} armadilhas no chão` : '', pe.inimigosExtra ? `+${pe.inimigosExtra} inimigo(s) a mais` : ''].filter(Boolean).join(' · ');
+}
+/** Aplica (e apaga) a consequência pendente numa batalha que acabou de começar. */
+function aplicarProxEfeito(T, p) {
+  const pe = p.proxEfeito;
+  if (!pe) return;
+  delete p.proxEfeito;
+  if (pe.armadilhas && T.tipoArm) racharChao(T, pe.armadilhas);
+  if (pe.inimigosExtra) chamarOnda(T, pe.inimigosExtra, '⚠️ Sua escolha trouxe mais inimigos!');
+}

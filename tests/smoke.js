@@ -99,12 +99,16 @@ const srv = http.createServer((q, r) => {
   // escolhe uma carta (toque marca, ▶ Jogar confirma) e joga a rodada
   await click('.cartaH >> nth=0');
   if (!(await page.$('.cartaH.sel'))) throw new Error('tocar numa carta deveria marcá-la');
+  await click('.cartaH >> nth=1');
+  if ((await page.$$('.cartaH.sel')).length !== 2) throw new Error('deveriam ser 2 cartas marcadas');
   await click('[data-a=tat-jogar]');
   await page.waitForFunction(() => T && T.fase === 'heroi' && !OCUPADO, null, { timeout: 20000 });
   await shot('07b-turno');
   await click('[data-a=tat-gaveta] >> nth=0');
   if ((await page.$$('.gaveta .carta-inim .efeitos li')).length < 2) throw new Error('depois de escolher, a carta do inimigo deveria ser revelada com os efeitos');
   await click('.gaveta [data-a=tat-gaveta]');
+  if ((await page.$$('.turno2 .m2')).length !== 4) throw new Error('no turno deveriam aparecer as 4 metades (2 cartas)');
+  await page.evaluate(() => { const c = T.pendentes.map(x => ({ id: x.id, m: metadesDaCarta(x) })); const a = c.find(x => x.m.base) || c[0]; ACOES['tat-metade']({ dataset: { id: a.id, q: a.m.base ? 'base' : 'topo' } }); });
   if (!(await page.$('[data-a=tat-atacar]')) || !(await page.$('[data-a=tat-fim]'))) throw new Error('os atalhos de ação (atacar/encerrar) deveriam aparecer sobre o mapa');
 
   // toque real num hexágono azul: o herói anda

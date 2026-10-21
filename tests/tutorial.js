@@ -27,7 +27,14 @@ const srv = http.createServer((q, r) => {
   const visto = new Set();
   const shot = async id => { if (!visto.has(id)) { visto.add(id); await page.screenshot({ path: path.join(out, `tut-${String(visto.size).padStart(2, '0')}-${id}.png`) }); } };
   const esperarCartao = async id => { try { await page.waitForFunction(i => { const c = document.getElementById('tut'); return c && c.dataset.passo === i; }, id, { timeout: 4000 }); } catch (e) { throw new Error(`o cartão "${id}" não apareceu (apareceu: ${JSON.stringify(await cartao())}; ${JSON.stringify(await page.evaluate(() => ({ cenarios: P.cenarios, off: P.tutorial.off, tela: document.querySelector('#app .tela') && document.querySelector('#app .tela').className, feitos: Object.keys(P.tutorial.feitos).filter(k => !k.startsWith('ev_')).length })))})`); } await shot(id); };
-  const passarHistoria = async () => { while (await page.$('[data-a=hist-prox]')) await click('[data-a=hist-prox]'); };
+  const passarHistoria = async () => {      // páginas de história e eventos de escolha (sempre a 1ª opção)
+    for (let g = 0; g < 60; g++) {
+      if (await page.$('[data-a=hist-prox]')) await click('[data-a=hist-prox]');
+      else if (await page.$('[data-a=ev-escolher]')) await click('[data-a=ev-escolher] >> nth=0');
+      else if (await page.$('[data-a=ev-continuar]')) await click('[data-a=ev-continuar]');
+      else break;
+    }
+  };
   /** Se há um cartão com botão "Entendi", clica nele. Devolve o id (ou null). */
   async function lerCartao() { const c = await cartao(); if (!c) return null; await shot(c.id); if (c.ok) { await click('[data-a=tut-ok]'); await page.waitForTimeout(30); } return c; }
 
@@ -109,7 +116,7 @@ const srv = http.createServer((q, r) => {
 
   /* ---- conferência final ---- */
   const feitos = await page.evaluate(() => P.tutorial.feitos);
-  const obrigatorios = ['m_bemvindo', 'r_cen1', 'br1', 'b_mapa', 'b_objetivo', 'b_iniciativa', 'b_escolher', 'b_mover', 'b_atacar', 'b_modcarta', 'b_fimturno', 'b_salalimpa', 'b_porta', 'b_ultima', 'b_vitoria1', 'r_loja', 'l_loja', 'l_voltar', 'r_inv', 'r_baralho', 'r_cen2', 'br2', 'b2_cartas', 'b2_bau', 'b2_vitoria', 'r_cen3', 'br3', 'b3_estrutura', 'r_fim'];
+  const obrigatorios = ['m_bemvindo', 'r_cen1', 'br1', 'b_mapa', 'b_objetivo', 'b_iniciativa', 'b_escolher', 'b_metades', 'b_mover', 'b_atacar', 'b_modcarta', 'b_fimturno', 'b_salalimpa', 'b_porta', 'b_ultima', 'b_vitoria1', 'r_loja', 'l_loja', 'l_voltar', 'r_inv', 'r_baralho', 'r_cen2', 'br2', 'b2_cartas', 'b2_bau', 'b2_vitoria', 'r_cen3', 'br3', 'b3_estrutura', 'r_fim'];
   const faltou = obrigatorios.filter(i => !feitos[i]);
   const todos = await page.evaluate(() => Tutorial.passos());
   const opcionais = todos.filter(i => !obrigatorios.includes(i) && !feitos[i]);

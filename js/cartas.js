@@ -36,7 +36,7 @@ const ARQUETIPOS = {
   predador: [
     K('Bote',           12, { mov: 2, atq: 0 }),
     K('Perseguir',      25, { mov: 3, atq: -2 }),
-    K('Mordida',        40, { mov: 1, atq: 1 }),
+    K('Mordida',        40, { mov: 1, atq: 1, cond: 'ferir' }),
     K('Dilacerar',      55, { atq: 2 }),
     K('Rodear',         35, { mov: 2, atq: -1 }),
     K('Chamado',        65, { fortalecer: 1, mov: 1 }),
@@ -62,7 +62,7 @@ const ARQUETIPOS = {
   // lentos e pesados
   bruto: [
     K('Marchar',        40, { mov: 0, atq: 0 }),
-    K('Esmagar',        75, { atq: 2, empurrarHeroi: 1 }),
+    K('Esmagar',        75, { atq: 2, empurrarHeroi: 1, cond: 'atordoar' }),
     K('Provocar',       30, { escudo: 2, mov: 1 }),
     K('Pancada',        50, { mov: 1, atq: 0 }),
     K('Descansar',      85, { curar: 2 }),
@@ -74,26 +74,26 @@ const ARQUETIPOS = {
 const JEITO = {
   draugr:      ['investida', K('Maldição dos mortos', 38, { fortalecer: 1, atq: 0 })],
   lobo_gelo:   ['predador',  K('Uivo da matilha', 18, { fortalecer: 1, mov: 2 })],
-  valquiria:   ['atirador',  K('Lança arremessada', 32, { atq: 2, alc: 2 })],
+  valquiria:   ['atirador',  K('Lança arremessada', 32, { atq: 2, alc: 2, cond: 'imobilizar' })],
   troll_gelo:  ['bruto',     K('Regeneração gélida', 72, { curar: 3 })],
-  harpia:      ['predador',  K('Rasante', 14, { mov: 3, atq: 1, puxarHeroi: 1 })],
+  harpia:      ['predador',  K('Rasante', 14, { mov: 3, atq: 1, puxarHeroi: 1, cond: 'cegar' })],
   satiro:      ['suporte',   K('Flauta de Pã', 15, { fortalecer: 2 })],
   ciclope:     ['atirador',  K('Pedra enorme', 65, { atq: 2, alc: 1, empurrarHeroi: 1 })],
-  minotauro:   ['bruto',     K('Chifrada', 24, { mov: 2, atq: 2, empurrarHeroi: 2 })],
+  minotauro:   ['bruto',     K('Chifrada', 24, { mov: 2, atq: 2, empurrarHeroi: 2, cond: 'atordoar' })],
   alma_penada: ['suporte',   K('Sussurro do além', 22, { curar: 2, fortalecer: 1, escudo: 1 })],
-  diabrete:    ['atirador',  K('Bola de fogo', 38, { atq: 2, alc: 1 })],
+  diabrete:    ['atirador',  K('Bola de fogo', 38, { atq: 2, alc: 1, cond: 'ferir' })],
   cerbero:     ['investida', K('Três mordidas', 26, { mov: 1, atq: 2 })],
   demonio:     ['predador',  K('Mergulho infernal', 16, { mov: 3, atq: 1, empurrarHeroi: 1 })],
-  escaravelho: ['predador',  K('Enxame', 20, { mov: 2, fortalecer: 1, atq: 0 })],
-  mumia:       ['bruto',     K('Abraço de ataduras', 58, { atq: 1, puxarHeroi: 1 })],
-  chacal:      ['investida', K('Julgamento de Anúbis', 34, { mov: 1, atq: 2, escudo: 1 })],
-  serpente:    ['atirador',  K('Cuspe venenoso', 30, { atq: 2, alc: 1, mov: 1 })],
+  escaravelho: ['predador',  K('Enxame', 20, { mov: 2, fortalecer: 1, atq: 0, cond: 'ferir' })],
+  mumia:       ['bruto',     K('Abraço de ataduras', 58, { atq: 1, puxarHeroi: 1, cond: 'imobilizar' })],
+  chacal:      ['investida', K('Julgamento de Anúbis', 34, { mov: 1, atq: 2, escudo: 1, cond: 'desarmar' })],
+  serpente:    ['atirador',  K('Cuspe venenoso', 30, { atq: 2, alc: 1, mov: 1, cond: 'ferir' })],
 };
 
 /* ---------- Baralhos únicos dos chefes (8 cartas cada). As cartas fortes mostram o perigo antes de acontecer ---------- */
 const BARALHOS_CHEFE = {
   fenrir: [
-    K('Mordida do Ragnarök', 15, { mov: 2, atq: 3, empurrarHeroi: 1 }),
+    K('Mordida do Ragnarök', 15, { mov: 2, atq: 3, empurrarHeroi: 1, cond: 'ferir' }),
     K('Salto',               10, { mov: 3, atq: 0 }),
     K('Garras',              35, { mov: 1, atq: 1 }),
     K('Uivo gelado',         50, { fortalecer: 2, mov: 1 }),
@@ -103,7 +103,7 @@ const BARALHOS_CHEFE = {
     K('Fome do lobo',        20, { mov: 2, atq: 1, curar: 1 }),
   ],
   ares: [
-    K('Fúria de Ares',       12, { mov: 2, atq: 3 }),
+    K('Fúria de Ares',       12, { mov: 2, atq: 3, cond: 'atordoar' }),
     K('Lançada',             30, { mov: 1, atq: 1, alc: 1 }),
     K('Investida do escudo', 22, { mov: 2, atq: 0, empurrarHeroi: 2 }),
     K('Grito de guerra',     48, { fortalecer: 2, escudo: 1 }),
@@ -113,7 +113,7 @@ const BARALHOS_CHEFE = {
     K('Sede de sangue',      18, { mov: 1, atq: 2, curar: 1 }),
   ],
   hades: [
-    K('Toque da Morte',      14, { mov: 1, atq: 3, alc: 1 }),
+    K('Toque da Morte',      14, { mov: 1, atq: 3, alc: 1, cond: 'desarmar' }),
     K('Garra das sombras',   30, { atq: 2, puxarHeroi: 2 }),
     K('Chamado dos mortos',  45, { fortalecer: 2, curar: 2 }),
     K('Passo sombrio',       24, { mov: 2, atq: 0 }),
@@ -125,7 +125,7 @@ const BARALHOS_CHEFE = {
   set: [
     K('Tempestade de Areia', 13, { mov: 2, atq: 3, alc: 1 }),
     K('Ferroada',            28, { mov: 1, atq: 2 }),
-    K('Pinças',              38, { atq: 2, puxarHeroi: 1 }),
+    K('Pinças',              38, { atq: 2, puxarHeroi: 1, cond: 'imobilizar' }),
     K('Caos nas dunas',      50, { fortalecer: 2, mov: 1 }),
     K('Rastejar',            22, { mov: 3, atq: -1 }),
     K('Casca de escorpião',  68, { escudo: 3 }),
@@ -134,12 +134,12 @@ const BARALHOS_CHEFE = {
   ],
   caos: [
     K('Colapso do Cosmos',   11, { mov: 2, atq: 4, alc: 1 }),
-    K('Tentáculos',          26, { atq: 2, puxarHeroi: 2 }),
+    K('Tentáculos',          26, { atq: 2, puxarHeroi: 2, cond: 'imobilizar' }),
     K('Onda do vazio',       36, { atq: 2, empurrarHeroi: 2 }),
     K('Ecos do Caos',        48, { fortalecer: 2, curar: 2 }),
     K('Deslizar',            20, { mov: 3, atq: 0 }),
     K('Manto estelar',       70, { escudo: 3, atq: -1 }),
-    K('Olhares',             42, { atq: 2, alc: 2 }),
+    K('Olhares',             42, { atq: 2, alc: 2, cond: 'cegar' }),
     K('Devorar',             58, { atq: 2, curar: 3 }),
   ],
   // estruturas (torres, altares...) não jogam cartas
@@ -172,46 +172,52 @@ const BARALHOS_HEROI = {
   guerreiro: [
     K('Golpe firme',     30, { mov: 2, atq: 3 }),
     K('Investida',       15, { mov: 4, atq: 2 }),
-    K('Marretada',       70, { mov: 1, atq: 6, empurrar: 1 }),
+    K('Marretada',       70, { mov: 1, atq: 7, empurrar: 1, cond: 'atordoar', queima: true }),
     K('Muralha',         45, { mov: 2, atq: 2, escudo: 2 }),
-    K('Giro de lâmina',  50, { mov: 2, atq: 3, alvo: 'ao-redor' }),
+    K('Giro de lâmina',  50, { mov: 2, atq: 3, alvo: 'ao-redor', elem: 'fogo' }),
     K('Empurrão',        40, { mov: 2, atq: 2, empurrar: 2 }),
     K('Fôlego',          80, { mov: 1, cura: 4 }),
-    K('Fúria',           25, { mov: 3, atq: 4 }),
-    K('Desafio',         20, { mov: 3, atq: 2, alc: 3, puxar: 2 }),
-    K('Golpe pesado',    60, { mov: 2, atq: 5 }),
+    K('Fúria',           25, { mov: 3, atq: 5, custo: { vida: 2 } }),
+    K('Desafio',         20, { mov: 3, atq: 2, alc: 3, puxar: 2, cond: 'imobilizar' }),
+    K('Golpe pesado',    60, { mov: 2, atq: 5, usaElem: { elem: 'fogo', atq: 2 } }),
+    K('Ataque cruzado',  35, { mov: 2, atq: 3, cond: 'cegar' }),
+    K('Postura firme',   55, { mov: 1, atq: 2, escudo: 3 }),
   ],
   cacador: [
     K('Tiro certeiro',   40, { mov: 2, atq: 3, alc: 4 }),
     K('Recuar e atirar', 25, { mov: 4, atq: 1, alc: 3 }),
-    K('Flecha pesada',   75, { mov: 1, atq: 5, alc: 4, empurrar: 1 }),
-    K('Rajada',          55, { mov: 2, atq: 2, alc: 3, alvo: 'vizinhos' }),
+    K('Flecha pesada',   75, { mov: 1, atq: 5, alc: 4, empurrar: 1, elem: 'gelo' }),
+    K('Rajada',          55, { mov: 2, atq: 2, alc: 3, alvo: 'vizinhos', usaElem: { elem: 'gelo', cond: 'imobilizar' } }),
     K('Salto',           10, { mov: 5 }),
-    K('Camuflagem',      30, { mov: 3, atq: 1, alc: 3, escudo: 2 }),
-    K('Flecha atordoante', 50, { mov: 2, atq: 2, alc: 3, empurrar: 2 }),
-    K('Mira firme',      65, { mov: 1, atq: 4, alc: 5 }),
+    K('Camuflagem',      30, { mov: 3, atq: 1, alc: 3, escudo: 2, cond: 'cegar' }),
+    K('Flecha atordoante', 50, { mov: 2, atq: 3, alc: 3, empurrar: 2, cond: 'atordoar', queima: true }),
+    K('Mira firme',      65, { mov: 1, atq: 4, alc: 5, usaElem: { elem: 'luz', atq: 2 } }),
     K('Fôlego',          70, { mov: 2, cura: 3 }),
-    K('Tiro rápido',     20, { mov: 3, atq: 2, alc: 3 }),
+    K('Tiro rápido',     20, { mov: 3, atq: 2, alc: 3, elem: 'luz' }),
+    K('Flecha de gelo',  38, { mov: 2, atq: 2, alc: 4, elem: 'gelo' }),
+    K('Laço de cordas',  60, { mov: 2, atq: 1, alc: 3, cond: 'imobilizar' }),
   ],
   oraculo: [
-    K('Raio',            35, { mov: 2, atq: 3, alc: 4 }),
-    K('Tempestade',      85, { mov: 1, atq: 4, alc: 4, alvo: 'vizinhos' }),
+    K('Raio',            35, { mov: 2, atq: 3, alc: 4, elem: 'luz' }),
+    K('Tempestade',      85, { mov: 1, atq: 5, alc: 4, alvo: 'vizinhos', usaElem: { elem: 'gelo', atq: 2 }, queima: true }),
     K('Bênção de cura',  50, { mov: 2, cura: 5 }),
-    K('Vento arcano',    25, { mov: 2, atq: 1, alc: 3, empurrar: 2 }),
-    K('Drenar alma',     45, { mov: 2, atq: 2, alc: 3, dreno: true, puxar: 1 }),
+    K('Vento arcano',    25, { mov: 2, atq: 1, alc: 3, empurrar: 2, elem: 'gelo' }),
+    K('Drenar alma',     45, { mov: 2, atq: 2, alc: 3, dreno: true, puxar: 1, elem: 'sombra' }),
     K('Escudo arcano',   30, { mov: 2, atq: 1, alc: 3, escudo: 3 }),
-    K('Explosão',        65, { mov: 1, atq: 3, alvo: 'ao-redor' }),
-    K('Passo etéreo',    12, { mov: 4, atq: 1, alc: 3 }),
-    K('Julgamento',      75, { mov: 1, atq: 5, alc: 4 }),
+    K('Explosão',        65, { mov: 1, atq: 3, alvo: 'ao-redor', elem: 'fogo', cond: 'ferir' }),
+    K('Passo etéreo',    12, { mov: 4, atq: 1, alc: 3, usaElem: { elem: 'sombra', cond: 'cegar' } }),
+    K('Julgamento',      75, { mov: 1, atq: 6, alc: 4, usaElem: { elem: 'luz', atq: 2 }, queima: true }),
     K('Meditar',         80, { mov: 1, cura: 3 }),
+    K('Chama azul',      28, { mov: 2, atq: 2, alc: 3, elem: 'fogo' }),
+    K('Véu de sombras',  55, { mov: 2, atq: 1, alc: 3, escudo: 2, elem: 'sombra' }),
   ],
 };
 /** A carta de descanso: iniciativa 99, você não anda nem age, mas recupera vida e todas as cartas. */
 const CARTA_DESCANSO = K('Descansar', 99, { descanso: true });
 
 /* ---------- Cartas do herói: mão inicial, cartas de nível e a mão que você leva ---------- */
-const MAO_INICIAL = 10;  // cartas com que o herói começa
-const MAO_MAX = 10;      // quantas cartas entram na mão de um cenário (as outras ficam na coleção)
+const MAO_INICIAL = 12;  // cartas com que o herói começa
+const MAO_MAX = 12;      // quantas cartas entram na mão de um cenário (as outras ficam na coleção)
 const MAO_MIN = 6;
 const ROMANO = ['', ' II', ' III', ' IV', ' V'];
 
@@ -220,28 +226,28 @@ const MODELOS_NIVEL = {
   guerreiro: [
     (t) => K('Golpe duplo',  0, { mov: 2, atq: 3 + t }),
     (t) => K('Carga',        0, { mov: 4, atq: 2 + t }),
-    (t) => K('Esmagar',      0, { mov: 1, atq: 5 + t, empurrar: 1 }),
+    (t) => K('Esmagar',      0, { mov: 1, atq: 5 + t, empurrar: 1, cond: 'atordoar', queima: true }),
     (t) => K('Baluarte',     0, { mov: 2, atq: 2 + Math.ceil(t / 2), escudo: 2 + Math.floor(t / 2) }),
-    (t) => K('Redemoinho',   0, { mov: 2, atq: 3 + t, alvo: 'ao-redor' }),
+    (t) => K('Redemoinho',   0, { mov: 2, atq: 3 + t, alvo: 'ao-redor', elem: 'fogo' }),
     (t) => K('Respirar fundo', 0, { mov: 1, cura: 3 + t }),
     (t) => K('Grito de guerra', 0, { mov: 3, atq: 2 + t, alc: 3, puxar: 2 }),
-    (t) => K('Derrubar',     0, { mov: 2, atq: 4 + t, empurrar: 2 }),
+    (t) => K('Derrubar',     0, { mov: 2, atq: 4 + t, empurrar: 2, cond: 'imobilizar' }),
   ],
   cacador: [
     (t) => K('Flecha veloz', 0, { mov: 3, atq: 2 + t, alc: 3 }),
     (t) => K('Disparo longo', 0, { mov: 2, atq: 3 + t, alc: 5 }),
-    (t) => K('Flecha de pedra', 0, { mov: 1, atq: 5 + t, alc: 4, empurrar: 1 }),
-    (t) => K('Chuva de flechas', 0, { mov: 2, atq: 2 + t, alc: 3, alvo: 'vizinhos' }),
+    (t) => K('Flecha de pedra', 0, { mov: 1, atq: 6 + t, alc: 4, empurrar: 1, queima: true }),
+    (t) => K('Chuva de flechas', 0, { mov: 2, atq: 2 + t, alc: 3, alvo: 'vizinhos', elem: 'gelo' }),
     (t) => K('Corrida',      0, { mov: 5 + Math.floor(t / 2) }),
     (t) => K('Esconderijo',  0, { mov: 3, atq: 1 + t, alc: 3, escudo: 2 + Math.floor(t / 2) }),
     (t) => K('Erva curativa', 0, { mov: 2, cura: 3 + t }),
-    (t) => K('Armadilha viva', 0, { mov: 2, atq: 2 + t, alc: 3, puxar: 2 }),
+    (t) => K('Armadilha viva', 0, { mov: 2, atq: 2 + t, alc: 3, puxar: 2, cond: 'imobilizar' }),
   ],
   oraculo: [
-    (t) => K('Faísca',       0, { mov: 3, atq: 2 + t, alc: 3 }),
-    (t) => K('Relâmpago',    0, { mov: 1, atq: 5 + t, alc: 4 }),
+    (t) => K('Faísca',       0, { mov: 3, atq: 2 + t, alc: 3, usaElem: { elem: 'fogo', atq: 2 } }),
+    (t) => K('Relâmpago',    0, { mov: 1, atq: 6 + t, alc: 4, elem: 'luz', queima: true }),
     (t) => K('Onda de força', 0, { mov: 2, atq: 1 + t, alc: 3, empurrar: 2 }),
-    (t) => K('Chuva de fogo', 0, { mov: 1, atq: 3 + t, alc: 4, alvo: 'vizinhos' }),
+    (t) => K('Chuva de fogo', 0, { mov: 1, atq: 3 + t, alc: 4, alvo: 'vizinhos', elem: 'fogo', cond: 'ferir' }),
     (t) => K('Aura de luz',  0, { mov: 2, cura: 4 + t }),
     (t) => K('Barreira',     0, { mov: 2, atq: 1 + t, alc: 3, escudo: 3 + Math.floor(t / 2) }),
     (t) => K('Pulso',        0, { mov: 1, atq: 3 + t, alvo: 'ao-redor' }),
@@ -271,6 +277,93 @@ function maoDoHeroi(p) {
   return p.mao.map(cartaHeroiPorId).filter(Boolean).map(c => ({ ...c }));
 }
 
+/* ---------- Condições, elementos e jeitos dos monstros ---------- */
+/** Condições que as cartas aplicam (no herói ou nos monstros). Duram até o fim do PRÓXIMO turno de quem sofreu (ferir dura até curar). */
+const CONDICOES = {
+  atordoar:   { tipo: 'atordoado',   icone: '💫', nome: 'Atordoado',   verbo: 'atordoa',   desc: 'perde o próximo turno (herói: só usa 1 carta)' },
+  imobilizar: { tipo: 'imobilizado', icone: '🕸️', nome: 'Imobilizado', verbo: 'imobiliza', desc: 'não anda no próximo turno' },
+  desarmar:   { tipo: 'desarmado',   icone: '⛓️', nome: 'Desarmado',   verbo: 'desarma',   desc: 'não ataca no próximo turno' },
+  cegar:      { tipo: 'cego',        icone: '🕶️', nome: 'Cego',        verbo: 'ofusca',    desc: 'ataca com desvantagem no próximo turno' },
+  ferir:      { tipo: 'ferido',      icone: '🩸', nome: 'Ferido',      verbo: 'fere',      desc: 'perde 1 de vida por rodada até ser curado' },
+};
+const CONDICAO_POR_TIPO = {};
+for (const k of Object.keys(CONDICOES)) CONDICAO_POR_TIPO[CONDICOES[k].tipo] = CONDICOES[k];
+
+/** Elementos: cartas geram (elem) e outras cartas gastam (usaElem) para ganhar um bônus. Dura a rodada em que foi criado e a seguinte. */
+const ELEMENTOS = {
+  fogo:   { icone: '🔥', nome: 'Fogo' },
+  gelo:   { icone: '❄️', nome: 'Gelo' },
+  luz:    { icone: '✨', nome: 'Luz' },
+  sombra: { icone: '🌑', nome: 'Sombra' },
+};
+
+/** O "jeito" de cada monstro: como ele se comporta além da carta da rodada. */
+const JEITOS_IA = {
+  bando:      { icone: '🐺', nome: 'Bando',      desc: '+1 de ataque por aliado colado nele (até +2).' },
+  guardiao:   { icone: '🛡️', nome: 'Guardião',   desc: 'não sai de perto de onde começou (3 hexágonos) e tem escudo 1.' },
+  covarde:    { icone: '🐔', nome: 'Covarde',    desc: 'com menos de 40% de vida, foge de você.' },
+  berserker:  { icone: '😡', nome: 'Furioso',    desc: 'com menos de 50% de vida ganha +2 de ataque e +1 de movimento.' },
+  adormecido: { icone: '😴', nome: 'Dorminhoco', desc: 'dorme até você chegar a 3 hexágonos ou até ser ferido.' },
+  curandeiro: { icone: '💚', nome: 'Curandeiro', desc: 'procura aliados feridos para curá-los, ficando longe de você.' },
+};
+const JEITO_IA = {
+  draugr: 'bando', lobo_gelo: 'bando', troll_gelo: 'guardiao', harpia: 'covarde', satiro: 'curandeiro', ciclope: 'guardiao',
+  minotauro: 'berserker', alma_penada: 'curandeiro', diabrete: 'covarde', cerbero: 'berserker', demonio: 'bando',
+  escaravelho: 'bando', mumia: 'adormecido', chacal: 'berserker', serpente: 'adormecido',
+};
+
+/** As duas METADES de uma carta do herói (como em Gloomhaven): a de cima (ataque/cura) e a de baixo (movimento/escudo).
+ *  Você joga DUAS cartas por rodada e usa UMA metade de cada. Devolve { topo, base } (null = não existe). */
+function metadesDaCarta(c) {
+  if (c.descanso) return { topo: null, base: null };
+  const extra = {};
+  for (const k of ['elem', 'usaElem', 'custo']) if (c[k]) extra[k] = c[k];
+  let topo = null, base = null;
+  if (c.atq) {
+    topo = { atq: c.atq, ...extra };
+    for (const k of ['alc', 'alvo', 'empurrar', 'puxar', 'dreno', 'cond']) if (c[k]) topo[k] = c[k];
+    base = {};
+    if (c.mov) base.mov = c.mov;
+    if (c.escudo) base.escudo = c.escudo;
+    if (c.cura) base.cura = c.cura;
+  } else {
+    if (c.cura) topo = { cura: c.cura, ...extra };
+    base = {};
+    if (c.mov) base.mov = c.mov;
+    if (c.escudo) base.escudo = c.escudo;
+    if (c.cura && !topo) base.cura = c.cura;
+  }
+  if (base && !Object.keys(base).length) base = null;
+  return { topo, base };
+}
+
+/** Texto de uma metade: [{icone, texto}]. */
+function descreverMetade(h, bonus) {
+  if (!h) return [{ icone: '▫️', texto: '—' }];
+  const b = bonus || { dano: 0, mov: 0, cura: 0, alc: 0 };
+  const out = [];
+  if (h.atq) {
+    const alc = (h.alc || 1) + ((h.alc || 1) > 1 ? b.alc : 0);
+    const alvo = h.alvo === 'ao-redor' ? ' (ao redor)' : h.alvo === 'vizinhos' ? ' (+vizinhos)' : '';
+    out.push({ icone: '⚔️', texto: `dano ${h.atq + b.dano}${alvo}` });
+    out.push({ icone: '🎯', texto: alc > 1 ? 'alcance ' + alc : 'corpo a corpo' });
+  }
+  if (h.mov) out.push({ icone: '👣', texto: 'anda ' + (h.mov + b.mov) });
+  if (h.empurrar) out.push({ icone: '💨', texto: 'empurra ' + h.empurrar });
+  if (h.puxar) out.push({ icone: '🧲', texto: 'puxa ' + h.puxar });
+  if (h.escudo) out.push({ icone: '🛡️', texto: 'escudo ' + h.escudo });
+  if (h.cura) out.push({ icone: '✚', texto: 'cura ' + (h.cura + b.cura) });
+  if (h.dreno) out.push({ icone: '🩸', texto: 'rouba vida' });
+  if (h.cond) out.push({ icone: CONDICOES[h.cond].icone, texto: CONDICOES[h.cond].verbo });
+  if (h.elem) out.push({ icone: ELEMENTOS[h.elem].icone, texto: 'cria ' + ELEMENTOS[h.elem].nome.toLowerCase() });
+  if (h.usaElem) {
+    const u = h.usaElem, bon = [u.atq ? `+${u.atq} dano` : '', u.cond ? CONDICOES[u.cond].verbo : ''].filter(Boolean).join(' e ');
+    out.push({ icone: ELEMENTOS[u.elem].icone, texto: `gasta ${ELEMENTOS[u.elem].nome.toLowerCase()}: ${bon}` });
+  }
+  if (h.custo && h.custo.vida) out.push({ icone: '💔', texto: `custa ${h.custo.vida} de vida` });
+  return out.length ? out : [{ icone: '▫️', texto: '—' }];
+}
+
 /** Texto curto dos efeitos de uma carta do herói: [{icone, texto}]. `bonus` (opcional) soma os bônus de atributos e itens. */
 function descreverCartaHeroi(c, bonus) {
   const b = bonus || { dano: 0, mov: 0, cura: 0, alc: 0 };
@@ -284,6 +377,11 @@ function descreverCartaHeroi(c, bonus) {
     out.push({ icone: '🎯', texto: alc > 1 ? 'alcance ' + alc : 'corpo a corpo' });
   }
   if (c.empurrar) out.push({ icone: '💨', texto: 'empurra ' + c.empurrar });
+  if (c.cond) out.push({ icone: CONDICOES[c.cond].icone, texto: CONDICOES[c.cond].verbo });
+  if (c.elem) out.push({ icone: ELEMENTOS[c.elem].icone, texto: 'cria ' + ELEMENTOS[c.elem].nome.toLowerCase() });
+  if (c.usaElem) out.push({ icone: ELEMENTOS[c.usaElem.elem].icone, texto: 'gasta ' + ELEMENTOS[c.usaElem.elem].nome.toLowerCase() + ' p/ bônus' });
+  if (c.custo && c.custo.vida) out.push({ icone: '💔', texto: 'custa ' + c.custo.vida + ' de vida' });
+  if (c.queima) out.push({ icone: '🔥', texto: 'queima: some após usar' });
   if (c.puxar) out.push({ icone: '🧲', texto: 'puxa ' + c.puxar });
   if (c.escudo) out.push({ icone: '🛡️', texto: 'escudo ' + c.escudo });
   if (c.cura) out.push({ icone: '✚', texto: 'cura ' + (c.cura + b.cura) });
@@ -313,6 +411,7 @@ function descreverCarta(c) {
   if (c.escudo) out.push({ icone: '🛡️', texto: 'escudo ' + c.escudo });
   if (c.empurrarHeroi) out.push({ icone: '💨', texto: 'empurra você ' + c.empurrarHeroi });
   if (c.puxarHeroi) out.push({ icone: '🧲', texto: 'puxa você ' + c.puxarHeroi });
+  if (c.cond) out.push({ icone: CONDICOES[c.cond].icone, texto: CONDICOES[c.cond].verbo + ' você' });
   return out;
 }
 
