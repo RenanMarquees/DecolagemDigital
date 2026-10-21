@@ -224,7 +224,7 @@ const DIFICULDADES = {
 const DIFICULDADE_PADRAO = 'intermediario';
 /** Botões gerais de equilíbrio: forca multiplica vida e ataque de TODOS os inimigos; ataque multiplica só o dano deles; xp multiplica o XP ganho.
  *  (Para deixar o jogo mais fácil ou mais difícil de uma vez, mexa só aqui.) */
-const BALANCO = { forca: 0.2, ataque: 0.5, xp: 1 };
+const BALANCO = { forca: 0.1, ataque: 0.4, xp: 1 };
 /** A cada nível do cenário acima do "nível-base" do reino, os inimigos ganham este tanto de vida/ataque (e o contrário abaixo). */
 const FORCA_POR_NIVEL = 0.03;
 const RECOMPENSA_POR_NIVEL = 0.05;
