@@ -1044,5 +1044,16 @@ teste('a batalha restaurada continua a jogar normalmente (rodada completa sem er
   igual(r.join(), 'true,true');
 });
 
+teste('desvantagem só vale se o alvo atacado estiver colado: com um monstro ao lado, atacar outro que está longe não tem desvantagem', () => {
+  const r = R(`(() => { SORTE.ativa = true; const out = [];
+    for (const alvoColado of [true, false]) {
+      const { p, T } = cen(1, { carta: { alc: 4, mov: 0, atq: 3 } }); const a = T.inim[0], b = T.inim[1]; pe(a, 1, 10); a.hp = a.hpMax = 99; pe(b, 4, 10); b.hp = b.hpMax = 99; a.def = b.def = 0;
+      tAtacar(T, p, (alvoColado ? a : b).uid); out.push(T.modFx[0].desv);
+    }
+    { const { p, T } = cen(1, { carta: { alc: 4, mov: 0, atq: 3, alvo: 'vizinhos' } }); const a = T.inim[0], b = T.inim[1]; pe(a, 1, 10); pe(b, 4, 10); a.hp = a.hpMax = b.hp = b.hpMax = 99; tAtacar(T, p, b.uid); out.push(T.modFx[0].desv); }
+    SORTE.ativa = false; return out; })()`);
+  igual(r.join(), 'true,false,false');
+});
+
 console.log(`\n${ok} testes passaram${falhas.length ? `, ${falhas.length} FALHARAM: ${falhas.join('; ')}` : ''}.`);
 process.exit(falhas.length ? 1 : 0);

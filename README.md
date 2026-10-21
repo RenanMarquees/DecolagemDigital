@@ -43,7 +43,7 @@ RPG de turnos para celular sobre os deuses antigos. Feito em HTML + JavaScript p
 
 **Equipamento de uso único:** cabeça, peito, pés e mãos **não dão bônus fixos**: cada peça vestida pode ser **usada 1 vez por cenário**, de graça, no seu turno (🎒 Itens), e dá cura, escudo, +dano, +movimento ou +alcance conforme o item. Depois fica gasta até o cenário seguinte.
 
-**Desvantagem:** se a carta que você jogou ataca **à distância** (alcance maior que 1) e há um monstro **colado** em você, o ataque tem desvantagem: viram **duas** cartas de sorte e vale a **pior**. Vale também para os monstros atiradores, que por isso sempre tentam se **afastar** de você antes de atirar (se não houver lugar, atiram assim mesmo).
+**Desvantagem:** se a carta que você jogou ataca **à distância** (alcance maior que 1) e o inimigo que você **ataca** está **colado** em você, o ataque tem desvantagem (ter um monstro ao lado não basta: se você atacar **outro** que não esteja colado, não há desvantagem): viram **duas** cartas de sorte e vale a **pior**. Vale também para os monstros atiradores, que por isso sempre tentam se **afastar** de você antes de atirar (se não houver lugar, atiram assim mesmo).
 
 **Empurrar e puxar:** **você escolhe** para onde o inimigo vai (toque num dos hexágonos dourados, ou deixe onde está); cada passo precisa afastar (empurrar) ou aproximar (puxar). Os **monstros** que empurram/puxam você escolhem **sempre o pior para você**: armadilha primeiro, depois o lugar com mais monstros em volta.
 

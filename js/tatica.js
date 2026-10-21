@@ -775,7 +775,7 @@ function tAtacar(T, p, uid) {
   }
   if (temCond(T.efeitos, 'desarmado')) { logar(T, '⛓️ Você está desarmado: não pode atacar neste turno.', 'erro'); return false; }
   T.ultimoMov = null;
-  const emDesv = ((c.alc || 1) > 1 && combatentes(T).some(e => dist(e, T.heroi) === 1)) || temCond(T.efeitos, 'cego');     // à distância com um monstro colado em você, ou cego
+  const emDesv = ((c.alc || 1) > 1 && alvos.some(e => dist(e, T.heroi) === 1)) || temCond(T.efeitos, 'cego');     // à distância, atacando um monstro COLADO em você (outro alvo longe não conta), ou cego
   const ataque = sacarParaAtaque(T, 'heroi', danoDoHeroi(T, p), 'você', emDesv);    // a carta de modificador vira sozinha
   if (ataque === 0) {                                                       // bloqueio: o ataque inteiro se perde
     T.acaoUsada = true;

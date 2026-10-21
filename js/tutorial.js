@@ -119,7 +119,7 @@ const Tutorial = (() => {
       texto: 'Além da carta, cada monstro tem um jeito de lutar, com um ícone nas cartas deles e explicado no 📋: 🐺 bando (mais forte em grupo), 🛡️ guardião (não sai do posto), 🐔 covarde (foge quando ferido), 😡 furioso (mais forte quando ferido), 😴 dorminhoco (dorme até você chegar perto) e 💚 curandeiro (cura os aliados e fica longe).',
       destaque: '.cartas-linha', botao: 'Entendi' },
     { id: 'b2_desv', tela: 'batalha', quando: () => naBatalha(2) && T.fase === 'heroi' && T.rodada >= 2, titulo: '⚠️ Desvantagem',
-      texto: 'Se a carta que você jogou ataca de LONGE (alcance maior que 1) e há um monstro COLADO em você, o ataque sofre desvantagem: viram DUAS cartas de sorte e vale a PIOR. Com os monstros que atiram é igual: eles tentam se afastar de você para não sofrer isso. Afaste-se antes de atirar!',
+      texto: 'Se a carta que você jogou ataca de LONGE (alcance maior que 1) e o alvo que você ataca está COLADO em você, o ataque sofre desvantagem: viram DUAS cartas de sorte e vale a PIOR. Se houver um monstro ao seu lado mas você atacar OUTRO que está longe, não há desvantagem! Com os monstros que atiram é igual: eles tentam se afastar de você para não sofrer isso.',
       destaque: '.pips', botao: 'Entendi' },
     { id: 'b2_itens', tela: 'batalha', quando: () => naBatalha(2) && T.fase === 'heroi' && T.rodada >= 2, titulo: '🎒 Itens são livres',
       texto: 'Toque em 🎒 Mochila para usar uma poção ou item: isso NÃO conta como a sua jogada, é um complemento. Só cabem os itens que a mochila aguenta (2 no começo, até 5 nos níveis altos). Escudo vem das cartas e dos equipamentos.',
