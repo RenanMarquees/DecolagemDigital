@@ -480,16 +480,21 @@ function baralhoMod(T, quem) {
   return exp.baralhos[quem];
 }
 /** Vira a carta do ataque (sozinha, sem o jogador fazer nada), registra para a tela mostrar e devolve o golpe final (0 = falhou). */
-function sacarParaAtaque(T, quem, base, nome) {
-  const carta = sacarMod(baralhoMod(T, quem));
-  const golpe = aplicarMod(base, carta);
-  T.modFx.push({ quem, carta, base, golpe, nome, embaralhou: carta.embaralhou });
+function sacarParaAtaque(T, quem, base, nome, desv = false) {
+  const baralho = baralhoMod(T, quem);
+  let carta = sacarMod(baralho), golpe = aplicarMod(base, carta), outra = null;
+  if (desv && SORTE.ativa) {                 // DESVANTAGEM: vira uma segunda carta e vale a PIOR
+    const c2 = sacarMod(baralho), g2 = aplicarMod(base, c2);
+    if (g2 < golpe) { outra = carta; carta = c2; golpe = g2; } else outra = c2;
+    carta.embaralhou = carta.embaralhou || outra.embaralhou;
+  }
+  T.modFx.push({ quem, carta, base, golpe, nome, embaralhou: carta.embaralhou, desv: !!outra, outra });
   if (SORTE.ativa) {
-    logar(T, `🎴 ${quem === 'heroi' ? 'Carta do seu ataque' : `Carta de ${nome}`}: ${carta.rotulo} (${carta.tipo === 'bloqueio' ? 'bloqueio!' : resumoMod(carta, base, golpe)})${carta.embaralhou ? ' · 🔀 baralho embaralhado' : ''}`, carta.tipo === 'bloqueio' ? (quem === 'heroi' ? 'aviso' : 'info') : carta.tipo === 'x2' ? 'forte' : 'info');
+    const resumo = carta.tipo === 'bloqueio' ? 'bloqueio!' : resumoMod(carta, base, golpe);
+    logar(T, `🎴 ${quem === 'heroi' ? 'Carta do seu ataque' : `Carta de ${nome}`}${outra ? ` (desvantagem: ${outra.rotulo} e ${carta.rotulo}, vale a pior)` : ''}: ${carta.rotulo} (${resumo})${carta.embaralhou ? ' · 🔀 baralho embaralhado' : ''}`, carta.tipo === 'bloqueio' ? (quem === 'heroi' ? 'aviso' : 'info') : carta.tipo === 'x2' ? 'forte' : 'info');
   }
   return golpe;
 }
-
 /** Um golpe do herói: dano fixo menos a defesa e o escudo do alvo (sempre causa pelo menos 1). */
 function golpeT(T, alvo, ataque) {
   const dano = Math.max(1, ataque - alvo.def - (alvo.escudo || 0));
@@ -519,7 +524,8 @@ function tAtacar(T, p, uid) {
     if (!principal) { logar(T, 'Esse inimigo está fora de alcance.', 'erro'); return false; }
     alvos = c.alvo === 'vizinhos' ? vivos(T).filter(e => e === principal || dist(e, principal) === 1) : [principal];
   }
-  const ataque = sacarParaAtaque(T, 'heroi', danoDoHeroi(T, p), 'você');    // a carta de modificador vira sozinha
+  const emDesv = (c.alc || 1) > 1 && combatentes(T).some(e => dist(e, T.heroi) === 1);     // à distância, com um monstro colado em você
+  const ataque = sacarParaAtaque(T, 'heroi', danoDoHeroi(T, p), 'você', emDesv);    // a carta de modificador vira sozinha
   if (ataque === 0) {                                                       // bloqueio: o ataque inteiro se perde
     T.acaoUsada = true;
     logar(T, `🚫 ${c.nome} falhou! Você perdeu o ataque.`, 'aviso');
@@ -786,19 +792,24 @@ function podeAtacarHeroi(T, e, pos, alc) {
 }
 
 /** O inimigo anda até um lugar de onde possa atacar (usando `mov` e `alc` da carta). Devolve {parou, morreu}. */
-function moverInimigo(T, p, e, mov, alc) {
+function moverInimigo(T, p, e, mov, alc, jaPodeAtacar = false) {
   const ocupadoPorOutro = (c, r) => T.inim.some(x => x.vivo && x !== e && x.c === c && x.r === r);
   const ehHeroi = (c, r) => c === T.heroi.c && r === T.heroi.r;
   // inimigos atravessam uns aos outros, mas ninguém atravessa o herói; caminhos sem armadilha são preferidos
   const nos = bfs(T.g, e, 80, ehHeroi, (c, r) => temArmadilha(T, c, r));
   const lista = [...nos.values()]; // ordem de inserção = do mais perto para o mais longe
   let meta = null;
-  for (const evitar of [true, false]) { // 1º: lugares sem armadilha; se não houver, aceita pisar numa
-    for (const n of lista) {
-      if (n.d === 0 || ocupadoPorOutro(n.c, n.r) || (evitar && temArmadilha(T, n.c, n.r))) continue;
-      if (podeAtacarHeroi(T, e, n, alc)) { meta = n; break; }
+  const distante = alc > 1;     // atirador: procura um lugar de onde ataque SEM ficar colado no herói (colado = desvantagem)
+  for (const colado of distante ? [false, true] : [true]) {   // 1º: sem ficar colado; se não houver, aceita ficar
+    for (const evitar of [true, false]) { // sem armadilha primeiro; se não houver, aceita pisar numa
+      for (const n of lista) {
+        if (n.d === 0 || ocupadoPorOutro(n.c, n.r) || (evitar && temArmadilha(T, n.c, n.r)) || (!colado && dist(n, T.heroi) === 1)) continue;
+        if (podeAtacarHeroi(T, e, n, alc)) { meta = n; break; }
+      }
+      if (meta) break;
     }
     if (meta) break;
+    if (distante && !colado && jaPodeAtacar) return { parou: false, morreu: false };   // não há lugar melhor: fica onde está e ataca assim mesmo
   }
   let cam = [];
   if (meta) {
@@ -829,7 +840,8 @@ function moverInimigo(T, p, e, mov, alc) {
 
 function atacarHeroi(T, p, d, e, carta) {
   const mod = carta.atq + e.bonusAtq;
-  const golpe = sacarParaAtaque(T, 'inim', Math.max(1, e.atk + mod), e.nome.split(',')[0]);   // carta de modificador do monstro
+  const alcE = Math.max(1, e.alc + (carta.alc || 0));
+  const golpe = sacarParaAtaque(T, 'inim', Math.max(1, e.atk + mod), e.nome.split(',')[0], alcE > 1 && dist(e, T.heroi) === 1);   // carta de modificador do monstro
   if (golpe === 0) {
     logar(T, `💨 ${e.nome} errou o ataque!`, 'info');
     T.fx.push({ alvo: 'heroi', v: 0, texto: '✖ errou', esquiva: true, de: e.uid });
@@ -878,7 +890,8 @@ function agirInimigo(T, p, d, e) {
   let paralisado = false;
   if (carta.mov !== undefined) {
     const mov = Math.max(1, e.mov + carta.mov - (temEfeito(e.efeitos, 'gelo') ? 1 : 0));
-    if (!podeAtacarHeroi(T, e, e, alc) || carta.atq === undefined) paralisado = moverInimigo(T, p, e, mov, alc).parou;
+    const colado = alc > 1 && dist(e, T.heroi) === 1;         // atirador colado no herói tenta se afastar (desvantagem)
+    if (!podeAtacarHeroi(T, e, e, alc) || carta.atq === undefined || colado) paralisado = moverInimigo(T, p, e, mov, alc, podeAtacarHeroi(T, e, e, alc) && carta.atq !== undefined).parou;
   }
   if (e.vivo && !paralisado && !T.fim && carta.atq !== undefined && podeAtacarHeroi(T, e, e, alc)) atacarHeroi(T, p, d, e, carta);
 }

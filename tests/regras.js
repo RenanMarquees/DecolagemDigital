@@ -696,7 +696,7 @@ teste('ataque em área (ao redor) usa UMA carta só para todos os alvos', () => 
 teste('os monstros também viram carta a cada ataque (baralho único dos monstros, que muda com a dificuldade)', () => {
   const r = R(`(() => { SORTE.ativa = true; const out = [];
     for (const id of ['+2', 'x2', 'bloq']) {
-      const { p, T } = cen(1, { etapa: 1, vivos: true }); const e = T.inim.find(x => !x.estrutura); e.parado = false; e.atk = 3; pe(e, 1, 10); p.hp = 99;
+      const { p, T } = cen(1, { etapa: 1, vivos: true }); const e = T.inim.find(x => !x.estrutura); e.parado = false; e.atk = 3; e.alc = 1; pe(e, 1, 10); p.hp = 99;
       baralhoMod(T, 'inim').compra = [id, ...baralhoMod(T, 'inim').compra]; T.escudoHeroi = 0;
       const carta = { atq: 0, nome: 'T' }; atacarHeroi(T, p, derivados(p), e, carta); out.push([99 - p.hp, T.modFx[0].quem, T.modFx[0].carta.id]);
     } SORTE.ativa = false; return out; })()`);
@@ -704,6 +704,29 @@ teste('os monstros também viram carta a cada ataque (baralho único dos monstro
 });
 teste('o baralho vale para o cenário inteiro (passa de uma etapa para a outra)', () => {
   igual(R(`(() => { const { p, T, exp } = cen(1, { etapa: 0 }); const b = T.exp.baralhos; const T2 = criarTatica(exp, p); return T2.exp.baralhos === b && !!b.heroi && !!b.inim; })()`), true);
+});
+
+teste('DESVANTAGEM: ataque à distância com um inimigo colado vira DUAS cartas e vale a pior (herói e monstros)', () => {
+  const r = R(`(() => { SORTE.ativa = true; const out = [];
+    for (const [alc, colado, topo] of [[3, true, ['+2', '+1']], [3, true, ['+1', '+2']], [3, false, ['+2', '+1']], [1, true, ['+2', '+1']]]) {
+      const { p, T } = cen(1, { etapa: 1, vivos: true, carta: { alc, atq: 3 } }); const e = T.inim[0]; T.inim.forEach(x => { x.parado = true; x.hp = x.hpMax = 99; x.def = 0; x.c = 11; x.r = 0; });
+      pe(e, colado ? 1 : 3, 10); const b = baralhoMod(T, 'heroi'); b.compra = [...topo, ...b.compra.filter(id => !topo.includes(id))]; const d0 = danoDoHeroi(T, p);
+      tAtacar(T, p, e.uid); const m = T.modFx[0]; out.push([99 - e.hp, d0, m.desv, m.carta.id]);
+    }
+    { const { p, T } = cen(1, { etapa: 1, vivos: true }); const e = T.inim[0]; e.alc = 3; e.atk = 3; pe(e, 1, 10); p.hp = 99; T.escudoHeroi = 0; const b = baralhoMod(T, 'inim'); b.compra = ['-2', '+1', ...b.compra.filter(id => id !== '-2' && id !== '+1')];
+      atacarHeroi(T, p, derivados(p), e, { atq: 0, nome: 'T' }); out.push([99 - p.hp, T.modFx[0].desv, T.modFx[0].carta.id]); }
+    SORTE.ativa = false; return out; })()`);
+  const [a, b, c, d, m] = r;
+  igual(a[0], a[1] + 1, 'duas cartas (+2 e +1): vale a pior, +1'); verdade(a[2] && b[2], 'marcada como desvantagem'); igual(a[0], b[0], 'a ordem das cartas não importa');
+  verdade(!c[2], 'sem ninguém colado não há desvantagem'); verdade(!d[2], 'corpo a corpo não tem desvantagem'); verdade(m[1] && m[0] === 1, 'monstro à distância, colado no herói: desvantagem (−2 contra +1 vale a pior: 1 de dano)');
+});
+teste('atirador (alcance) colado no herói se afasta para atacar sem desvantagem; se não houver lugar, ataca assim mesmo', () => {
+  const r = R(`(() => { SORTE.ativa = false; const { p, T } = cen(1, { semTurno: true, vivos: true }); const e = T.inim[0]; sozinho(T, e); limpar(T, 8); limpar(T, 9); limpar(T, 10);
+    e.parado = false; e.alc = 3; e.mov = 3; e.atk = 1; T.heroi = { c: 5, r: 9 }; pe(e, 6, 9); const carta = K('t', 5, { mov: 0, atq: 0 }); T.cartas[e.tipo] = carta;
+    agirInimigo(T, p, derivados(p), e); const afastou = dist(e, T.heroi) >= 2 && dist(e, T.heroi) <= 3;
+    pe(e, 0, 9); for (const [c, r] of [[1, 8], [1, 9], [1, 10], [0, 8], [0, 10]]) T.g.cel[r][c] = '#'; T.heroi = { c: 1, r: 9 }; T.g.cel[9][1] = '.'; const p0 = p.hp; T.cartas[e.tipo] = carta;
+    agirInimigo(T, p, derivados(p), e); return [afastou, e.c === 0, p.hp < p0]; })()`);
+  igual(r.join(), 'true,true,true');
 });
 
 console.log('\nConquistas e cartas novas');
