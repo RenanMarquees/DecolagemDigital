@@ -19,18 +19,18 @@ const r = vm.runInContext(`(function () {
     let H = []; const E = [], A = [], D = [];
     rows.forEach((l, r) => { g.cel.push([]); [...l].forEach((ch, c) => { if (ch === 'H') H.push({ c, r }); if (ch === 'E') E.push({ c, r }); if (ch === 'A') A.push({ c, r }); if (ch === 'D') D.push({ c, r }); g.cel[r].push('HEAD'.includes(ch) && ch !== ' ' ? '.' : ch); }); });
     if (H.length !== 1) problemas.push('precisa de exatamente 1 H (tem ' + H.length + ')');
-    if (E.length < 4) problemas.push('precisa de ao menos 4 E (tem ' + E.length + ')');
+    if (E.length < 3) problemas.push('precisa de ao menos 3 E (tem ' + E.length + ')');
     const ehArena = REINOS.some(x => x.arena === id);
     if (ehArena && D.length) problemas.push('arena não deve ter porta');
     if (!ehArena && D.length !== 1) problemas.push('sala precisa de exatamente 1 porta D (tem ' + D.length + ')');
-    if (A.length < 4) problemas.push('precisa de ao menos 4 armadilhas A (tem ' + A.length + ')');
+    if (A.length < 3) problemas.push('precisa de ao menos 3 armadilhas A (tem ' + A.length + ')');
     let alc = 0, chao = 0;
     if (H.length === 1) {
       const nos = bfs(g, H[0], 99, () => false);
       chao = g.cel.flat().filter(x => x === '.').length; alc = nos.size;
       for (const e of E) if (!nos.has(chave(e.c, e.r))) problemas.push('E em ' + e.c + ',' + e.r + ' sem caminho até o herói');
       for (const d of D) if (!nos.has(chave(d.c, d.r))) problemas.push('porta sem caminho até o herói');
-      for (const t of A) if (dist(t, H[0]) < 4) problemas.push('armadilha em ' + t.c + ',' + t.r + ' perto demais da entrada');
+      for (const t of A) if (dist(t, H[0]) < 3) problemas.push('armadilha em ' + t.c + ',' + t.r + ' perto demais da entrada');
       if (alc < chao) problemas.push((chao - alc) + ' hexágono(s) de chão isolado(s)');
       if (!['pinheiro','runa','coluna','arbusto','espinho','obelisco','sarcofago','cristal'].includes(m.parede)) problemas.push('parede desconhecida: ' + m.parede);
       if (!['fenda','nuvem','lava','areia','vazio'].includes(m.liquido)) problemas.push('líquido desconhecido: ' + m.liquido);

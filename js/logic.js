@@ -19,8 +19,8 @@ function equipInicial(classe) {
 function novoJogador(nome, classe) {
   const c = CLASSES[classe];
   const p = {
-    nome, classe, nivel: 1, xp: 0, pontos: 0,
-    attr: { ...c.attr }, gold: 10,
+    nome, classe, nivel: 1, xp: 0, gold: 10,
+    colecao: idsMaoInicial(classe), mao: idsMaoInicial(classe), escolhas: [],   // cartas do herói: todas as que tem, as 10 que leva, e os níveis esperando escolha de carta
     inv: {},                            // itens guardados (fora do corpo e da mochila)
     equip: equipInicial(classe),        // cabeça, peito, pés, 2 mãos e mochila
     hp: 0,
@@ -48,19 +48,29 @@ function bonusEquip(p) {
   return b;
 }
 
-/** Valores finais do herói (atributos + equipamento). Tudo em números pequenos:
- *  vida (máx. 30), dano extra, movimento extra, cura extra, escudo e alcance extra. */
+/** Valores finais do herói. Não há atributos nem bônus fixos de equipamento: o equipamento é de USO ÚNICO por cenário
+ *  (veja efeitoEquip). A vida cresce um pouco por nível (máx. 30); o resto vem das cartas. */
 function derivados(p) {
-  const b = bonusEquip(p), A = p.attr, c = CLASSES[p.classe];
-  return {
-    ...A,
-    hpMax: Math.min(VIDA_MAX_JOGO, c.hpBase + Math.round(p.nivel * c.hpNivel) + Math.floor(A.VIT / BONUS_ATRIBUTO.vida) + b.hp),
-    dano: Math.floor(A[c.basico] / BONUS_ATRIBUTO.dano) + b.atq,     // somado ao dano da carta
-    mov: Math.floor(A.DES / BONUS_ATRIBUTO.mov) + b.mov,             // somado ao movimento da carta
-    cura: Math.floor(A.INT / BONUS_ATRIBUTO.cura) + b.cura,          // somada à cura da carta
-    esc: b.esc,                                                      // reduz cada golpe recebido
-    alc: b.alc,                                                      // somado ao alcance da carta (só ataques à distância)
-  };
+  const c = CLASSES[p.classe];
+  return { hpMax: Math.min(VIDA_MAX_JOGO, c.hpBase + Math.round(p.nivel * c.hpNivel)), dano: 0, mov: 0, cura: 0, esc: 0, alc: 0 };
+}
+
+/** O que um equipamento faz quando você o USA (1 vez por cenário, de graça, no seu turno): cura, dano, movimento, escudo, alcance. */
+function efeitoEquip(it) {
+  return { cura: (it.hp || 0) + (it.cura || 0), atq: it.atq || 0, mov: it.mov || 0, esc: it.esc || 0, alc: it.alc || 0 };
+}
+function textoEfeitoEquip(it) {
+  const e = efeitoEquip(it), o = [];
+  if (e.cura) o.push(`✚ cura ${e.cura}`); if (e.atq) o.push(`⚔️ +${e.atq} de dano no ataque`); if (e.mov) o.push(`👣 +${e.mov} de movimento`);
+  if (e.esc) o.push(`🛡️ escudo ${e.esc} na rodada`); if (e.alc) o.push(`🎯 +${e.alc} de alcance`);
+  return o.join(' · ');
+}
+/** Os equipamentos vestidos, cada um com a sua chave de uso (ex.: 'peito', 'maos0'). */
+function equipamentosUsaveis(p) {
+  const e = p.equip, lista = [];
+  for (const slot of ['cabeca', 'peito', 'pes']) if (e[slot]) lista.push({ chave: slot, id: e[slot] });
+  (e.maos || []).forEach((id, i) => { if (id) lista.push({ chave: 'maos' + i, id }); });
+  return lista;
 }
 
 function ajustarVida(p) { p.hp = Math.min(p.hp, derivados(p).hpMax); }
@@ -73,7 +83,7 @@ function ganharXp(p, xp) {
   while (p.nivel < NIVEL_MAX && p.xp >= xpParaProximo(p.nivel)) {
     p.xp -= xpParaProximo(p.nivel);
     p.nivel++;
-    p.pontos += PONTOS_POR_NIVEL;
+    p.escolhas.push(p.nivel);          // a cada nível: escolher 1 carta entre 2
     subidas.push({ nivel: p.nivel, mochila: tamanhoMochila(p.nivel), ganhouMochila: tamanhoMochila(p.nivel) > tamanhoMochila(p.nivel - 1) });
     p.hp = derivados(p).hpMax;       // subir de nível cura tudo
   }
@@ -84,12 +94,23 @@ function ganharXp(p, xp) {
 /** Ouro que entra (moedas, baú, recompensa): também conta para as conquistas. */
 function ganharOuro(p, n) { p.gold += n; p.stats.ouro += n; }
 
-function distribuirPonto(p, attr) {
-  if (p.pontos <= 0) return false;
-  p.attr[attr]++;
-  p.pontos--;
-  ajustarVida(p);
-  return true;
+/** Escolhe a carta do nível `nivel` (opção 0 ou 1). A outra se perde para sempre. Se a mão tem lugar, a nova carta já entra nela. */
+function escolherCartaNivel(p, nivel, opcao) {
+  const i = p.escolhas.indexOf(nivel);
+  if (i < 0 || (opcao !== 0 && opcao !== 1)) return null;
+  const carta = cartasDoNivel(p.classe, nivel)[opcao];
+  p.escolhas.splice(i, 1);
+  p.colecao.push(carta.id);
+  if (p.mao.length < MAO_MAX) p.mao.push(carta.id);
+  return carta;
+}
+/** Põe ou tira uma carta da mão que você leva aos cenários (de 6 a 10 cartas). */
+function alternarCartaMao(p, id) {
+  if (!p.colecao.includes(id)) return false;
+  const i = p.mao.indexOf(id);
+  if (i >= 0) { if (p.mao.length <= MAO_MIN) return false; p.mao.splice(i, 1); return true; }
+  if (p.mao.length >= MAO_MAX) return false;
+  p.mao.push(id); return true;
 }
 
 /* ---------- Inventário, equipamentos e mochila ---------- */
@@ -222,10 +243,11 @@ function migrarSave(p) {
   p.dificuldade = DIFICULDADES[p.dificuldade] ? p.dificuldade : DIFICULDADE_PADRAO;
   if (!p.tutorial) p.tutorial = { off: !!p.cenarios[1], feitos: {} };   // quem já passou do cenário 1 não precisa do tutorial
   if (!p.equip || !Array.isArray(p.equip.maos)) {                       // formato antigo
-    p.equip = equipInicial(p.classe); p.inv = {};
-    p.attr = { ...CLASSES[p.classe].attr }; p.pontos = Math.max(0, (p.nivel || 1) - 1) * PONTOS_POR_NIVEL; p.xp = 0;
+    p.equip = equipInicial(p.classe); p.inv = {}; p.xp = 0;
     p.gold = Math.min(p.gold || 0, 60);
   }
+  delete p.attr; delete p.pontos;                                        // não há mais atributos: o herói melhora por cartas
+  if (!Array.isArray(p.colecao)) { p.colecao = idsMaoInicial(p.classe); p.mao = idsMaoInicial(p.classe); p.escolhas = []; for (let n = 2; n <= (p.nivel || 1); n++) p.escolhas.push(n); }
   delete p.mp;
   if (!Array.isArray(p.baralho)) p.baralho = BARALHO_BASE.slice();
   if (!p.stats) p.stats = { xp: 0, ouro: 0, abates: 0, baus: 0, cenarios: Object.keys(p.cenarios).length, chefes: Object.keys(p.derrotados || {}).length };

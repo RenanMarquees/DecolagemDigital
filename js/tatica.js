@@ -162,6 +162,7 @@ function criarExpedicao(cenario, p, difId = DIFICULDADE_PADRAO) {
     cenario, reinoId: cenario.reino, difId, dif: resumo.dif, nivelCen: resumo.nivel,
     stat: resumo.stat, rec: resumo.rec, etapas: cenario.etapas, idx: 0,
     baralhos: { heroi: novoBaralhoMod(p.baralho), inim: novoBaralhoMod(baralhoInimigos(difId)) },   // a sorte dos ataques (o cenário todo usa os mesmos)
+    equipGasto: {},                                                                                    // equipamentos já usados neste cenário (1 uso por cenário)
     moedasColetadas: 0,                                                                                // moedas saqueadas; viram ouro no fim do cenário
   };
 }
@@ -213,26 +214,35 @@ function criarTatica(exp, p) {
     for (let i = 0; i < ADDS_CHEFE; i++) lista.push({ id: sorteio(), esc: ESCALA_ADD });
     spawns.sort((a, b) => dist(b, heroi) - dist(a, heroi)); // o chefe aparece no ponto mais distante
   } else {
-    const n = etapa.n || Math.min(4, 2 + exp.idx + (reino.tier >= 3 ? 1 : 0));
+    const n = etapa.n || Math.min(5, 3 + exp.idx + (reino.tier >= 3 ? 1 : 0));
     for (let i = 0; i < n; i++) lista.push({ id: sorteio(), esc: ESCALA_GRUPO[n] });
     spawns = embaralhar(spawns);
   }
-  // os monstros começam PERTO do herói (como em Gloomhaven: Botões e Bichinhos): de 3 a 6 hexágonos, e o chefe um pouco mais longe
-  const proximas = (min, max, usadas) => {
-    const livres = [];
+  // os monstros começam JUNTOS (um grupo colado) e PERTO do herói (de 4 a 6 hexágonos; o chefe de 5 a 7), como em Gloomhaven: Botões e Bichinhos
+  const livres = (min, max) => {
+    const l = [];
     for (let r = 0; r < g.rows; r++) for (let c = 0; c < g.cols; c++) {
       if (g.cel[r][c] !== '.' || armadilhas.has(chave(c, r))) continue;
       const d = dist({ c, r }, heroi);
-      if (d < min || d > max || usadas.some(u => dist(u, { c, r }) < 2)) continue;
-      livres.push({ c, r });
+      if (d >= min && d <= max) l.push({ c, r });
     }
-    return livres.length ? livres[Math.floor(Math.random() * livres.length)] : null;
+    return l;
   };
-  const usadas = [], pontos = [];
+  const sorteia = l => l[Math.floor(Math.random() * l.length)] || null;
+  const ocupa = (pos, usadas) => usadas.some(u => u.c === pos.c && u.r === pos.r);
+  const pontos = [];
+  const ancora = lista.some(e => e.chefe) ? sorteia(livres(5, 7)) || sorteia(livres(4, 9)) : sorteia(livres(4, 6)) || sorteia(livres(3, 9));
   for (const e of lista) {
-    const pos = e.chefe ? (proximas(5, 7, usadas) || proximas(4, 9, usadas)) : (proximas(3, 6, usadas) || proximas(3, 9, usadas));
-    const fallback = spawns.find(sp => !usadas.some(u => u.c === sp.c && u.r === sp.r)) || spawns[0];
-    const ponto = pos || fallback; usadas.push(ponto); pontos.push(ponto);
+    let pos = null;
+    if (ancora && !pontos.length) pos = ancora;
+    else if (ancora) {                    // o mais colado possível no grupo (distância 1 do primeiro, depois 2, depois 3)
+      for (let d = 1; d <= 3 && !pos; d++) {
+        const cand = livres(0, 99).filter(h => !ocupa(h, pontos) && pontos.some(u => dist(u, h) <= d) && dist(h, heroi) >= 3);
+        cand.sort((a, b) => pontos.reduce((s, u) => s + dist(u, a), 0) - pontos.reduce((s, u) => s + dist(u, b), 0));
+        pos = cand[0] || null;
+      }
+    }
+    pontos.push(pos || spawns.find(sp => !ocupa(sp, pontos)) || spawns[0]);
   }
   const inim = lista.map((e, i) => criarInimigoT(e.id, e.esc, i + 1, pontos[i], !!e.chefe, exp));
 
@@ -244,12 +254,12 @@ function criarTatica(exp, p) {
     tipoArm: reino.armadilha || null, armadilhas, porta, livre: false,
     moedas: new Map(), bau: null, objetivoCumprido: false,
     heroi, saida: { ...heroi }, inim, mortos: [],
-    rodada: 1, fase: 'escolha', movRest: 0, acaoUsada: false, bonusItem: { atq: 0 }, efeitos: [],
+    rodada: 1, fase: 'escolha', movRest: 0, acaoUsada: false, bonusItem: { atq: 0, alc: 0 }, efeitos: [],
     baralhos: {}, cartas: {}, fila: [], fim: null, log: [], fx: [], modFx: [],
     mao: null, descarte: null, cartaHeroi: null, escudoHeroi: 0, heroiJogou: false,
   };
   // as cartas do herói acompanham o cenário inteiro (a mão e o descarte passam de uma etapa para a outra)
-  if (!exp.cartasHeroi) exp.cartasHeroi = { mao: maoDoHeroi(p.classe), descarte: [] };
+  if (!exp.cartasHeroi) exp.cartasHeroi = { mao: maoDoHeroi(p), descarte: [] };
   if (!exp.cartasHeroi.perdidas) exp.cartasHeroi.perdidas = [];
   T.mao = exp.cartasHeroi.mao; T.descarte = exp.cartasHeroi.descarte; T.perdidas = exp.cartasHeroi.perdidas;
 
@@ -318,7 +328,7 @@ function cartaAtual(T) { return (T && !T.livre && T.cartaHeroi) || {}; }
 /** Alcance do ataque da carta (1 = corpo a corpo). Armas de longo alcance somam quando a carta já é à distância. */
 function alcanceDa(p, T) {
   const c = cartaAtual(T), base = c.alc || 1;
-  return base > 1 ? base + derivados(p).alc : base;
+  return base > 1 ? base + ((T.bonusItem && T.bonusItem.alc) || 0) : base;
 }
 /** Inimigos que o herói pode escolher como alvo da ação, a partir de onde está. */
 function tAlvos(T, p) {
@@ -349,17 +359,15 @@ function sortearEquipamento(reino, p) {
   return pool[Math.floor(Math.random() * pool.length)];
 }
 
-/** Ao terminar o movimento em cima de moedas (ou do baú, na sala livre), pega o que estiver lá. */
+/** No FIM do turno, se o herói está parado em cima de moedas, pega todas (igual ao baú: precisa terminar o turno ali). */
 function lootarAqui(T, p) {
   const k = chave(T.heroi.c, T.heroi.r);
   const m = T.moedas.get(k);
-  if (m) {
-    T.moedas.delete(k);
-    T.exp.moedasColetadas += m.valor;
-    T.fx.push({ alvo: 'heroi', v: 0, texto: `+${m.valor} 🪙`, cura: true });
-    logar(T, `🪙 Você pega ${m.valor} ${m.valor > 1 ? 'moedas' : 'moeda'} (${T.exp.moedasColetadas} no total; viram ouro no fim do cenário).`, 'cura');
-  }
-  if (T.livre && T.bau && !T.bau.aberto && T.bau.c === T.heroi.c && T.bau.r === T.heroi.r) abrirBau(T, p);
+  if (!m) return;
+  T.moedas.delete(k);
+  T.exp.moedasColetadas += m.valor;
+  T.fx.push({ alvo: 'heroi', v: 0, texto: `+${m.valor} 🪙`, cura: true });
+  logar(T, `🪙 Você pega ${m.valor} ${m.valor > 1 ? 'moedas' : 'moeda'} (${T.exp.moedasColetadas} no total; viram ouro no fim do cenário).`, 'cura');
 }
 
 function abrirBau(T, p) {
@@ -461,7 +469,7 @@ function tMover(T, p, c, r) {
   if (T.limpa && T.porta && T.porta.acessivel && T.heroi.c === T.porta.c && T.heroi.r === T.porta.r) {      // chegou na porta: ela se abre
     T.porta.aberta = true; T.fim = 'porta'; return true;
   }
-  lootarAqui(T, p);               // parou aqui: pega as moedas que estiverem no chão
+  T.movRest = 0;                  // o movimento é usado UMA vez só: o que sobrou da carta se perde
   return true;
 }
 
@@ -539,6 +547,24 @@ function tAtacar(T, p, uid) {
 }
 
 
+
+/** Usa um EQUIPAMENTO vestido (1 vez por cenário, de graça, durante o seu turno). `chave` = 'cabeca', 'peito', 'pes', 'maos0' ou 'maos1'. */
+function tUsarEquip(T, p, chave) {
+  if (T.fim || T.fase !== 'heroi') { logar(T, 'Use equipamentos durante o seu turno.', 'erro'); return false; }
+  const it = equipamentosUsaveis(p).find(x => x.chave === chave);
+  if (!it) return false;
+  if (T.exp.equipGasto[chave]) { logar(T, 'Este equipamento já foi usado neste cenário.', 'erro'); return false; }
+  const item = ITENS[it.id], e = efeitoEquip(item);
+  T.exp.equipGasto[chave] = true;
+  const partes = [];
+  if (e.cura) { const v = Math.min(derivados(p).hpMax - p.hp, e.cura); p.hp += v; partes.push(`+${v} de vida`); if (v > 0) T.fx.push({ alvo: 'heroi', v, cura: true }); }
+  if (e.atq) { T.bonusItem.atq += e.atq; partes.push(`+${e.atq} de dano neste ataque`); }
+  if (e.alc) { T.bonusItem.alc = (T.bonusItem.alc || 0) + e.alc; partes.push(`+${e.alc} de alcance`); }
+  if (e.mov) { T.movRest += e.mov; partes.push(`+${e.mov} de movimento`); }
+  if (e.esc) { T.escudoHeroi += e.esc; partes.push(`escudo ${e.esc} nesta rodada`); }
+  logar(T, `${item.icone} Você usa ${item.nome}: ${partes.join(', ') || 'sem efeito'}. (uso único neste cenário)`, 'cura');
+  return true;
+}
 
 /** Usa o item do lugar `i` da mochila. NÃO gasta a sua jogada (dá para usar vários, antes ou depois de agir). */
 function tUsarItem(T, p, i) {
@@ -704,7 +730,7 @@ function iniciarTurnoHeroi(T, p) {
   const d = derivados(p), c = T.cartaHeroi || {};
   T.fase = 'heroi';
   T.acaoUsada = !c.atq && !c.descanso ? true : false;      // carta sem ataque: não há ação para usar
-  T.bonusItem = { atq: 0 };
+  T.bonusItem = { atq: 0, alc: 0 };
   T.movRest = movEfetivo(c.mov, d.mov, T.efeitos);
   if (c.descanso) {
     const hp0 = p.hp;
@@ -744,6 +770,7 @@ const maoVazia = T => !T.mao || T.mao.length === 0;
 /** Encerra o turno do herói. Se ele estiver parado em cima do baú, abre. Depois os inimigos que faltam agem, na ordem da iniciativa. */
 function tEncerrarTurno(T, p) {
   if (T.fase !== 'heroi' || T.fim || T.livre) return false;
+  lootarAqui(T, p);                // terminou o turno em cima de moedas: pega
   if (T.bau && !T.bau.aberto && T.bau.c === T.heroi.c && T.bau.r === T.heroi.r) {
     abrirBau(T, p);                // ficou 1 turno em cima do baú
     if (T.fim) return true;
@@ -861,7 +888,7 @@ function finalizarRodada(T, p) {
   if (T.fim) return;            // morreu de veneno, ou o veneno cumpriu o objetivo
   T.rodada++;
   T.fase = 'escolha';           // nova rodada: primeiro você escolhe a sua carta de iniciativa
-  T.cartaHeroi = null; T.escudoHeroi = 0; T.fila = []; T.heroiJogou = false; T.bonusItem = { atq: 0 };
+  T.cartaHeroi = null; T.escudoHeroi = 0; T.fila = []; T.heroiJogou = false; T.bonusItem = { atq: 0, alc: 0 };
   T.movRest = 0; T.acaoUsada = false;
   T.cartas = {}; T.rapidoUsado = false;     // as cartas dos monstros ficam ocultas até você escolher a sua
   for (const e of T.inim) { e.bonusAtq = 0; e.escudo = 0; }   // fortalecer e escudo duram só a rodada
@@ -898,7 +925,7 @@ function tProximoInimigo(T, p) {
 /* ---------- Portas, etapas e sala livre ---------- */
 function tModoLivre(T) {
   T.fim = null; T.livre = true; T.fase = 'heroi';
-  T.movRest = 99; T.acaoUsada = false; T.bonusItem = { atq: 0 }; T.escudoHeroi = 0;
+  T.movRest = 99; T.acaoUsada = false; T.bonusItem = { atq: 0, alc: 0 }; T.escudoHeroi = 0;
   for (const e of T.inim) if (e.vivo) e.vivo = false;
 }
 

@@ -5,43 +5,29 @@
    Para adicionar um inimigo, item ou reino novo, edite só este arquivo.
    ============================================================ */
 
-const ATRIBUTOS = ['FOR', 'DES', 'INT', 'VIT'];
-const ATRIBUTO_NOME = { FOR: 'Força', DES: 'Destreza', INT: 'Inteligência', VIT: 'Vitalidade' };
-// (o cálculo está em derivados(), em js/logic.js)
-const ATRIBUTO_DESC = {
-  FOR: 'A cada 6: +1 de dano nos ataques do Guerreiro',
-  DES: 'A cada 6: +1 de dano do Caçador. A cada 10: +1 de movimento',
-  INT: 'A cada 6: +1 de dano do Oráculo e +1 de cura nas cartas',
-  VIT: 'A cada 4: +1 de vida máxima',
-};
 /** Personagens que usam um arquivo pronto em modelos/<id>.glb no lugar do modelo feito por código (veja docs/MINIATURAS.md).
  *  Exemplo: const MODELOS_GLB = ['cerbero', 'hades']; */
 const MODELOS_GLB = [];
 const NIVEL_MAX = 20;
-const PONTOS_POR_NIVEL = 1;
 const VIDA_MAX_JOGO = 30;          // ninguém passa disso: as contas ficam fáceis
-const BONUS_ATRIBUTO = { dano: 6, mov: 10, cura: 6, vida: 4 };   // a cada quantos pontos de atributo vale +1
 
 const RARIDADE_COR = { comum: '#b8b8c4', incomum: '#5fd068', raro: '#4aa3ff', epico: '#b46bff', lendario: '#ffb02e' };
 
 /* ---------- CLASSES ----------
    Tudo que o herói FAZ no turno (andar, atacar, curar, empurrar) vem da CARTA que ele joga (js/cartas.js).
-   A classe define a vida, o atributo que aumenta o dano (`basico`) e as cartas. */
+   A classe define a vida (cresce um pouco por nível) e as cartas. Não há atributos: o herói melhora ganhando CARTAS (1 a cada nível). */
 const CLASSES = {
   guerreiro: {
-    nome: 'Guerreiro', icone: '⚔️', basico: 'FOR', hpBase: 8, hpNivel: 0.6,
+    nome: 'Guerreiro', icone: '⚔️', hpBase: 8, hpNivel: 0.6,
     desc: 'Muita vida (até 30), cartas de golpe forte e de empurrar. Aguenta os golpes dos deuses e responde com fúria.',
-    attr: { FOR: 8, DES: 3, INT: 1, VIT: 6 },
   },
   cacador: {
-    nome: 'Caçador', icone: '🏹', basico: 'DES', hpBase: 6, hpNivel: 0.5,
+    nome: 'Caçador', icone: '🏹', hpBase: 6, hpNivel: 0.5,
     desc: 'Rápido e preciso. Cartas de longo alcance e de movimento: acerta de longe e some.',
-    attr: { FOR: 2, DES: 8, INT: 2, VIT: 4 },
   },
   oraculo: {
-    nome: 'Oráculo', icone: '🔮', basico: 'INT', hpBase: 5, hpNivel: 0.5,
+    nome: 'Oráculo', icone: '🔮', hpBase: 5, hpNivel: 0.5,
     desc: 'Mestre da magia. Cartas de raio, de cura e de área: fere vários inimigos e cuida de si.',
-    attr: { FOR: 1, DES: 3, INT: 8, VIT: 4 },
   },
 };
 
@@ -206,9 +192,9 @@ const INIMIGOS = {
 /* ---------- GRUPOS EM BATALHA ----------
    Como agora há vários inimigos no mapa, cada um é mais fraco que o "solo" da lista acima.
    stat = multiplicador de vida e ataque; xp = multiplicador de XP e ouro. */
-const ESCALA_GRUPO = { 2: { stat: 1, xp: 1 }, 3: { stat: 1, xp: 1 }, 4: { stat: 1, xp: 1 } };   // (os números dos inimigos já são pensados para grupos)
+const ESCALA_GRUPO = { 2: { stat: 1, xp: 1 }, 3: { stat: 1, xp: 1 }, 4: { stat: 1, xp: 1 }, 5: { stat: 1, xp: 1 } };   // (os números dos inimigos já são pensados para grupos)
 const ESCALA_ADD = { stat: 0.7, xp: 0.4 }; // capangas que acompanham um chefe
-const ADDS_CHEFE = 2;
+const ADDS_CHEFE = 3;
 
 /* ---------- ARMADILHAS ----------
    Cada cenário tem a sua. Quem pisa nela (herói ou inimigo) dispara o efeito, e a armadilha some.

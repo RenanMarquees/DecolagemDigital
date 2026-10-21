@@ -209,9 +209,66 @@ const BARALHOS_HEROI = {
 /** A carta de descanso: iniciativa 99, você não anda nem age, mas recupera vida e todas as cartas. */
 const CARTA_DESCANSO = K('Descansar', 99, { descanso: true });
 
-/** Monta a mão inicial do herói (cada carta ganha um id para ser escolhida). */
-function maoDoHeroi(classe) {
-  return (BARALHOS_HEROI[classe] || BARALHOS_HEROI.guerreiro).map((c, i) => ({ ...c, id: classe + '_' + i }));
+/* ---------- Cartas do herói: mão inicial, cartas de nível e a mão que você leva ---------- */
+const MAO_INICIAL = 8;   // cartas com que o herói começa
+const MAO_MAX = 10;      // quantas cartas entram na mão de um cenário (as outras ficam na coleção)
+const MAO_MIN = 6;
+const ROMANO = ['', ' II', ' III', ' IV', ' V'];
+
+/** Modelos das cartas de nível de cada classe: o nível sobe, os números crescem (t = 0 a 4). */
+const MODELOS_NIVEL = {
+  guerreiro: [
+    (t) => K('Golpe duplo',  0, { mov: 2, atq: 3 + t }),
+    (t) => K('Carga',        0, { mov: 4, atq: 2 + t }),
+    (t) => K('Esmagar',      0, { mov: 1, atq: 5 + t, empurrar: 1 }),
+    (t) => K('Baluarte',     0, { mov: 2, atq: 2 + Math.ceil(t / 2), escudo: 2 + Math.floor(t / 2) }),
+    (t) => K('Redemoinho',   0, { mov: 2, atq: 3 + t, alvo: 'ao-redor' }),
+    (t) => K('Respirar fundo', 0, { mov: 1, cura: 3 + t }),
+    (t) => K('Grito de guerra', 0, { mov: 3, atq: 2 + t, alc: 3, puxar: 2 }),
+    (t) => K('Derrubar',     0, { mov: 2, atq: 4 + t, empurrar: 2 }),
+  ],
+  cacador: [
+    (t) => K('Flecha veloz', 0, { mov: 3, atq: 2 + t, alc: 3 }),
+    (t) => K('Disparo longo', 0, { mov: 2, atq: 3 + t, alc: 5 }),
+    (t) => K('Flecha de pedra', 0, { mov: 1, atq: 5 + t, alc: 4, empurrar: 1 }),
+    (t) => K('Chuva de flechas', 0, { mov: 2, atq: 2 + t, alc: 3, alvo: 'vizinhos' }),
+    (t) => K('Corrida',      0, { mov: 5 + Math.floor(t / 2) }),
+    (t) => K('Esconderijo',  0, { mov: 3, atq: 1 + t, alc: 3, escudo: 2 + Math.floor(t / 2) }),
+    (t) => K('Erva curativa', 0, { mov: 2, cura: 3 + t }),
+    (t) => K('Armadilha viva', 0, { mov: 2, atq: 2 + t, alc: 3, puxar: 2 }),
+  ],
+  oraculo: [
+    (t) => K('Faísca',       0, { mov: 3, atq: 2 + t, alc: 3 }),
+    (t) => K('Relâmpago',    0, { mov: 1, atq: 5 + t, alc: 4 }),
+    (t) => K('Onda de força', 0, { mov: 2, atq: 1 + t, alc: 3, empurrar: 2 }),
+    (t) => K('Chuva de fogo', 0, { mov: 1, atq: 3 + t, alc: 4, alvo: 'vizinhos' }),
+    (t) => K('Aura de luz',  0, { mov: 2, cura: 4 + t }),
+    (t) => K('Barreira',     0, { mov: 2, atq: 1 + t, alc: 3, escudo: 3 + Math.floor(t / 2) }),
+    (t) => K('Pulso',        0, { mov: 1, atq: 3 + t, alvo: 'ao-redor' }),
+    (t) => K('Sifão de vida', 0, { mov: 2, atq: 2 + t, alc: 3, dreno: true }),
+  ],
+};
+/** As DUAS cartas oferecidas ao chegar no nível `nivel` (2 a 20). Escolhe-se uma; a outra se perde para sempre. */
+function cartasDoNivel(classe, nivel) {
+  const m = MODELOS_NIVEL[classe] || MODELOS_NIVEL.guerreiro, t = Math.min(4, Math.floor((nivel - 2) / 4));
+  const a = ((nivel - 2) * 2) % m.length;
+  return [0, 1].map(k => {
+    const c = m[(a + k) % m.length](t);
+    return { ...c, nome: c.nome + ROMANO[t], ini: ((nivel * 37 + k * 53) % 89) + 6, id: `${classe}_n${nivel}${k ? 'b' : 'a'}` };
+  });
+}
+/** Acha qualquer carta do herói pelo id (inicial ou de nível). */
+function cartaHeroiPorId(id) {
+  let m = /^([a-z]+)_(\d+)$/.exec(id);
+  if (m) { const c = (BARALHOS_HEROI[m[1]] || [])[+m[2]]; return c ? { ...c, id } : null; }
+  m = /^([a-z]+)_n(\d+)([ab])$/.exec(id);
+  return m ? cartasDoNivel(m[1], +m[2])[m[3] === 'a' ? 0 : 1] : null;
+}
+/** Ids das cartas com que o herói começa. */
+function idsMaoInicial(classe) { return (BARALHOS_HEROI[classe] || BARALHOS_HEROI.guerreiro).slice(0, MAO_INICIAL).map((c, i) => classe + '_' + i); }
+/** Monta a mão do herói para o cenário: as cartas escolhidas (`p.mao`) com seus ids. */
+function maoDoHeroi(p) {
+  return p.mao.map(cartaHeroiPorId).filter(Boolean).map(c => ({ ...c }));
 }
 
 /** Texto curto dos efeitos de uma carta do herói: [{icone, texto}]. `bonus` (opcional) soma os bônus de atributos e itens. */
