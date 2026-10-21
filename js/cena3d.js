@@ -531,7 +531,7 @@ const Cena3D = (() => {
     const texHp = new THREE.CanvasTexture(cvHp);
     const hpSpr = new THREE.Sprite(new THREE.SpriteMaterial({ map: texHp, transparent: true, depthTest: false })); hpSpr.renderOrder = 10;
     const yBarra = alt + 0.3;
-    hpSpr.scale.set(0.8, 0.4, 1); hpSpr.position.set(0, yBarra, 0);
+    hpSpr.scale.set(1.05, 0.52, 1); hpSpr.position.set(0, yBarra, 0);
     grupo.add(hpSpr);
     const status = new THREE.Group(); status.position.set(0, yBarra + 0.26, 0); grupo.add(status);
 
@@ -586,7 +586,8 @@ const Cena3D = (() => {
     for (const [k, o] of E.ov) {
       const t = E.tiles.get(k);
       let m = null;
-      if (ctx.alvos && ctx.alvos.has(k)) m = E.mats.alvo;
+      if (ctx.escolha && ctx.escolha.has(k)) m = E.mats.porta;           // escolhendo o lugar do empurrão/puxão: hexágonos dourados
+      else if (ctx.alvos && ctx.alvos.has(k)) m = E.mats.alvo;
       else if (ctx.perigo && ctx.perigo.has(k)) m = E.mats.perigo;
       else if (ctx.alc && ctx.alc.has(k)) m = (T.porta && T.porta.aberta && k === chave(T.porta.c, T.porta.r)) ? E.mats.porta : E.mats.alc;
       else if (T.porta && T.porta.aberta && k === chave(T.porta.c, T.porta.r)) m = E.mats.porta;

@@ -33,9 +33,13 @@ RPG de turnos para celular sobre os deuses antigos. Feito em HTML + JavaScript p
 
 **Equipamento de uso único:** cabeça, peito, pés e mãos **não dão bônus fixos**: cada peça vestida pode ser **usada 1 vez por cenário**, de graça, no seu turno (🎒 Itens), e dá cura, escudo, +dano, +movimento ou +alcance conforme o item. Depois fica gasta até o cenário seguinte.
 
+**Desvantagem:** se a carta que você jogou ataca **à distância** (alcance maior que 1) e há um monstro **colado** em você, o ataque tem desvantagem: viram **duas** cartas de sorte e vale a **pior**. Vale também para os monstros atiradores, que por isso sempre tentam se **afastar** de você antes de atirar (se não houver lugar, atiram assim mesmo).
+
+**Empurrar e puxar:** **você escolhe** para onde o inimigo vai (toque num dos hexágonos dourados, ou deixe onde está); cada passo precisa afastar (empurrar) ou aproximar (puxar). Os **monstros** que empurram/puxam você escolhem **sempre o pior para você**: armadilha primeiro, depois o lugar com mais monstros em volta.
+
 **Mover só uma vez:** o movimento da carta é usado de uma vez só; se você andar menos do que a carta permite, o resto **se perde**. **Moedas, como o baú:** só são pegas se você **terminar o turno** em cima delas.
 
-**Salas pequenas e monstros em grupo:** as salas são de 8×8 hexágonos (feitas para jogar sozinho), com 3 a 5 monstros por sala (o chefe vem com 3 capangas), que nascem **juntos e perto** do herói (de 4 a 6 hexágonos) e andam menos.
+**Salas pequenas e monstros em grupo:** as salas são de 8×8 hexágonos (feitas para jogar sozinho), com 3 a 5 monstros por sala (o chefe vem com 3 capangas), que nascem **espalhados de forma variada** (alguns em grupo, outros sozinhos, de 3 a 8 hexágonos do herói) e andam menos.
 
 **Itens:** usar um item da mochila **não gasta a sua jogada**. Slots: 1 de cabeça, 1 de peito, 1 de pés, 2 de mãos, e a **mochila** começa com 2 lugares e vai a 5 (níveis 5, 10 e 15).
 
@@ -60,6 +64,10 @@ RPG de turnos para celular sobre os deuses antigos. Feito em HTML + JavaScript p
 | Abismo do Caos | 🌀 vazio | dano e você perde 1 carta da mão |
 
 **Miniaturas 3D detalhadas:** cada herói, monstro, chefe e estrutura é um modelo 3D esculpido por código (centenas de peças por monstro: chifres, costelas, correntes, asas com penas, cicatrizes, tochas…), com texturas de pele/metal/pelo, contorno de miniatura pintada e animações (andar, golpear, asas, mandíbulas, capas). Os modelos ficam em `js/modelos3d/` (um arquivo por reino). Quer ainda mais detalhe? Dá para trocar qualquer personagem por um arquivo `.glb` gerado em serviços como Meshy ou Tripo — veja `docs/MINIATURAS.md`.
+
+**História:** o prólogo apresenta a Marca do Tecelão e os corvos Hugin e Munin; depois de **cada chefe** há uma cena de 4 a 5 páginas com pistas e reviravoltas (Fenrir, Ares, Hades e Set), um chefe final (o Caos Primordial) e um epílogo. Os textos ficam em `js/data.js` (`HISTORIA_PROLOGO`, `falaAntes`/`falaDepois` de cada chefe, `HISTORIA_FINAL`).
+
+**Vida em número:** a vida do herói e dos monstros aparece como **número** (em cima de cada miniatura e no painel). As cartas dos monstros aparecem numa fileira legível depois que você escolhe a sua.
 
 **Tutorial:** os 3 primeiros cenários (Valhala) ensinam o jogo com cartões que aparecem na hora certa e esperam você fazer a ação: câmera e zoom, objetivo, faixa de iniciativa, escolher a carta, andar, atacar, encerrar o turno, vida e itens livres, armadilhas, moedas, portas, loja, inventário, pontos de atributo, empurrar/puxar, baú e estruturas. Dá para pular (✕ no cartão) e rever depois pelo link no mapa dos reinos. Os textos ficam em `js/tutorial.js`.
 

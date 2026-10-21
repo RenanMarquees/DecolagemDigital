@@ -32,7 +32,7 @@ const srv = http.createServer((q, r) => {
   await click('[data-id=oraculo]');
   await shot('02-criar');
   await click('[data-a=comecar]');
-  for (let i = 0; i < 3; i++) await click('[data-a=hist-prox]');
+  while (await page.$('[data-a=hist-prox]')) await click('[data-a=hist-prox]');   // o prólogo tem várias páginas
   if (!(await page.$('#tut'))) throw new Error('o tutorial deveria aparecer no mapa do jogo novo');
   await shot('03-mapa');
   await click('[data-a=tut-pular]');                      // o tutorial tem teste próprio (tests/tutorial.js)

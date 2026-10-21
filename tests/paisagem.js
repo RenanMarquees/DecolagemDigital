@@ -22,7 +22,7 @@ const srv = http.createServer((q, r) => {
     await page.addInitScript('window.TESTE_RAPIDO = true;');
     await page.goto(`http://localhost:${srv.address().port}/`);
     await page.click('[data-a=novo]'); await page.fill('#nome', 'Astrid'); await page.click('[data-a=comecar]');
-    for (let i = 0; i < 3; i++) await page.click('[data-a=hist-prox]');
+    while (await page.$('[data-a=hist-prox]')) await page.click('[data-a=hist-prox]');
     await page.click('[data-a=tut-pular]');
     await page.click('[data-a=reino][data-id=valhala]'); await page.click('[data-a=hist-prox]');
     await page.click('[data-a=cenario][data-id="1"]'); await page.click('[data-a=iniciar]');

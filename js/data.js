@@ -235,15 +235,15 @@ const CHEFE_FATOR_ARM = 0.5;   // chefes sofrem metade do efeito das armadilhas
    armadilha  multiplica o efeito das armadilhas
    porta      parte da vida que você recupera ao atravessar uma porta */
 const DIFICULDADES = {
-  facil:         { nome: 'Fácil',         icone: '🌱', nivel: -1, stat: 0.85, recompensa: 0.8, armadilha: 0.7, porta: 0.25 },
+  facil:         { nome: 'Fácil',         icone: '🌱', nivel: -1, stat: 0.8, recompensa: 0.8, armadilha: 0.7, porta: 0.25 },
   intermediario: { nome: 'Intermediário', icone: '⚔️', nivel: 0,  stat: 1.0,  recompensa: 1.0, armadilha: 1.0, porta: 0.15 },
-  dificil:       { nome: 'Difícil',       icone: '🔥', nivel: 1,  stat: 1.1,  recompensa: 1.2, armadilha: 1.3, porta: 0.10 },
-  expert:        { nome: 'Expert',        icone: '💀', nivel: 2,  stat: 1.15,  recompensa: 1.5, armadilha: 1.6, porta: 0.05 },
+  dificil:       { nome: 'Difícil',       icone: '🔥', nivel: 1,  stat: 1.25, recompensa: 1.2, armadilha: 1.3, porta: 0.10 },
+  expert:        { nome: 'Expert',        icone: '💀', nivel: 2,  stat: 1.5,   recompensa: 1.5, armadilha: 1.6, porta: 0.05 },
 };
 const DIFICULDADE_PADRAO = 'intermediario';
 /** Botões gerais de equilíbrio: forca multiplica vida e ataque de TODOS os inimigos; ataque multiplica só o dano deles; xp multiplica o XP ganho.
  *  (Para deixar o jogo mais fácil ou mais difícil de uma vez, mexa só aqui.) */
-const BALANCO = { forca: 0.1, ataque: 0.4, xp: 1 };
+const BALANCO = { forca: 0.25, ataque: 0.7, xp: 1 };
 /** A cada nível do cenário acima do "nível-base" do reino, os inimigos ganham este tanto de vida/ataque (e o contrário abaixo). */
 const FORCA_POR_NIVEL = 0.03;
 const RECOMPENSA_POR_NIVEL = 0.05;

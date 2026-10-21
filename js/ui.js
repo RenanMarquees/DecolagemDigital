@@ -347,7 +347,8 @@ function atualizarTabuleiro() {
   if (!T) return;
   const alc = new Set(), alvos = new Set(), perigo = new Set();
   const pend = T.fase === 'heroi' && !T.fim && !OCUPADO ? pendenciaForca(T) : null;
-  if (pend) { pend.opcoes.forEach(o => alc.add(chave(o.c, o.r))); alvos.add(chave(pend.alvo.c, pend.alvo.r)); }   // escolher o lugar do empurrão/puxão
+  const escolha = new Set();
+  if (pend) { pend.opcoes.forEach(o => escolha.add(chave(o.c, o.r))); }   // escolher o lugar do empurrão/puxão
   else if (T.fase === 'heroi' && !T.fim && !OCUPADO) {
     if (MODO) alvosDoModo().forEach(e => alvos.add(chave(e.c, e.r)));
     else {
@@ -356,7 +357,7 @@ function atualizarTabuleiro() {
       if (!T.acaoUsada) tAlvos(T, P).forEach(e => alvos.add(chave(e.c, e.r)));
     }
   }
-  Cena3D.sincronizar(T, P, { alc, alvos, perigo });
+  Cena3D.sincronizar(T, P, { alc, alvos, perigo, escolha });
 }
 
 function mostrarFxT() {
