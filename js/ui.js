@@ -376,11 +376,13 @@ function proximaCartaMod() {
   const m = FILA_MOD.shift(), c = m.carta;
   CARTA_MOD_NA_TELA = true;
   const resumo = c.tipo === 'bloqueio' ? (m.quem === 'heroi' ? 'Seu ataque falhou!' : `${esc(m.nome)} errou!`) : `${m.base} ${c.tipo === 'x2' ? '×2' : c.rotulo.replace('−', '−')} = <b>${m.golpe}</b>`;
+  const cls = k => `${k.tipo} ${k.tipo === 'valor' ? (k.v > 0 ? 'bom' : k.v < 0 ? 'ruim' : 'neutro') : ''}`;
+  const cartaHtml = (k, extra) => `<div class="mc-carta ${cls(k)} ${extra || ''}"><b>${k.rotulo}</b><small>${k.nome}</small></div>`;
   alvo.innerHTML = `<div class="modcarta-cx ${c.tipo} ${c.tipo === 'valor' ? (c.v > 0 ? 'bom' : c.v < 0 ? 'ruim' : 'neutro') : ''} ${m.quem}">
-    <span class="mc-quem">${m.quem === 'heroi' ? '🎴 Seu ataque' : `🎴 ${esc(m.nome)}`}</span>
-    <div class="mc-carta"><b>${c.rotulo}</b><small>${c.nome}</small></div>
+    <span class="mc-quem">${m.quem === 'heroi' ? '🎴 Seu ataque' : `🎴 ${esc(m.nome)}`}${m.desv ? ' · ⚠️ desvantagem (vale a pior)' : ''}</span>
+    <div class="mc-cartas">${m.desv ? cartaHtml(m.outra, 'descartada') : ''}${cartaHtml(c, m.desv ? 'escolhida' : '')}</div>
     <span class="mc-res">${resumo}</span>${m.embaralhou ? '<span class="mc-emb">🔀 baralho embaralhado</span>' : ''}</div>`;
-  setTimeout(() => { alvo.innerHTML = ''; CARTA_MOD_NA_TELA = false; proximaCartaMod(); }, FILA_MOD.length ? 900 : 1500);
+  setTimeout(() => { alvo.innerHTML = ''; CARTA_MOD_NA_TELA = false; proximaCartaMod(); }, FILA_MOD.length ? 900 : 1700);
 }
 /** Baralho de modificadores como fileira de cartinhas: as já viradas ficam apagadas até o próximo embaralhamento. */
 function baralhoChips(b, ids) {
@@ -463,6 +465,29 @@ function iniciativaHtml() {
   return chips.join('');
 }
 
+/** As cartas que os monstros viraram nesta rodada, bem legíveis, numa fileira (aparece depois que você escolhe a sua). */
+function cartasLinhaHtml() {
+  if (T.limpa || T.fase === 'escolha' || !Object.keys(T.cartas).length) return '';
+  const ordem = ordemDaRodada(T, null).filter(x => x.tipo === 'inimigo'), tipos = [];
+  for (const it of ordem) if (!tipos.includes(it.e.tipo)) tipos.push(it.e.tipo);
+  const emFila = new Set(T.fila.filter(x => x !== 'heroi'));
+  const cartas = tipos.map(tipo => {
+    const grupo = combatentes(T).filter(e => e.tipo === tipo), ref = grupo[0], c = T.cartas[tipo];
+    if (!ref || !c) return '';
+    const movEf = c.mov === undefined ? null : Math.max(1, ref.mov + c.mov - (temEfeito(ref.efeitos, 'gelo') ? 1 : 0)), alcEf = Math.max(1, ref.alc + (c.alc || 0));
+    const atqEf = c.atq === undefined ? null : Math.max(0, ref.atk + c.atq + (ref.bonusAtq || 0));
+    const extras = descreverCarta(c).slice(2).filter(d => !d.texto.startsWith('alcance')).map(d => `<span>${d.icone} ${d.texto}</span>`).join('');
+    const feito = !grupo.some(e => emFila.has(e.uid)), agindo = OCUPADO && ATOR_TIPO === tipo;
+    return `<div class="mcarta ${ref.chefe ? 'chefe' : ''} ${agindo ? 'agindo' : ''} ${feito && !agindo ? 'feito' : ''}" style="--cor:${Cena3D.corDoTipo(tipo)}">
+      <div class="mc-topo"><i class="n" title="Iniciativa">${c.ini}</i>${miniIcone(ref.id, 26)}<b>${esc(ref.nome.split(',')[0])}${grupo.length > 1 ? ` ×${grupo.length}` : ''}</b></div>
+      <div class="mc-nome">${esc(c.nome)}</div>
+      <div class="mc-nums"><span class="${movEf === null ? 'nada' : ''}">👣 ${movEf === null ? '—' : movEf}</span><span class="${atqEf === null ? 'nada' : ''}">⚔️ ${atqEf === null ? '—' : atqEf}</span>${atqEf === null ? '' : `<span>🎯 ${alcEf}</span>`}</div>
+      ${extras ? `<div class="mc-efs">${extras}</div>` : ''}
+      <div class="mc-vida">${grupo.map(e => `<span>❤️ ${e.hp}</span>`).join('')}</div></div>`;
+  }).join('');
+  return cartas ? `<div class="cartas-linha">${cartas}</div>` : '';
+}
+
 /** Cartas completas dos inimigos (com vida de cada um), para o painel de detalhes. */
 function cartasHtml() {
   const tipos = [];
@@ -472,7 +497,7 @@ function cartasHtml() {
     if (!c) return `<div class="carta-inim oculta" style="--cor:${Cena3D.corDoTipo(tipo)}">
       <div class="carta-topo"><span class="ini">?</span>${miniIcone(ref.id, 28)}<b>${esc(ref.nome.split(',')[0])}</b>${grupo.length > 1 ? `<em>×${grupo.length}</em>` : ''}</div>
       <div class="carta-nome">🂠 Carta oculta</div><small>Revelada quando você escolher a sua.</small>
-      <div class="vidas">${grupo.map(e => `<div class="barra hp inimigo mini"><i style="width:${pct(e.hp, e.hpMax)}%"></i><span>${e.hp}/${e.hpMax}${e.efeitos.map(ef => (ef.tipo === 'gelo' ? '❄️' : '☠️')).join('')}</span></div>`).join('')}</div></div>`;
+      <div class="vidas">${grupo.map(e => `<span class="vida-tag">❤️ ${e.hp}/${e.hpMax}${e.efeitos.map(ef => (ef.tipo === 'gelo' ? '❄️' : '☠️')).join('')}</span>`).join('')}</div></div>`;
     const movEf = c.mov === undefined ? 0 : Math.max(1, ref.mov + c.mov), alcEf = Math.max(1, ref.alc + (c.alc || 0));
     const atqEf = c.atq === undefined ? null : Math.max(0, ref.atk + c.atq + (ref.bonusAtq || 0));   // dano exato desta rodada
     const numeros = [c.mov !== undefined ? `👣 ${movEf}` : '', atqEf !== null ? `⚔️ ${atqEf} de dano` : '', atqEf !== null ? `🎯 alcance ${alcEf}` : ''].filter(Boolean).join('  ');
@@ -481,14 +506,14 @@ function cartasHtml() {
       <div class="carta-nome">🃏 ${esc(c.nome)}</div>
       <ul class="efeitos">${descreverCarta(c).map(d => `<li>${d.icone} ${d.texto}</li>`).join('')}</ul>
       ${numeros ? `<div class="carta-num">${numeros}</div>` : ''}
-      <div class="vidas">${grupo.map(e => `<div class="barra hp inimigo mini"><i style="width:${pct(e.hp, e.hpMax)}%"></i><span>${e.hp}/${e.hpMax}${e.efeitos.map(ef => (ef.tipo === 'gelo' ? '❄️' : '☠️')).join('')}</span></div>`).join('')}</div>
+      <div class="vidas">${grupo.map(e => `<span class="vida-tag">❤️ ${e.hp}/${e.hpMax}${e.efeitos.map(ef => (ef.tipo === 'gelo' ? '❄️' : '☠️')).join('')}</span>`).join('')}</div>
     </div>`;
   }).join('');
   const estr = T.inim.filter(e => e.vivo && e.estrutura);
   const estrHtml = estr.length ? `<div class="carta-inim estrutura" style="--cor:#8a8a99">
       <div class="carta-topo">${miniIcone(estr[0].id, 28)}<b>${esc(estr[0].nome)}</b><em>×${estr.length}</em></div>
       <div class="carta-nome">🏗️ Estrutura: não ataca nem anda</div>
-      <div class="vidas">${estr.map(e => `<div class="barra hp inimigo mini"><i style="width:${pct(e.hp, e.hpMax)}%"></i><span>${e.hp}/${e.hpMax}</span></div>`).join('')}</div>
+      <div class="vidas">${estr.map(e => `<span class="vida-tag">❤️ ${e.hp}/${e.hpMax}</span>`).join('')}</div>
     </div>` : '';
   return cartas + estrHtml;
 }
@@ -547,7 +572,7 @@ function dockHtml() {
   ].join('');
   const ult = T.log[T.log.length - 1];
   const barras = `<div class="hud-heroi">
-      <div class="hh-barras">${miniIcone(P.classe, 26)}${barra('hp', P.hp, d.hpMax, '❤️ ')}<span class="ouro-mini">🪙 ${P.gold}</span></div>
+      <div class="hh-barras">${miniIcone(P.classe, 26)}<span class="vida-num ${P.hp <= d.hpMax * 0.34 ? 'baixa' : ''}">❤️ <b>${P.hp}</b><small>/${d.hpMax}</small></span><span class="ouro-mini">🪙 ${P.gold}</span></div>
       <div class="pips">${(T.fase === 'heroi' ? `<span class="${T.movRest > 0 ? 'on' : ''}">👣 ${T.movRest}</span><span class="${T.acaoUsada || !c.atq ? '' : 'on'}">${!c.atq ? '⚔️ sem ataque' : T.acaoUsada ? '⚔️ ataque usado' : `⚔️ dano ${danoDoHeroi(T, P)}`}</span>` : '')}${T.cartaHeroi ? `<span class="on carta-atual">🃏 ${esc(T.cartaHeroi.nome)}</span>` : ''}${etiquetas}<button class="tag baralho-tag" data-a="tat-gaveta" title="Seu baralho de modificadores">🎴 ${T.exp.baralhos.heroi.compra.length}/${T.exp.baralhos.heroi.todas.length}</button>
         <span class="cen-tag">${DIFICULDADES[T.exp.difId].icone} Nv ${T.exp.nivelCen}</span></div>
     </div>`;
@@ -556,9 +581,9 @@ function dockHtml() {
   const pendF = pendenciaForca(T);
   if (pendF && !OCUPADO) return tick + barras + `<div class="alvo-msg forca"><span>${pendF.modo === 'puxar' ? '🧲' : '💨'} <b>Escolha para onde ${pendF.modo === 'puxar' ? 'puxar' : 'empurrar'} ${esc(pendF.alvo.nome.split(',')[0])}</b> (até ${pendF.n}): toque num hexágono destacado</span><button class="btn peq" data-a="tat-forca-pular">Deixar onde está</button></div>`;
   if (T.fim === 'derrota') return tick + barras;
-  if (OCUPADO || T.fase === 'inimigos') return tick + barras + '<div class="aguarde">⏳ Os inimigos estão agindo…</div>';
+  if (OCUPADO || T.fase === 'inimigos') return tick + cartasLinhaHtml() + barras + '<div class="aguarde">⏳ Os inimigos estão agindo…</div>';
   if (T.fase === 'escolha') return tick + barras + (SUB === 'itens' ? acoesHtml() : maoHtml());
-  return tick + barras + acoesHtml();
+  return tick + cartasLinhaHtml() + barras + acoesHtml();
 }
 
 function acoesHtml() {

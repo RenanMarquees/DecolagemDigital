@@ -408,3 +408,24 @@ b { font-weight: 700; }
 .mao.colecao .cartaH { flex: 0 0 104px; }
 .mao.escolha-cartas { flex-wrap: wrap; justify-content: center; overflow-x: visible; gap: 14px; }
 .mao.escolha-cartas .cartaH { flex: 0 0 140px; font-size: .82rem; padding: 10px; } .mao.escolha-cartas .cartaH b { font-size: .95rem; }
+
+/* ---------- vida em número e cartas dos monstros legíveis ---------- */
+.vida-num { flex: 1; font-size: 1.35rem; font-weight: 700; color: #fff; text-align: left; } .vida-num b { font-size: 1.7rem; color: #ffd6d6; } .vida-num small { color: var(--suave); font-size: .95rem; margin-left: 2px; }
+.vida-num.baixa b { color: #ff6b6b; animation: pisca 1s ease-in-out infinite alternate; }
+@keyframes pisca { to { opacity: .55; } }
+.vida-tag { display: inline-block; font-size: .8rem; font-weight: 700; background: #00000066; border-radius: 8px; padding: 1px 8px; margin: 1px 3px 1px 0; }
+.vidas { display: flex; flex-wrap: wrap; }
+.cartas-linha { display: flex; gap: 8px; overflow-x: auto; padding: 4px 2px 6px; -webkit-overflow-scrolling: touch; }
+.mcarta { flex: 0 0 150px; background: linear-gradient(180deg, #241d3b, #120f1f); border: 2px solid var(--cor, #7a2f35); border-radius: 12px; padding: 7px 8px; display: flex; flex-direction: column; gap: 4px; }
+.mcarta.chefe { box-shadow: 0 0 10px #ffd16688; }
+.mcarta.agindo { box-shadow: 0 0 0 3px #fff, 0 0 16px var(--cor); transform: translateY(-3px); }
+.mcarta.feito { opacity: .45; }
+.mc-topo { display: flex; align-items: center; gap: 5px; } .mc-topo b { font-size: .8rem; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mc-topo .n { font-style: normal; flex: none; width: 26px; height: 26px; border-radius: 50%; background: var(--cor, #7a2f35); color: #fff; font-weight: 800; display: grid; place-items: center; font-size: .85rem; }
+.mc-nome { color: var(--ouro); font-weight: 700; font-size: .85rem; }
+.mc-nums { display: flex; gap: 6px; font-size: 1.05rem; font-weight: 800; } .mc-nums span { background: #00000055; border-radius: 8px; padding: 1px 7px; } .mc-nums .nada { color: var(--suave); font-weight: 600; }
+.mc-efs { display: flex; flex-wrap: wrap; gap: 4px; font-size: .74rem; } .mc-efs span { background: #ffd16622; border: 1px solid #ffd16655; border-radius: 8px; padding: 0 6px; }
+.mc-vida { display: flex; flex-wrap: wrap; gap: 4px; font-size: .78rem; font-weight: 700; } .mc-vida span { background: #a02a3055; border-radius: 8px; padding: 0 7px; }
+.mc-cartas { display: flex; gap: 10px; align-items: center; }
+.mc-carta.descartada { opacity: .45; transform: scale(.85) rotate(-6deg); filter: grayscale(.6); }
+.mc-carta.escolhida { box-shadow: 0 0 20px #fff8, 0 6px 18px #000c; }

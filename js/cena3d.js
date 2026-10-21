@@ -526,19 +526,34 @@ const Cena3D = (() => {
     }
     pick.userData.uid = chaveU;
 
-    // barra de vida
-    const mk = (cor, op) => { const s = new THREE.Sprite(new THREE.SpriteMaterial({ color: cor, transparent: true, opacity: op, depthTest: false })); s.renderOrder = 10; return s; };
-    const fundoB = mk(0x000000, 0.75), frente = mk(opc.heroi ? 0x5fd068 : 0xe0575c, 1);
-    const larg = 1.0 * Math.max(1, esc * 0.85);
-    fundoB.scale.set(larg + 0.06, 0.15, 1); frente.scale.set(larg, 0.1, 1); frente.center.set(0, 0.5);
-    const yBarra = alt + 0.28;
-    fundoB.position.set(0, yBarra, 0); frente.position.set(-larg / 2, yBarra, 0.001);
-    grupo.add(fundoB); grupo.add(frente);
+    // vida: um NÚMERO em cima da miniatura (mais fácil de ler que uma barra)
+    const cvHp = document.createElement('canvas'); cvHp.width = 160; cvHp.height = 80;
+    const texHp = new THREE.CanvasTexture(cvHp);
+    const hpSpr = new THREE.Sprite(new THREE.SpriteMaterial({ map: texHp, transparent: true, depthTest: false })); hpSpr.renderOrder = 10;
+    const yBarra = alt + 0.3;
+    hpSpr.scale.set(0.8, 0.4, 1); hpSpr.position.set(0, yBarra, 0);
+    grupo.add(hpSpr);
     const status = new THREE.Group(); status.position.set(0, yBarra + 0.26, 0); grupo.add(status);
 
     E.cena.add(grupo);
-    return { grupo, sprite, modelo, pick, foco: null, base, frente, larg, status, statusTxt: '', esc, alt, cor: corBase,
-      x: 0, z: 0, de: null, para: null, t: 1, dur: 0.4, fase: Math.random() * 6.28, flash: 0, lunge: null, morrendo: 0, hpFrac: 1, heroi: !!opc.heroi, c: 0, r: 0 };
+    return { grupo, sprite, modelo, pick, foco: null, base, hpSpr, cvHp, texHp, hpTxt: '', status, statusTxt: '', esc, alt, cor: corBase,
+      x: 0, z: 0, de: null, para: null, t: 1, dur: 0.4, fase: Math.random() * 6.28, flash: 0, lunge: null, morrendo: 0, hp: 1, hpMax: 1, heroi: !!opc.heroi, c: 0, r: 0 };
+  }
+
+  /** Desenha o número da vida (❤ 7) na etiqueta da miniatura; só redesenha quando o valor muda. */
+  function desenharHp(u) {
+    const txt = `${Math.max(0, Math.ceil(u.hp))}`;
+    const chave = txt + '/' + u.hpMax + (u.hp <= u.hpMax * 0.34 ? 'b' : '');
+    if (u.hpTxt === chave) return;
+    u.hpTxt = chave;
+    const g = u.cvHp.getContext('2d'), W = u.cvHp.width, H = u.cvHp.height;
+    g.clearRect(0, 0, W, H);
+    g.fillStyle = 'rgba(8,6,16,.82)'; g.strokeStyle = u.heroi ? '#5fd068' : '#e0575c'; g.lineWidth = 6;
+    g.beginPath(); g.roundRect ? g.roundRect(8, 10, W - 16, H - 20, 22) : g.rect(8, 10, W - 16, H - 20); g.fill(); g.stroke();
+    g.font = 'bold 44px system-ui, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillStyle = u.hp <= u.hpMax * 0.34 ? '#ff8a8a' : '#ffffff';
+    g.fillText(`❤ ${txt}`, W / 2, H / 2 + 2);
+    u.texHp.needsUpdate = true;
   }
 
   function moverUnid(u, c, r, imediato) {
@@ -611,7 +626,7 @@ const Cena3D = (() => {
     if (!uh) { uh = criarUnid(heroiId, P.classe, COR_HEROI, { heroi: true }); E.unid.set(heroiId, uh); moverUnid(uh, T.heroi.c, T.heroi.r, true); }
     else moverUnid(uh, T.heroi.c, T.heroi.r, false);
     const dh = derivados(P);
-    uh.hpFrac = Math.max(0, P.hp / dh.hpMax);
+    uh.hp = P.hp; uh.hpMax = dh.hpMax;
     atualizarStatus(uh, [...(T.buff ? ['📣'] : []), ...(T.defendendo ? ['🛡️'] : []), ...T.efeitos.map(ef => (ef.tipo === 'gelo' ? '❄️' : '☠️'))]);
     for (const e of T.inim) {
       let u = E.unid.get(e.uid);
@@ -621,7 +636,7 @@ const Cena3D = (() => {
         u = criarUnid(e.uid, e.id, cor, { chefe: e.chefe, estrutura: e.estrutura });
         E.unid.set(e.uid, u); moverUnid(u, e.c, e.r, true);
       } else moverUnid(u, e.c, e.r, false);
-      u.hpFrac = Math.max(0, e.hp / e.hpMax);
+      u.hp = e.hp; u.hpMax = e.hpMax;
       atualizarStatus(u, [...e.efeitos.map(ef => (ef.tipo === 'gelo' ? '❄️' : '☠️')), ...(e.bonusAtq > 0 ? ['💪'] : []), ...(e.escudo > 0 ? ['🛡️'] : [])]);
     }
     // para onde cada miniatura olha quando está parada
@@ -692,8 +707,8 @@ const Cena3D = (() => {
       if (u.brilho > 0) { u.brilho -= dt; u.sprite.material.color.setRGB(0.6 + 0.4 * (1 - u.brilho / 0.5), 1, 0.6 + 0.4 * (1 - u.brilho / 0.5)); if (u.brilho <= 0) u.sprite.material.color.setRGB(1, 1, 1); }
       }
       // vida
-      const alvoF = u.hpFrac, atual = u.frente.scale.x / u.larg;
-      u.frente.scale.x = Math.max(0.0001, (atual + (alvoF - atual) * Math.min(1, dt * 8))) * u.larg;
+      desenharHp(u);
+
       // morte: cai e some
       if (u.morrendo) {
         u.morrendo += dt;
@@ -701,7 +716,7 @@ const Cena3D = (() => {
         if (u.modelo) { Modelos3D.esmaecer(u.modelo, k); if (!u.modelo.estrutura) u.modelo.corpo.rotation.x = -k * 1.3; u.modelo.corpo.position.y = -k * 0.25; }
         else { u.sprite.material.opacity = 1 - k; u.sprite.position.y = 0.15 - k * 0.3; }
         u.grupo.scale.setScalar(1 - k * 0.2);
-        u.frente.visible = false; u.status.visible = false;
+        u.hpSpr.visible = false; u.status.visible = false;
         if (k >= 1) { E.cena.remove(u.grupo); E.unid.delete(id); }
       }
     }
