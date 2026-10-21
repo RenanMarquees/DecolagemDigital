@@ -68,7 +68,7 @@ teste('saves antigos (formato com atributos e mana) ganham equipamento e cartas 
   const r = R(`(() => { const p = novoJogador('T', 'guerreiro'); delete p.cenarios; delete p.dificuldade; delete p.colecao; delete p.mao; delete p.escolhas; p.derrotados.fenrir = true; p.nivel = 6; p.gold = 5000; p.mp = 40;
     p.equip = { arma: 'guerreiro_2', armadura: 'armadura_1', amuleto: null }; p.attr = { FOR: 30, DES: 10, INT: 5, VIT: 20 }; migrarSave(p);
     return [p.dificuldade, p.cenarios[1], p.cenarios[4], !!p.cenarios[5], Array.isArray(p.equip.maos), p.gold, p.attr === undefined, p.colecao.length, p.mao.length, p.escolhas.length, p.mp === undefined, p.hp > 0]; })()`);
-  igual(r.join(), 'intermediario,true,true,false,true,60,true,8,8,5,true,true');   // nível 6: 5 escolhas de carta (níveis 2 a 6) esperando
+  igual(r.join(), 'intermediario,true,true,false,true,60,true,10,10,5,true,true');   // nível 6: 5 escolhas de carta (níveis 2 a 6) esperando
 });
 teste('as etapas têm mais inimigos que as anteriores (Valhala 3 → 4; Inferno 4 → 5)', () => {
   const r = R(`[1, 9].map(id => { const { p, c } = cen(id); const exp = criarExpedicao(c, p); const n = [];
@@ -82,9 +82,9 @@ teste('a última etapa não tem porta; as outras têm', () => {
 });
 
 console.log('\nNúmeros pequenos: vida, atributos e níveis');
-teste('o guerreiro começa com cerca de 9 de vida; todos ficam entre 5 e 30 (a vida cresce um pouco por nível)', () => {
+teste('o guerreiro começa com cerca de 13 de vida; todos ficam entre 5 e 30 (a vida cresce um pouco por nível)', () => {
   const r = R(`(() => { const o = {}; for (const c of ['guerreiro', 'cacador', 'oraculo']) { const p = novoJogador('T', c); const a = derivados(p).hpMax; p.nivel = 20; o[c] = [a, derivados(p).hpMax]; } return o; })()`);
-  verdade(r.guerreiro[0] >= 8 && r.guerreiro[0] <= 10, 'guerreiro ' + r.guerreiro); verdade(r.guerreiro[0] > r.cacador[0] && r.cacador[0] >= r.oraculo[0], JSON.stringify(r));
+  verdade(r.guerreiro[0] >= 12 && r.guerreiro[0] <= 14, 'guerreiro ' + r.guerreiro); verdade(r.guerreiro[0] > r.cacador[0] && r.cacador[0] >= r.oraculo[0], JSON.stringify(r));
   for (const [a, b] of Object.values(r)) { verdade(a >= 5 && a <= 30 && b >= a && b <= 30, 'vida ' + a + ' → ' + b); }
 });
 teste('NINGUÉM passa de 30 de vida, nem no nível 20 (e o equipamento não aumenta a vida máxima: ele cura 1 vez por cenário)', () => {
@@ -102,7 +102,7 @@ teste('ao subir de nível você escolhe 1 de 2 cartas (a outra se perde); a cart
     const depois = [p.escolhas.length, p.colecao.length, p.mao.length, c.id === op[1].id, p.colecao.includes(op[0].id), escolherCartaNivel(p, 2, 0)];
     for (let n = 3; n <= 8; n++) { p.escolhas.push(n); escolherCartaNivel(p, n, 0); }
     return { antes, errada, depois, final: [p.colecao.length, p.mao.length], distintas: op[0].id !== op[1].id && op[0].nome !== op[1].nome }; })()`);
-  igual(r.antes.join(), '2,8,8'); igual(r.errada, null, 'só níveis pendentes'); igual(r.depois.join(), '0,9,9,true,false,'); igual(r.final.join(), '15,10', 'a mão para em 10; o resto fica na coleção'); verdade(r.distintas);
+  igual(r.antes.join(), '2,10,10'); igual(r.errada, null, 'só níveis pendentes'); igual(r.depois.join(), '0,11,10,true,false,'); igual(r.final.join(), '17,10', 'a mão para em 10; o resto fica na coleção'); verdade(r.distintas);
 });
 teste('as cartas de nível crescem com o nível e existem para todas as classes (2 a 20), com iniciativa de 6 a 94', () => {
   const r = R(`['guerreiro', 'cacador', 'oraculo'].map(c => { let ok = true, maxAtq = 0; for (let n = 2; n <= 20; n++) for (const k of cartasDoNivel(c, n)) { ok = ok && k.ini >= 6 && k.ini <= 94 && cartaHeroiPorId(k.id).nome === k.nome; maxAtq = Math.max(maxAtq, k.atq || 0); }
@@ -114,7 +114,7 @@ teste('montar a mão: de 6 a 10 cartas da coleção', () => {
     out.push(p.colecao.length, p.mao.length); const novo = p.colecao.find(id => !p.mao.includes(id)); out.push(alternarCartaMao(p, novo));      // mão cheia: não entra
     out.push(alternarCartaMao(p, p.mao[0]), alternarCartaMao(p, novo), p.mao.length);
     for (let i = 0; i < 10; i++) alternarCartaMao(p, p.mao[0]); out.push(p.mao.length, alternarCartaMao(p, 'xxx')); return out; })()`);
-  igual(r.join(), '13,10,false,true,true,10,6,false');
+  igual(r.join(), '15,10,false,true,true,10,6,false');
 });
 teste('a mochila começa com 2 lugares e vai a 3, 4 e 5 nos níveis 5, 10 e 15', () => {
   igual(R(`[1, 4, 5, 9, 10, 14, 15, 20].map(tamanhoMochila).join()`), '2,2,3,3,4,4,5,5');
@@ -282,11 +282,11 @@ console.log('\nCartas do herói (habilidades + iniciativa)');
 teste('a rodada começa escolhendo uma carta; a mão tem 10 cartas e a jogada vai para o descarte', () => {
   const r = R(`(() => { const { p, T } = cen(1, { semTurno: true }); const a = [T.fase, T.mao.length, T.descarte.length];
     const id = T.mao[0].id; const ok = tEscolherCarta(T, p, id); return [...a, ok, T.fase, T.mao.length, T.descarte.length, T.cartaHeroi.id === id]; })()`);
-  igual(r.join(), 'escolha,8,0,true,heroi,7,1,true');
+  igual(r.join(), 'escolha,10,0,true,heroi,9,1,true');
 });
-teste('cada classe começa com 8 cartas de iniciativas diferentes e números pequenos (dano até 6, andar até 5)', () => {
-  const r = R(`['guerreiro', 'cacador', 'oraculo'].map(c => { const m = maoDoHeroi(novoJogador('T', c)); return [m.length, new Set(m.map(x => x.ini)).size === 8, m.every(x => x.ini >= 1 && x.ini <= 99), Math.max(...m.map(x => x.atq || 0)) <= 6, Math.max(...m.map(x => x.mov || 0)) <= 5, m.some(x => x.empurrar || x.puxar), m.some(x => x.mov)]; })`);
-  for (const x of r) { igual(x[0], 8); verdade(x.slice(1).every(Boolean), JSON.stringify(x)); }
+teste('cada classe começa com 10 cartas de iniciativas diferentes e números pequenos (dano até 6, andar até 5)', () => {
+  const r = R(`['guerreiro', 'cacador', 'oraculo'].map(c => { const m = maoDoHeroi(novoJogador('T', c)); return [m.length, new Set(m.map(x => x.ini)).size === 10, m.every(x => x.ini >= 1 && x.ini <= 99), Math.max(...m.map(x => x.atq || 0)) <= 6, Math.max(...m.map(x => x.mov || 0)) <= 5, m.some(x => x.empurrar || x.puxar), m.some(x => x.mov)]; })`);
+  for (const x of r) { igual(x[0], 10); verdade(x.slice(1).every(Boolean), JSON.stringify(x)); }
 });
 teste('não dá para andar nem atacar antes de escolher a carta', () => {
   igual(R(`(() => { const { p, T } = cen(1, { semTurno: true }); return [tMover(T, p, 1, 10), tAtacar(T, p, 1), tEncerrarTurno(T, p), tAlcance(T).length]; })()`).join(), 'false,false,false,0');
@@ -385,7 +385,7 @@ teste('descanso longo: iniciativa 99, não anda nem age, cura 3, e a carta usada
     for (let i = 0; i < 3; i++) { tEscolherCarta(T, p, T.mao[0].id); T.fase = 'escolha'; T.cartaHeroi = null; }
     const antes = T.mao.length; const escolhida = T.descarte[1]; p.hp = 2; tEscolherCarta(T, p, 'descanso', escolhida.id);
     return [antes, T.mao.length, T.descarte.length, T.perdidas.length, T.perdidas[0].id === escolhida.id, T.mao.some(c => c.id === escolhida.id), p.hp, T.cartaHeroi.ini, T.movRest, T.acaoUsada]; })()`);
-  igual(r.join(), '5,7,0,1,true,false,5,99,0,true');
+  igual(r.join(), '7,9,0,1,true,false,5,99,0,true');
 });
 teste('descanso longo exige 2 cartas usadas e que você diga qual se perde', () => {
   const r = R(`(() => { const { p, T } = cen(1, { semTurno: true }); const a = tEscolherCarta(T, p, 'descanso', 'x');      // nada usado ainda
@@ -401,7 +401,7 @@ teste('descanso rápido: uma carta usada SORTEADA se perde, as outras voltam à 
     const perdida = tDescansoRapido(T, p); const ok2 = tDescansoRapido(T, p);
     const depois = [T.mao.length, T.descarte.length, T.perdidas.length, ids.includes(perdida.id), T.fase, p.hp === hp0, ok2];
     const joga = tEscolherCarta(T, p, T.mao[0].id); return [mao0, usadas, ...depois, joga, T.fase]; })()`);
-  igual(r.join(), '4,4,7,0,1,true,escolha,true,,true,heroi');
+  igual(r.join(), '6,4,9,0,1,true,escolha,true,,true,heroi');
 });
 teste('descanso rápido precisa de 2 cartas usadas; na próxima rodada pode de novo', () => {
   const r = R(`(() => { const { p, T } = cen(1, { semTurno: true }); const a = tDescansoRapido(T, p);
@@ -416,13 +416,13 @@ teste('sem cartas na mão e com menos de 2 no descarte o herói desmaia (derrota
 teste('as cartas perdidas ficam perdidas na próxima etapa também (o baralho do herói vale pelo cenário todo)', () => {
   const r = R(`(() => { const { p, T, exp } = cen(1, { semTurno: true }); for (let i = 0; i < 2; i++) { tEscolherCarta(T, p, T.mao[0].id); T.fase = 'escolha'; T.cartaHeroi = null; }
     tDescansoRapido(T, p); const T2 = criarTatica(exp, p); return [T2.perdidas.length, T2.mao.length + T2.descarte.length + T2.perdidas.length]; })()`);
-  igual(r.join(), '1,8');
+  igual(r.join(), '1,10');
 });
 teste('com a mão vazia só dá para descansar; a mão e o descarte seguem para a etapa seguinte', () => {
   const r = R(`(() => { const { p, T, exp } = cen(1, { semTurno: true }); T.descarte.push(...T.mao.splice(0)); const ruim = tEscolherCarta(T, p, T.descarte[0].id); const bom = tEscolherCarta(T, p, 'descanso', T.descarte[0].id);
     const { p: q, T: U, exp: e2 } = cen(1, { semTurno: true }); tEscolherCarta(U, q, U.mao[3].id); const U2 = criarTatica(e2, q);
     return [maoVazia({ mao: [] }), ruim, bom, U2.mao.length, U2.descarte.length, U2.fase]; })()`);
-  igual(r.join(), 'true,false,true,7,1,escolha');
+  igual(r.join(), 'true,false,true,9,1,escolha');
 });
 teste('sala limpa: não há modo livre; você segue usando cartas (a rodada passa sem inimigos)', () => {
   const r = R(`(() => { const { p, T } = cen(1, { semTurno: true, etapa: 0 }); turnoDeTeste(T, p); matarTodos(T); p.hp = 3;
@@ -647,6 +647,14 @@ teste('só dá para fugir pela entrada, e nunca na arena do chefe', () => {
     const b = cen(1); b.T.heroi = { c: 4, r: 4 }; const longe = tFugir(b.T);
     const c = cen(4, { etapa: 2 }); c.T.heroi = { ...c.T.saida }; const arena = tFugir(c.T); return [livre, longe, arena]; })()`);
   igual(r.join(), 'true,false,false');
+});
+
+teste('os monstros nascem em GRUPO (colados uns nos outros) e perto do herói; as salas têm 3 a 5 e o chefe vem com 3 capangas', () => {
+  const r = R(`(() => { let pior = 0, maxHeroi = 0, minHeroi = 99, juntos = true; const tams = new Set();
+    for (const id of [1, 4, 5, 9, 13, 20]) for (let k = 0; k < 8; k++) { const { T } = cen(id, { etapa: id === 4 || id === 20 ? 2 : 1, vivos: true }); const cs = T.inim.filter(e => !e.estrutura); tams.add(cs.length);
+      for (const e of cs) { const d = dist(e, T.heroi); maxHeroi = Math.max(maxHeroi, d); minHeroi = Math.min(minHeroi, d); const viz = cs.filter(o => o !== e).map(o => dist(o, e)); if (viz.length && Math.min(...viz) > 3) juntos = false; } }
+    return { maxHeroi, minHeroi, juntos, tams: [...tams].sort().join() }; })()`);
+  verdade(r.juntos, 'cada monstro tem outro a até 3 hexágonos'); verdade(r.minHeroi >= 3, 'nunca colado no herói'); verdade(r.maxHeroi <= 13, 'perto do herói: ' + r.maxHeroi);   // (nos mapas grandes de teste; no jogo as salas são de 8x8 e o máximo medido é 9) verdade(!r.tams.includes('1') && !r.tams.includes('2'), 'tamanhos ' + r.tams);
 });
 
 console.log('\nBaralho de modificadores (a sorte)');

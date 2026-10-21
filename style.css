@@ -402,3 +402,9 @@ b { font-weight: 700; }
 .fim.perda { max-width: 380px; } .perda-lista { flex-wrap: wrap; justify-content: center; overflow-x: visible; max-height: 46vh; overflow-y: auto; }
 .perda-lista .cartaH { flex: 0 0 104px; }
 .regra-limpa { font-size: .84rem; line-height: 1.4; color: var(--texto); background: #ffd16618; border: 1px solid var(--ouro); border-radius: 10px; padding: 6px 10px; }
+
+/* ---------- cartas de nível, mão e equipamento ---------- */
+.mao.colecao { flex-wrap: wrap; overflow-x: visible; justify-content: center; max-height: 340px; overflow-y: auto; }
+.mao.colecao .cartaH { flex: 0 0 104px; }
+.mao.escolha-cartas { flex-wrap: wrap; justify-content: center; overflow-x: visible; gap: 14px; }
+.mao.escolha-cartas .cartaH { flex: 0 0 140px; font-size: .82rem; padding: 10px; } .mao.escolha-cartas .cartaH b { font-size: .95rem; }

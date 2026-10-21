@@ -24,7 +24,7 @@ const ROBO = require('./robo');
   await page.goto(`http://localhost:${srv.address().port}/`);
   await page.evaluate(() => {
     const p = novoJogador('Teste', 'guerreiro');
-    p.tutorial.off = true; p.nivel = 20; p.attr.FOR = 300; p.attr.VIT = 300; p.gold = 5000;
+    p.tutorial.off = true; p.nivel = 20; p.gold = 5000;
     const d = derivados(p); p.hp = d.hpMax;
     localStorage.setItem(SAVE_KEY, JSON.stringify(p));
   });

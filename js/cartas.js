@@ -210,7 +210,7 @@ const BARALHOS_HEROI = {
 const CARTA_DESCANSO = K('Descansar', 99, { descanso: true });
 
 /* ---------- Cartas do herói: mão inicial, cartas de nível e a mão que você leva ---------- */
-const MAO_INICIAL = 8;   // cartas com que o herói começa
+const MAO_INICIAL = 10;  // cartas com que o herói começa
 const MAO_MAX = 10;      // quantas cartas entram na mão de um cenário (as outras ficam na coleção)
 const MAO_MIN = 6;
 const ROMANO = ['', ' II', ' III', ' IV', ' V'];

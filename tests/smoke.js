@@ -136,7 +136,7 @@ const srv = http.createServer((q, r) => {
   if ((await page.$$('.cartaH')).length < 8) throw new Error('as cartas da rodada 2 deveriam aparecer (uma foi para o descarte)');
 
   // janelas, loja e salvar/continuar
-  await page.evaluate(() => { P.nivel = 8; P.attr.FOR = 60; P.attr.VIT = 60; const d = derivados(P); P.hp = d.hpMax; salvar(); });
+  await page.evaluate(() => { P.nivel = 8; const d = derivados(P); P.hp = d.hpMax; salvar(); });
   await page.reload();
   await click('[data-a=continuar]');
   await click('[data-a=personagem]'); await shot('11-personagem'); await click('[data-a=fechar]');

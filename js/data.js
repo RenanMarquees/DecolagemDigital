@@ -18,15 +18,15 @@ const RARIDADE_COR = { comum: '#b8b8c4', incomum: '#5fd068', raro: '#4aa3ff', ep
    A classe define a vida (cresce um pouco por nível) e as cartas. Não há atributos: o herói melhora ganhando CARTAS (1 a cada nível). */
 const CLASSES = {
   guerreiro: {
-    nome: 'Guerreiro', icone: '⚔️', hpBase: 8, hpNivel: 0.6,
+    nome: 'Guerreiro', icone: '⚔️', hpBase: 12, hpNivel: 0.8,
     desc: 'Muita vida (até 30), cartas de golpe forte e de empurrar. Aguenta os golpes dos deuses e responde com fúria.',
   },
   cacador: {
-    nome: 'Caçador', icone: '🏹', hpBase: 6, hpNivel: 0.5,
+    nome: 'Caçador', icone: '🏹', hpBase: 9, hpNivel: 0.7,
     desc: 'Rápido e preciso. Cartas de longo alcance e de movimento: acerta de longe e some.',
   },
   oraculo: {
-    nome: 'Oráculo', icone: '🔮', hpBase: 5, hpNivel: 0.5,
+    nome: 'Oráculo', icone: '🔮', hpBase: 8, hpNivel: 0.7,
     desc: 'Mestre da magia. Cartas de raio, de cura e de área: fere vários inimigos e cuida de si.',
   },
 };
@@ -71,12 +71,12 @@ const NOMES_ARMAS = {
   oraculo:   [['Cajado de Carvalho', '🪄'], ['Cajado de Runas', '🔮'], ['Cajado de Apolo', '✨'], ['Cetro das Sombras', '💀'], ['Cajado de Thoth', '📜']],
 };
 
-/** Texto curto dos bônus de um item: "+2 vida, +1 dano..." */
+/** O que o equipamento faz quando você o USA (1 vez por cenário): "✚ cura 3 · 🛡️ escudo 1 · ⚔️ +2 de dano...". */
 function descreverBonus(it) {
-  const o = [];
-  if (it.hp) o.push(`+${it.hp} vida`); if (it.atq) o.push(`+${it.atq} dano`); if (it.esc) o.push(`+${it.esc} escudo`);
-  if (it.mov) o.push(`+${it.mov} movimento`); if (it.alc) o.push(`+${it.alc} alcance`); if (it.cura) o.push(`+${it.cura} cura`);
-  return o.join(', ');
+  const o = [], cura = (it.hp || 0) + (it.cura || 0);
+  if (cura) o.push(`✚ cura ${cura}`); if (it.atq) o.push(`⚔️ +${it.atq} de dano`); if (it.mov) o.push(`👣 +${it.mov} de movimento`);
+  if (it.esc) o.push(`🛡️ escudo ${it.esc}`); if (it.alc) o.push(`🎯 +${it.alc} de alcance`);
+  return o.join(' · ');
 }
 
 // Gera automaticamente os equipamentos a partir das tabelas acima
@@ -222,9 +222,9 @@ const DIFICULDADES = {
   expert:        { nome: 'Expert',        icone: '💀', nivel: 2,  stat: 1.15,  recompensa: 1.5, armadilha: 1.6, porta: 0.05 },
 };
 const DIFICULDADE_PADRAO = 'intermediario';
-/** Dois "botões" gerais de equilíbrio: forca multiplica vida e ataque de TODOS os inimigos; xp multiplica o XP ganho.
+/** Botões gerais de equilíbrio: forca multiplica vida e ataque de TODOS os inimigos; ataque multiplica só o dano deles; xp multiplica o XP ganho.
  *  (Para deixar o jogo mais fácil ou mais difícil de uma vez, mexa só aqui.) */
-const BALANCO = { forca: 0.22, xp: 1 };
+const BALANCO = { forca: 0.2, ataque: 0.5, xp: 1 };
 /** A cada nível do cenário acima do "nível-base" do reino, os inimigos ganham este tanto de vida/ataque (e o contrário abaixo). */
 const FORCA_POR_NIVEL = 0.03;
 const RECOMPENSA_POR_NIVEL = 0.05;

@@ -16,6 +16,8 @@ for (const f of ['data.js', 'cartas.js', 'cenarios.js', 'logic.js', 'mapas.js', 
 }
 const FORTE = !!process.env.FORTE;   // FORTE=1: começa com o herói superforte do tests/boss.js
 
+const MOTIVOS = {};
+vm.runInContext('var MOTIVOS = {}', ctx);
 const robo = `(function () {
   const FORTE = ${FORTE};
 
@@ -80,6 +82,19 @@ const robo = `(function () {
     }
   }
 
+  /** Equipamento de uso único: cura quando ferido, escudo quando há inimigo perto, e dano/alcance logo antes de atacar. */
+  function usarEquipRobo(T, p, antesDeAtacar) {
+    if (T.fase !== 'heroi' || T.fim) return;
+    const d = derivados(p), perto = alvosDoRobo(T).some(e => dist(e, T.heroi) <= 3);
+    for (const it of equipamentosUsaveis(p)) {
+      if (T.exp.equipGasto[it.chave]) continue;
+      const e = efeitoEquip(ITENS[it.id]);
+      if (e.cura && p.hp <= d.hpMax * 0.6) tUsarEquip(T, p, it.chave);
+      else if (e.esc && perto && alvosDoRobo(T).some(x => x.chefe) || (e.esc && perto && p.hp <= d.hpMax * 0.8)) tUsarEquip(T, p, it.chave);
+      else if (antesDeAtacar && (e.atq || e.alc) && !e.cura && (cartaAtual(T).atq)) tUsarEquip(T, p, it.chave);
+    }
+  }
+
   function melhorMovimento(T, p) {
     const c = cartaAtual(T), alc = alcanceDa(p, T);
     const bau = querBau(T, p);
@@ -117,6 +132,7 @@ const robo = `(function () {
     const quem = alvosDoRobo(T), alvos = tAlvos(T, p);
     if (!alvos.length) return false;
     const alvo = alvos.filter(e => quem.includes(e)).sort((a, b) => a.hp - b.hp)[0] || alvos[0];
+    usarEquipRobo(T, p, true);
     return tAtacar(T, p, alvo.uid);
   }
 
@@ -125,7 +141,7 @@ const robo = `(function () {
     if (T.fase === 'escolha') { const [id, perder] = escolherCarta(T, p); tEscolherCarta(T, p, id, perder); }
     while (T.fase === 'inimigos' && !T.fim) tProximoInimigo(T, p);        // inimigos com iniciativa menor agem antes
     if (T.fim || T.fase !== 'heroi') return;
-    usarItens(T, p);
+    usarItens(T, p); usarEquipRobo(T, p, false);
     const alc = alcanceDa(p, T);
     let guard = 0;
     while (T.fase === 'heroi' && !T.fim && guard++ < 20) {
@@ -193,14 +209,25 @@ const robo = `(function () {
       }
       rodadas += T.rodada;
       if (T.fim === 'vitoria') { concluirCenario(T, p); return { resultado: 'vitoria', rodadas }; }
-      if (T.fim !== 'porta') { penalidadeDerrota(p); return { resultado: 'derrota', rodadas }; }
+      if (T.fim !== 'porta') { MOTIVOS[T.log.some(l => /exaustão/.test(l.msg)) ? 'exaustão' : 'vida'] = (MOTIVOS[T.log.some(l => /exaustão/.test(l.msg)) ? 'exaustão' : 'vida'] || 0) + 1; penalidadeDerrota(p); return { resultado: 'derrota', rodadas }; }
       T = tProximaEtapa(T, p);
     }
   }
 
   /* ---- preparação do herói entre cenários: pontos, equipamento, loja e mochila ---- */
   const valorItem = it => (it.hp || 0) * 1.6 + (it.atq || 0) * 3 + (it.esc || 0) * 3.2 + (it.mov || 0) * 2.5 + (it.alc || 0) * 1.5 + (it.cura || 0) * 1;
-  function gastarPontos(p) { const principal = CLASSES[p.classe].basico; while (p.pontos > 0) distribuirPonto(p, p.pontos % 3 === 0 ? 'VIT' : principal); }
+  /** Escolhe as cartas de nível pendentes (a de melhor valor) e monta a melhor mão de 10 (com pelo menos 1 carta de cura). */
+  const valorCarta = c => (c.atq || 0) * 2 + (c.mov || 0) * 0.8 + (c.cura || 0) * 1.5 + (c.escudo || 0) + (c.empurrar || c.puxar ? 1 : 0) + (c.alvo ? 1.5 : 0) + ((c.alc || 1) > 1 ? 0.5 : 0) + (c.dreno ? 1 : 0);
+  function gastarPontos(p) {
+    while (p.escolhas.length) {
+      const n = p.escolhas[0], [a, b] = cartasDoNivel(p.classe, n);
+      escolherCartaNivel(p, n, valorCarta(a) >= valorCarta(b) ? 0 : 1);
+    }
+    const todas = p.colecao.map(cartaHeroiPorId).sort((x, y) => valorCarta(y) - valorCarta(x));
+    let mao = todas.slice(0, MAO_MAX);
+    if (!mao.some(c => c.cura)) { const cura = todas.find(c => c.cura); if (cura) mao[mao.length - 1] = cura; }
+    p.mao = mao.map(c => c.id);
+  }
 
   function equiparMelhor(p) {
     for (const slot of ['cabeca', 'peito', 'pes']) {
@@ -249,7 +276,7 @@ const robo = `(function () {
   /* ---- a campanha ---- */
   return function (classe, difId) {
     const p = novoJogador('Robo', classe);
-    if (FORTE) { p.nivel = 20; p.attr[CLASSES[classe].basico] = 30; p.attr.VIT = 30; p.gold = 500; p.equip.maos = [classe + '_4', 'escudo_4']; p.equip.peito = 'peito_4'; p.equip.cabeca = 'cabeca_4'; p.equip.pes = 'pes_4'; p.hp = derivados(p).hpMax; }
+    if (FORTE) { p.nivel = 20; p.gold = 500; p.equip.maos = [classe + '_4', 'escudo_4']; p.equip.peito = 'peito_4'; p.equip.cabeca = 'cabeca_4'; p.equip.pes = 'pes_4'; p.hp = derivados(p).hpMax; }
     const linhas = [];
     let lutas = 0;
     const preparar = reino => { gastarPontos(p); equiparMelhor(p); comprarMelhorias(p, reino); encherMochila(p, reino); };
@@ -278,8 +305,10 @@ const robo = `(function () {
   };
 })()`;
 
+process.on('exit', () => { if (process.env.DIAG) console.log('derrotas por motivo:', JSON.stringify(vm.runInContext('MOTIVOS', ctx))); });
 // Experimentos de equilíbrio sem mexer nos arquivos do jogo
 if (process.env.BAL_FORCA) vm.runInContext(`BALANCO.forca = ${+process.env.BAL_FORCA}`, ctx);
+if (process.env.BAL_ATQ) vm.runInContext(`BALANCO.ataque = ${+process.env.BAL_ATQ}`, ctx);
 if (process.env.BAL_XP) vm.runInContext(`BALANCO.xp = ${+process.env.BAL_XP}`, ctx);
 const fn = vm.runInContext(robo, ctx);
 const N = parseInt(process.argv[2] || '10', 10);

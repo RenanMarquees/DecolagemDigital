@@ -123,7 +123,7 @@ function telaCriar() {
           <span class="ico-g">${c.icone}</span>
           <b>${c.nome}</b>
           <small>${esc(c.desc)}</small>
-          <div class="mini-attr">${ATRIBUTOS.map(a => `<span>${a} ${c.attr[a]}</span>`).join('')}</div>
+          <div class="mini-attr"><span>❤️ vida ${c.hpBase}</span><span>🃏 ${MAO_INICIAL} cartas</span></div>
         </button>`).join('')}
     </div>
     <button class="btn grande" data-a="comecar">Começar a jornada</button>
@@ -159,11 +159,15 @@ function telaMapa() {
     ${rodapeNav()}
   </div>`;
   Tutorial.checar('mapa');
+  abrirEscolhaPendente();
 }
+
+/** Se o herói subiu de nível e ainda não escolheu a carta nova, abre a janela de escolha sozinha. */
+function abrirEscolhaPendente() { if (P && P.escolhas.length && !modal.classList.contains('on')) modalCartaNivel(); }
 
 function rodapeNav() {
   return `<nav class="rodape">
-    <button data-a="personagem">🧙 Personagem${P.pontos > 0 ? `<em class="badge">${P.pontos}</em>` : ''}</button>
+    <button data-a="personagem">🧙 Personagem${P.escolhas.length > 0 ? `<em class="badge">${P.escolhas.length}</em>` : ''}</button>
     <button data-a="inventario">🎒 Inventário</button>
     <button data-a="titulo">☰ Menu</button>
   </nav>`;
@@ -199,6 +203,7 @@ function telaReino() {
     ${rodapeNav()}
   </div>`;
   Tutorial.checar('reino');
+  abrirEscolhaPendente();
 }
 
 /* ---------- preparação do cenário ---------- */
@@ -243,16 +248,7 @@ function telaBriefing() {
 function compararItem(id) {
   const it = ITENS[id];
   if (it.tipo === 'mochila') return '';
-  const chaves = ['hp', 'atq', 'esc', 'mov', 'alc', 'cura'], nomes = { hp: 'vida', atq: 'dano', esc: 'escudo', mov: 'movimento', alc: 'alcance', cura: 'cura' };
-  let atual = null;
-  if (it.tipo === 'maos') {
-    const maos = P.equip.maos.map(m => (m ? ITENS[m] : null)), soma = x => (x ? chaves.reduce((a, k) => a + (x[k] || 0), 0) : -1);
-    atual = soma(maos[0]) <= soma(maos[1]) ? maos[0] : maos[1];
-  } else atual = P.equip[it.tipo] ? ITENS[P.equip[it.tipo]] : null;
-  const partes = chaves.map(k => [k, (it[k] || 0) - (atual ? atual[k] || 0 : 0)]).filter(([, v]) => v !== 0);
-  if (!partes.length) return '<small>= igual ao que você usa</small>';
-  const melhor = partes.reduce((a, [, v]) => a + v, 0) > 0;
-  return `<small class="${melhor ? 'melhor' : 'pior'}">${melhor ? '▲' : '▼'} ${partes.map(([k, v]) => `${v > 0 ? '+' : ''}${v} ${nomes[k]}`).join(', ')} vs. ${atual ? 'equipado' : 'vazio'}</small>`;
+  return `<small class="melhor">${esc(descreverBonus(it) || 'sem efeito')} <i>(uso único por cenário)</i></small>`;
 }
 
 function telaLoja() {
@@ -566,16 +562,21 @@ function acoesHtml() {
   }
   const bt = (a, ic, txt, extra = '', cls = '') => `<button class="ac ${cls}" data-a="${a}" ${extra}><b>${ic}</b><span>${txt}</span></button>`;
   if (SUB === 'itens') {
-    const m = P.equip.mochila;
-    return `<div class="submenu"><p class="dica-sub">🎒 Mochila (${m.length}/${tamanhoMochila(P.nivel)}) · usar um item <b>não gasta</b> a sua jogada</p>${m.length ? m.map((id, i) => {
+    const m = P.equip.mochila, heroi = T.fase === 'heroi' && !T.fim;
+    const equips = equipamentosUsaveis(P).map(q => {
+      const it = ITENS[q.id], gasto = !!T.exp.equipGasto[q.chave];
+      return `<button class="btn hab" data-a="tat-equip" data-k="${q.chave}" ${gasto || !heroi ? 'disabled' : ''}><span>${it.icone} ${it.nome} ${gasto ? '<small>✔ usado</small>' : ''}</span><small>${esc(descreverBonus(it))} · uso único por cenário${heroi ? '' : ' (só no seu turno)'}</small></button>`;
+    }).join('');
+    return `<div class="submenu"><p class="dica-sub">🛡️ Equipamento · cada peça pode ser usada <b>1 vez por cenário</b> (de graça, no seu turno)</p>${equips || '<p class="vazio">Nenhum equipamento vestido.</p>'}
+      <p class="dica-sub">🎒 Mochila (${m.length}/${tamanhoMochila(P.nivel)}) · usar um item <b>não gasta</b> a sua jogada</p>${m.length ? m.map((id, i) => {
       const it = ITENS[id], vazio = !!(it.heal && !it.limpa && P.hp >= derivados(P).hpMax);
       return `<button class="btn hab" data-a="tat-item" data-i="${i}" ${vazio ? 'disabled' : ''}><span>${it.icone} ${it.nome}</span><small>${it.desc}</small></button>`;
     }).join('') : '<p class="vazio">Mochila vazia.</p>'}<button class="btn link peq" data-a="tat-voltar">← Voltar</button></div>`;
   }
-  if (T.limpa) return `<div class="acoes-linha">${bt('tat-itens', '🎒', `Mochila ${P.equip.mochila.length}`)}${bt('tat-fim', '⏭️', 'Encerrar', '', 'fim-turno')}</div>`;
+  if (T.limpa) return `<div class="acoes-linha">${bt('tat-itens', '🎒', `Itens ${P.equip.mochila.length + equipamentosUsaveis(P).filter(q => !T.exp.equipGasto[q.chave]).length}`)}${bt('tat-fim', '⏭️', 'Encerrar', '', 'fim-turno')}</div>`;
   const c = cartaAtual(T);
   const podeAtacar = !!c.atq && !T.acaoUsada;
-  return `<div class="acoes-linha">${bt('tat-atacar', '⚔️', c.atq ? `Atacar ${danoDoHeroi(T, P)}` : 'Sem ataque', podeAtacar ? '' : 'disabled')}${bt('tat-itens', '🎒', `Mochila ${P.equip.mochila.length}`)}${bt('tat-fim', '⏭️', 'Encerrar', '', 'fim-turno')}</div>`;
+  return `<div class="acoes-linha">${bt('tat-atacar', '⚔️', c.atq ? `Atacar ${danoDoHeroi(T, P)}` : 'Sem ataque', podeAtacar ? '' : 'disabled')}${bt('tat-itens', '🎒', `Itens ${P.equip.mochila.length + equipamentosUsaveis(P).filter(q => !T.exp.equipGasto[q.chave]).length}`)}${bt('tat-fim', '⏭️', 'Encerrar', '', 'fim-turno')}</div>`;
 }
 
 function atualizarHud() {
@@ -605,7 +606,7 @@ function derrotaHtml() {
 function painelVitoria() {
   const r = RES;
   const itens = r.itens.map(id => `<span class="drop" style="color:${RARIDADE_COR[ITENS[id].raridade]}">${ITENS[id].icone} ${esc(ITENS[id].nome)}</span>`).join('');
-  const subidas = r.subidas.map(s => `<p class="nivelup">⭐ Nível ${s.nivel}! +${PONTOS_POR_NIVEL} ponto de atributo${s.ganhouMochila ? ` · A mochila agora tem ${s.mochila} lugares!` : ''}</p>`).join('');
+  const subidas = r.subidas.map(s => `<p class="nivelup">⭐ Nível ${s.nivel}! Uma carta nova espera por você (escolha 1 de 2 no reino)${s.ganhouMochila ? ` · A mochila agora tem ${s.mochila} lugares!` : ''}</p>`).join('');
   const ultima = T.ultimaEtapa;
   const noChao = [...T.moedas.values()].reduce((a, m) => a + m.valor, 0), baus = T.bau && !T.bau.aberto;
   const sobras = [noChao ? `🪙 ${noChao} ${noChao > 1 ? 'moedas' : 'moeda'} no chão` : '', baus ? '🧰 o baú ainda está fechado' : ''].filter(Boolean).join(' · ');
@@ -666,6 +667,7 @@ function irPara(c, r) {
   garantirVisivel(T.heroi);
   if (T.fim) { depoisDaAcao(true); return true; }
   if (T.bau && !T.bau.aberto && T.bau.c === T.heroi.c && T.bau.r === T.heroi.r) toast('🧰 Termine o turno aqui para abrir o baú.');
+  else if (T.moedas.has(chave(T.heroi.c, T.heroi.r))) toast('🪙 Termine o turno aqui (⏭️ Encerrar) para pegar as moedas.');
   conferirAutoFim();
   return true;
 }
@@ -777,34 +779,40 @@ function slotHtml(rotulo, ico, id, slot, lugar) {
 function modalPersonagem() {
   MODAL_ATUAL = 'personagem';
   const d = derivados(P), c = CLASSES[P.classe], e = P.equip;
-  const attrs = ATRIBUTOS.map(a => `<div class="attr-linha">
-    <div><b>${ATRIBUTO_NOME[a]}</b> <small>${ATRIBUTO_DESC[a]}</small></div>
-    <div class="attr-val">${P.attr[a]}</div>
-    <button class="btn peq" data-a="ponto" data-id="${a}" ${P.pontos > 0 ? '' : 'disabled'}>＋</button></div>`).join('');
   const mochila = Array.from({ length: tamanhoMochila(P.nivel) }, (_, i) => {
     const id = e.mochila[i];
     return id ? `<div class="slot">${linhaItem(id, '', `<span class="bts"><button class="btn peq" data-a="mochila-usar" data-i="${i}">Usar</button><button class="btn peq sec" data-a="mochila-tirar" data-i="${i}">Tirar</button></span>`)}</div>`
       : '<div class="slot vazio-slot"><span>🎒</span> lugar vazio</div>';
   }).join('');
-  const cartas = (BARALHOS_HEROI[P.classe] || []).map(k => `<li><b>🃏 ${esc(k.nome)}</b> <small>iniciativa ${k.ini} · ${descreverCartaHeroi(k, d).map(x => `${x.icone} ${x.texto}`).join(' · ')}</small></li>`).join('');
+  const colecao = P.colecao.map(cartaHeroiPorId).filter(Boolean).sort((x, y) => x.ini - y.ini);
+  const cartas = colecao.map(k => cartaMaoHtml(k, P.mao.includes(k.id), false, 'mao-alternar')).join('');
   abrirModal(`<h2>${c.icone} ${esc(P.nome)} <small>${c.nome} · Nv ${P.nivel}</small></h2>
-    <p class="pts">${P.pontos > 0 ? `✨ ${P.pontos} ponto(s) para distribuir!` : 'Sem pontos livres. Suba de nível para ganhar mais.'}</p>
-    <div class="attrs">${attrs}</div>
-    <div class="derivados">
-      <span>❤️ Vida <b>${P.hp}/${d.hpMax}</b></span><span>⚔️ Dano extra <b>+${d.dano}</b></span>
-      <span>👣 Movimento extra <b>+${d.mov}</b></span><span>✚ Cura extra <b>+${d.cura}</b></span>
-      <span>🛡️ Escudo <b>${d.esc}</b></span><span>🎯 Alcance extra <b>+${d.alc}</b></span>
-    </div>
-    <h3>Equipado</h3>
+    <p class="pts">❤️ Vida <b>${P.hp}/${d.hpMax}</b> · você melhora ganhando <b>cartas</b> (1 a cada nível) e equipamentos.</p>
+    ${P.escolhas.length ? `<button class="btn grande" data-a="abrir-escolha">🎁 Nova carta! Escolha 1 de 2 (nível ${P.escolhas[0]})</button>` : ''}
+    <h3>Equipado <small>uso único por cenário</small></h3>
     ${slotHtml('Cabeça', '🪖', e.cabeca, 'cabeca', 0)}${slotHtml('Peito', '🥋', e.peito, 'peito', 0)}${slotHtml('Pés', '🥾', e.pes, 'pes', 0)}
     ${slotHtml('Mão 1', '🗡️', e.maos[0], 'maos', 0)}${slotHtml('Mão 2', '🛡️', e.maos[1], 'maos', 1)}
     <h3>Mochila (${e.mochila.length}/${tamanhoMochila(P.nivel)}) <small>cresce nos níveis 5, 10 e 15</small></h3>${mochila}
-    <h3>Suas cartas de iniciativa</h3><ul class="habs">${cartas}</ul>
+    <h3>🃏 Sua mão <small>${P.mao.length}/${MAO_MAX} cartas · você tem ${P.colecao.length}</small></h3>
+    <p class="dica-mod">Toque numa carta para pôr ou tirar da mão que você leva aos cenários (de ${MAO_MIN} a ${MAO_MAX} cartas). As cartas de nível que você escolhe ficam na coleção.</p>
+    <div class="mao colecao">${cartas}</div>
     <h3>🎴 Baralho de ataque <small>${P.baralho.length}/${BARALHO_MAX} cartas</small></h3>
     <p class="dica-mod">Cada ataque seu vira uma destas cartas, sozinha: +N soma dano, −N tira, ×2 dobra, ✖ falha. Só quando sai ×2 ou ✖ o baralho é embaralhado de novo. Conquistas colocam cartas melhores aqui (com 15 cartas, a nova toma o lugar da pior).</p>
     ${baralhoChips(null, P.baralho)}
     <h3>🏅 Conquistas <small>${MARCOS.filter(m => P.marcos[m.id]).length}/${MARCOS.length}</small></h3>
     <ul class="marcos">${MARCOS.map(m => { const feito = !!P.marcos[m.id], v = Math.min(m.meta, P.stats[m.stat] || 0); return `<li class="${feito ? 'feito' : ''}"><span>${feito ? '✅' : '⬜'} ${esc(m.nome)}</span><b class="mod-pq ${CARTAS_MOD[m.carta].tipo}">${CARTAS_MOD[m.carta].rotulo}</b><small>${feito ? 'recebida' : `${v}/${m.meta}`}</small></li>`; }).join('')}</ul>`);
+}
+
+/** Ao subir de nível: escolha 1 carta entre 2. A que não for escolhida se perde para sempre. */
+function modalCartaNivel() {
+  const n = P.escolhas[0];
+  if (!n) return;
+  MODAL_ATUAL = 'carta-nivel';
+  const opcoes = cartasDoNivel(P.classe, n);
+  abrirModal(`<h2>⭐ Nível ${n}!</h2>
+    <p class="pts">Escolha <b>uma</b> carta nova para a sua coleção. <b>A outra se perde para sempre.</b>${P.escolhas.length > 1 ? ` <small>(mais ${P.escolhas.length - 1} escolha(s) esperando)</small>` : ''}</p>
+    <div class="mao escolha-cartas">${opcoes.map(c => cartaMaoHtml(c, false, false, 'carta-nivel')).join('')}</div>
+    <p class="dica-mod">${P.mao.length < MAO_MAX ? 'A carta já entra na sua mão.' : `Sua mão já tem ${MAO_MAX} cartas: depois, em 🧙 Personagem, troque as cartas da mão.`}</p>`);
 }
 
 function modalInventario() {
@@ -832,7 +840,7 @@ function atualizarModal() {
   if (MODAL_ATUAL === 'personagem') modalPersonagem();
   else if (MODAL_ATUAL === 'inventario') modalInventario();
   // atualiza o topo da tela por trás
-  if (!T && P) { const t = app.querySelector('.topo'); if (t) t.outerHTML = statusTopo(); const bd = app.querySelector('.badge'); if (bd && P.pontos <= 0) bd.remove(); }
+  if (!T && P) { const t = app.querySelector('.topo'); if (t) t.outerHTML = statusTopo(); const bd = app.querySelector('.badge'); if (bd && P.escolhas.length <= 0) bd.remove(); }
 }
 
 /* ---------- confirmação dentro do jogo (confirm() do navegador não funciona em todo lugar) ---------- */
@@ -915,7 +923,7 @@ const ACOES = {
     if (T.porta && !T.porta.aberta && c === T.porta.c && r === T.porta.r) { toast(T.limpa ? '🚪 A porta está longe: use uma carta com mais movimento ou ande por etapas.' : '🚪 A porta está trancada. Derrote todos os inimigos da sala!'); return; }
     if (temArmadilha(T, c, r)) { const def = ARMADILHAS[T.tipoArm]; toast(`${def.icone} ${def.nome}: ${def.desc}`); return; }
     if (T.bau && T.bau.c === c && T.bau.r === r) toast(T.bau.aberto ? '🧰 O baú já foi aberto.' : '🧰 Baú do tesouro: termine o turno parado em cima dele.');
-    else if (T.moedas.has(chave(c, r))) toast(`🪙 ${T.moedas.get(chave(c, r)).valor} moedas: pare em cima para saquear.`);
+    else if (T.moedas.has(chave(c, r))) toast(`🪙 ${T.moedas.get(chave(c, r)).valor} moedas: termine o turno em cima para pegar.`);
   },
   'tat-limpa-ok'() { if (RES) RES.visto = true; atualizarHud(); },
   'tat-atacar'() {
@@ -952,6 +960,7 @@ const ACOES = {
   'tat-itens'() { SUB = 'itens'; atualizarHud(); },
   'tat-voltar'() { SUB = 'main'; atualizarHud(); },
   'tat-cancelar'() { MODO = null; atualizarTudo(); },
+  'tat-equip'(el) { if (T && !OCUPADO) { const ok = tUsarEquip(T, P, el.dataset.k); if (ok) { SUB = 'main'; Tutorial.evento('equip'); } depoisDaAcao(ok); } },
   'tat-item'(el) { if (T && !OCUPADO) executar({ tipo: 'item', i: +el.dataset.i }); },
   'tat-fugir'() { if (T && !OCUPADO) depoisDaAcao(tFugir(T)); },
   'tat-fim'() { return encerrarTurno(); },
@@ -971,7 +980,18 @@ const ACOES = {
   personagem() { Tutorial.evento('personagem'); modalPersonagem(); },
   inventario() { Tutorial.evento('inventario'); modalInventario(); },
   fechar() { MODAL_ATUAL = null; fecharModal(); if (!T && CEN) telaBriefing(); else if (!T && REINO) telaReino(); else if (!T && P && !HIST) telaMapa(); },
-  ponto(el) { if (distribuirPonto(P, el.dataset.id)) { salvar(); atualizarModal(); } },
+  'abrir-escolha'() { modalCartaNivel(); },
+  'carta-nivel'(el) {
+    const m = /_n(\d+)([ab])$/.exec(el.dataset.id);
+    const c = m && escolherCartaNivel(P, +m[1], m[2] === 'a' ? 0 : 1);
+    if (!c) return;
+    salvar(); toast(`🃏 "${c.nome}" entrou na sua coleção!`);
+    if (P.escolhas.length) modalCartaNivel(); else ACOES.fechar();
+  },
+  'mao-alternar'(el) {
+    if (alternarCartaMao(P, el.dataset.id)) { salvar(); atualizarModal(); }
+    else toast(P.mao.includes(el.dataset.id) ? `A mão precisa de pelo menos ${MAO_MIN} cartas.` : `A mão já tem ${MAO_MAX} cartas: tire uma antes.`);
+  },
   equipar(el) { const r = equipar(P, el.dataset.id, el.dataset.lugar !== undefined ? +el.dataset.lugar : undefined); if (r.ok) { salvar(); atualizarModal(); } else toast(r.msg); },
   desequipar(el) { desequipar(P, el.dataset.id, +(el.dataset.lugar || 0)); salvar(); atualizarModal(); },
   levar(el) { const r = levarNaMochila(P, el.dataset.id); if (r.ok) { salvar(); atualizarModal(); } else toast(r.msg); },

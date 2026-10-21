@@ -59,12 +59,7 @@ function derivados(p) {
 function efeitoEquip(it) {
   return { cura: (it.hp || 0) + (it.cura || 0), atq: it.atq || 0, mov: it.mov || 0, esc: it.esc || 0, alc: it.alc || 0 };
 }
-function textoEfeitoEquip(it) {
-  const e = efeitoEquip(it), o = [];
-  if (e.cura) o.push(`✚ cura ${e.cura}`); if (e.atq) o.push(`⚔️ +${e.atq} de dano no ataque`); if (e.mov) o.push(`👣 +${e.mov} de movimento`);
-  if (e.esc) o.push(`🛡️ escudo ${e.esc} na rodada`); if (e.alc) o.push(`🎯 +${e.alc} de alcance`);
-  return o.join(' · ');
-}
+const textoEfeitoEquip = descreverBonus;
 /** Os equipamentos vestidos, cada um com a sua chave de uso (ex.: 'peito', 'maos0'). */
 function equipamentosUsaveis(p) {
   const e = p.equip, lista = [];

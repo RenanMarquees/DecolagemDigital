@@ -132,7 +132,7 @@ function embaralhar(arr) {
 function criarInimigoT(id, esc, uid, pos, ehChefe, exp) {
   const b = INIMIGOS[id], f = esc.stat * exp.stat;
   const hp = Math.max(1, Math.round(b.hp * f));
-  const atk = Math.max(1, Math.round(b.atk * (1 + (f - 1) * 0.6)));   // o ataque cresce mais devagar que a vida (números pequenos)
+  const atk = Math.max(1, Math.round(b.atk * (1 + (f - 1) * 0.6) * BALANCO.ataque));   // o ataque cresce mais devagar que a vida (números pequenos)
   const ganho = v => (v > 0 ? Math.max(1, Math.round(v * esc.xp * exp.rec * BALANCO.xp)) : 0);
   return {
     uid, id, tipo: id, nome: b.nome, icone: b.icone, chefe: ehChefe, estrutura: false,

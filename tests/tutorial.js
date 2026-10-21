@@ -31,8 +31,8 @@ const srv = http.createServer((q, r) => {
   /** Se há um cartão com botão "Entendi", clica nele. Devolve o id (ou null). */
   async function lerCartao() { const c = await cartao(); if (!c) return null; await shot(c.id); if (c.ok) { await click('[data-a=tut-ok]'); await page.waitForTimeout(30); } return c; }
 
-  /** Subiu de nível? O cartão pede para abrir o Personagem (onde se gastam os pontos). */
-  async function tratarPontos() { const c = await cartao(); if (c && c.id === 'r_pontos') { await shot('r_pontos'); await click('[data-a=personagem]'); await click('[data-a=fechar]'); } }
+  /** Subiu de nível? A janela de escolha de carta abre sozinha no reino: escolhe a primeira. */
+  async function tratarPontos() { for (let i = 0; i < 6 && await page.$('[data-a=carta-nivel]'); i++) { await shot('carta-nivel'); await click('[data-a=carta-nivel] >> nth=0'); await page.waitForTimeout(80); } }
 
   /** Toca em Começar (e confirma o aviso de "vida baixa", se aparecer). */
   async function iniciar() { await click('[data-a=iniciar]'); if (await page.$('[data-a=conf-sim]')) await click('[data-a=conf-sim]'); await page.waitForSelector('#cena3d canvas'); }
@@ -78,7 +78,7 @@ const srv = http.createServer((q, r) => {
     }
     throw new Error('o robô não conseguiu vencer o cenário ' + id);
   }
-  await vencer(1);
+  await vencer(1); await tratarPontos();
   /* ---- depois do cenário 1: loja, inventário, pontos ---- */
   await esperarCartao('r_loja');
   await click('[data-a=loja]');
@@ -95,13 +95,13 @@ const srv = http.createServer((q, r) => {
   await click('[data-a=cenario][data-id="2"]');
   await esperarCartao('br2');
   await iniciar();
-  await vencer(2);
+  await vencer(2); await tratarPontos();
   await tratarPontos();
   await esperarCartao('r_cen3');
   await click('[data-a=cenario][data-id="3"]');
   await esperarCartao('br3');
   await iniciar();
-  await vencer(3);
+  await vencer(3); await tratarPontos();
   await tratarPontos();
   await esperarCartao('r_fim');
   await click('[data-a=tut-ok]');
