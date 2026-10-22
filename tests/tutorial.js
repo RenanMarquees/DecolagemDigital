@@ -82,6 +82,7 @@ const srv = http.createServer((q, r) => {
   async function vencer(id) {
     for (let t = 0; t < 5; t++) {
       if (await jogarCenario(id)) return;
+      await tratarPontos();                                  // o nível que subiu antes de cair abre a escolha de carta
       await click(`[data-a=cenario][data-id="${id}"]`); await iniciar();
     }
     throw new Error('o robô não conseguiu vencer o cenário ' + id);
