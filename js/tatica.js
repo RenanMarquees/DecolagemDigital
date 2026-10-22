@@ -977,7 +977,7 @@ function tEscolherCarta(T, p, id, perder, id2) {
     }
     carta = T.mao.splice(i, 1)[0];
     if (id2 !== undefined && id2 !== null) carta2 = T.mao.splice(T.mao.findIndex(c => c.id === id2), 1)[0];
-    for (const c of [carta, carta2]) if (c) (c.queima ? T.perdidas : T.descarte).push(c);      // carta que queima some para sempre (neste cenário)
+    for (const c of [carta, carta2]) if (c && !c.improviso) (c.queima ? T.perdidas : T.descarte).push(c);      // o improviso não vai para o descarte      // carta que queima some para sempre (neste cenário)
   }
   T.cartaHeroi = carta;
   T.modo2 = !!carta2;
@@ -1205,21 +1205,6 @@ function apoioDaCarta(T, e, carta) {
   }
 }
 
-/** Hexágono vizinho (a até `mov` passos) que mais AFASTA o inimigo do herói. */
-function fugirDoHeroi(T, p, e, mov) {
-  const ocupadoPorOutro = (c, r) => T.inim.some(x => x.vivo && x !== e && x.c === c && x.r === r);
-  const nos = bfs(T.g, e, mov, (c, r) => (c === T.heroi.c && r === T.heroi.r) || ocupadoPorOutro(c, r), (c, r) => temArmadilha(T, c, r));
-  let melhor = null;
-  for (const n of nos.values()) {
-    if (n.d === 0 || temArmadilha(T, n.c, n.r)) continue;
-    const s = dist(n, T.heroi) * 10 - n.d;
-    if (!melhor || s > melhor.s) melhor = { n, s };
-  }
-  if (!melhor || dist(melhor.n, T.heroi) <= dist(e, T.heroi)) return false;
-  e.c = melhor.n.c; e.r = melhor.n.r;
-  return true;
-}
-
 /** Anda `mov` passos em direção a `alvo` (um aliado ferido, por exemplo), sem pisar em armadilha. */
 function andarAte(T, e, alvo, mov) {
   const ocupadoPorOutro = (c, r) => T.inim.some(x => x.vivo && x !== e && x.c === c && x.r === r) || (c === T.heroi.c && r === T.heroi.r);
@@ -1245,15 +1230,10 @@ function agirInimigo(T, p, d, e) {
   if (e.dorme) { logar(T, `😴 ${e.nome} continua dormindo.`, 'info'); return; }
   if (temCond(e.efeitos, 'atordoado')) { logar(T, `💫 ${e.nome} está atordoado e perde o turno.`, 'dano'); fim(); return; }
   const furioso = e.jeito === 'berserker' && e.hp < e.hpMax * 0.5;
-  const covarde = e.jeito === 'covarde' && e.hp < e.hpMax * 0.4 && (e.fugas || 0) < 3;      // depois de 3 fugas ele se cansa e luta
   apoioDaCarta(T, e, carta);
   const alc = Math.max(1, e.alc + (carta.alc || 0));
   let paralisado = false;
   const imob = temCond(e.efeitos, 'imobilizado'), desarm = temCond(e.efeitos, 'desarmado');
-  if (covarde && carta.mov !== undefined && !imob) {                // covarde ferido: foge em vez de lutar
-    const mov = Math.max(1, e.mov + carta.mov);
-    if (fugirDoHeroi(T, p, e, mov)) { e.fugas = (e.fugas || 0) + 1; logar(T, `🐔 ${e.nome} foge de você!`, 'info'); dispararArmadilha(T, p, e, e.c, e.r); fim(); return; }
-  }
   const ferido = e.jeito === 'curandeiro' ? combatentes(T).filter(x => x !== e && x.hp < x.hpMax && dist(x, e) > 1).sort((a, b) => (a.hp / a.hpMax) - (b.hp / b.hpMax))[0] : null;
   if (ferido && !imob && carta.mov !== undefined && !podeAtacarHeroi(T, e, e, alc)) {      // curandeiro: vai até o aliado ferido
     if (andarAte(T, e, ferido, Math.max(1, e.mov + carta.mov))) { logar(T, `💚 ${e.nome} corre até ${ferido.nome} para ajudar.`, 'info'); dispararArmadilha(T, p, e, e.c, e.r); }
@@ -1295,11 +1275,13 @@ function finalizarRodada(T, p) {
   conferirExaustao(T);
   if (!T.fim) tirarFoto(T, T.exp.jogador);
 }
-/** Sem cartas na mão e com menos de 2 no descarte: não dá mais para jogar nem descansar. O herói desmaia. */
+/** Sem cartas na mão e com menos de 2 no descarte: não dá para descansar. O herói NÃO desmaia: ele improvisa com uma carta básica (anda 2, ataca 1) até conseguir se recuperar. */
+const CARTA_IMPROVISO = { id: 'improviso', nome: 'Improviso', ini: 60, mov: 2, atq: 1, improviso: true };
 function conferirExaustao(T) {
   if (T.fim || T.fase !== 'escolha') return;
   if (T.mao.length === 0 && T.descarte.length < 2) {
-    T.fim = 'derrota'; logar(T, '😵 Você ficou sem cartas e desmaia de exaustão!', 'erro');
+    T.mao.push({ ...CARTA_IMPROVISO });
+    logar(T, '😮‍💨 Você ficou sem cartas e improvisa: uma carta básica (anda 2, ataca 1).', 'aviso');
   }
 }
 

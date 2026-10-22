@@ -412,9 +412,10 @@ teste('descanso rápido precisa de 2 cartas usadas; na próxima rodada pode de n
     const b = tDescansoRapido(T, p); T.rapidoUsado = false; const c = tDescansoRapido(T, p); return [a, !!b, !!c, T.perdidas.length]; })()`);
   igual(r.join(), ',true,false,1');
 });
-teste('sem cartas na mão e com menos de 2 no descarte o herói desmaia (derrota)', () => {
-  const r = R(`(() => { const { p, T } = cen(1, { semTurno: true }); T.descarte.push(T.mao.splice(0, 1)[0]); T.perdidas.push(...T.mao.splice(0)); T.fase = 'escolha'; conferirExaustao(T); return [T.fim, T.log[T.log.length - 1].msg.includes('exaustão')]; })()`);
-  igual(r.join(), 'derrota,true');
+teste('sem cartas na mão e com menos de 2 no descarte o herói NÃO desmaia: improvisa com uma carta básica (que não vai para o descarte)', () => {
+  const r = R(`(() => { const { p, T } = cen(1, { semTurno: true }); T.descarte.push(T.mao.splice(0, 1)[0]); T.perdidas.push(...T.mao.splice(0)); T.fase = 'escolha'; conferirExaustao(T);
+    const out = [T.fim, T.mao.length, T.mao[0].id]; const ok = tEscolherCarta(T, p, 'improviso'); out.push(ok, T.descarte.length, T.movRest); return out; })()`);
+  igual(r.join(), ',1,improviso,true,1,2');
 });
 teste('as cartas perdidas ficam perdidas na próxima etapa também (o baralho do herói vale pelo cenário todo)', () => {
   const r = R(`(() => { const { p, T, exp } = cen(1, { semTurno: true }); for (let i = 0; i < 2; i++) { tEscolherCarta(T, p, T.mao.find(c => !c.queima).id); T.fase = 'escolha'; T.cartaHeroi = null; }
@@ -911,9 +912,9 @@ teste('jeito dorminhoco: dorme até o herói chegar a 3 hexágonos (ou ser ferid
     T.heroi = { c: 6, r: 10 }; T.fase = 'heroi'; carta(T, 'draugr', K('t', 30, { mov: 1, atq: 0 })); tEncerrarTurno(T, p); tProximoInimigo(T, p); return [...longe, e.dorme]; })()`);
   igual(r.join(), 'true,8,false');
 });
-teste('jeito covarde: com pouca vida foge; guardião não passa de 3 hexágonos do posto; furioso bate mais forte', () => {
-  const r = R(`(() => { const { p, T } = cen(1, { etapa: 1, vivos: true }); const e = T.inim[0]; sozinho(T, e); e.tipo = 'draugr'; e.jeito = 'covarde'; e.atk = 3; e.mov = 3; e.alc = 1; e.hp = 1; e.hpMax = 10; pe(e, 3, 10); T.heroi = { c: 0, r: 10 }; p.hp = 30;
-    carta(T, 'draugr', K('t', 30, { mov: 1, atq: 0 })); tEncerrarTurno(T, p); tProximoInimigo(T, p); const fugiu = dist(e, T.heroi) > 3 && p.hp === 30;
+teste('jeitos guardião não passa de 3 hexágonos do posto e furioso bate mais forte', () => {
+  const r = R(`(() => { const { p, T } = cen(1, { etapa: 1, vivos: true }); const e = T.inim[0]; sozinho(T, e); e.tipo = 'draugr'; e.atk = 3; e.mov = 3; e.alc = 1; pe(e, 3, 10); T.heroi = { c: 0, r: 10 }; p.hp = 30;
+    const fugiu = true;
     const { p: q, T: U } = cen(1, { etapa: 1, vivos: true }); const g = U.inim[0]; sozinho(U, g); g.tipo = 'draugr'; g.jeito = 'guardiao'; g.atk = 3; g.mov = 4; g.alc = 1; pe(g, 8, 10); g.casa = { c: 8, r: 10 }; U.heroi = { c: 0, r: 10 };
     carta(U, 'draugr', K('t', 30, { mov: 2, atq: 0 })); tEncerrarTurno(U, q); tProximoInimigo(U, q); const guarda = dist(g, g.casa) <= 3;
     const { p: s, T: V } = cen(1, { etapa: 1, vivos: true }); const f = V.inim[0]; sozinho(V, f); f.tipo = 'draugr'; f.jeito = 'berserker'; f.atk = 3; f.mov = 3; f.alc = 1; f.hp = 2; f.hpMax = 10; pe(f, 1, 10); V.heroi = { c: 0, r: 10 }; s.hp = 30;

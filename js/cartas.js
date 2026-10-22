@@ -301,14 +301,13 @@ const ELEMENTOS = {
 const JEITOS_IA = {
   bando:      { icone: '🐺', nome: 'Bando',      desc: '+1 de ataque por aliado colado nele (até +2).' },
   guardiao:   { icone: '🛡️', nome: 'Guardião',   desc: 'não sai de perto de onde começou (3 hexágonos) e tem escudo 1.' },
-  covarde:    { icone: '🐔', nome: 'Covarde',    desc: 'com menos de 40% de vida, foge de você.' },
   berserker:  { icone: '😡', nome: 'Furioso',    desc: 'com menos de 50% de vida ganha +2 de ataque e +1 de movimento.' },
   adormecido: { icone: '😴', nome: 'Dorminhoco', desc: 'dorme até você chegar a 3 hexágonos ou até ser ferido.' },
   curandeiro: { icone: '💚', nome: 'Curandeiro', desc: 'procura aliados feridos para curá-los, ficando longe de você.' },
 };
 const JEITO_IA = {
-  draugr: 'bando', lobo_gelo: 'bando', troll_gelo: 'guardiao', harpia: 'covarde', satiro: 'curandeiro', ciclope: 'guardiao',
-  minotauro: 'berserker', alma_penada: 'curandeiro', diabrete: 'covarde', cerbero: 'berserker', demonio: 'bando',
+  draugr: 'bando', lobo_gelo: 'bando', troll_gelo: 'guardiao', harpia: 'berserker', satiro: 'curandeiro', ciclope: 'guardiao',
+  minotauro: 'berserker', alma_penada: 'curandeiro', diabrete: 'bando', cerbero: 'berserker', demonio: 'bando',
   escaravelho: 'bando', mumia: 'adormecido', chacal: 'berserker', serpente: 'adormecido',
 };
 
