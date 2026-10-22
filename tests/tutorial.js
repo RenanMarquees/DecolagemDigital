@@ -73,6 +73,7 @@ const srv = http.createServer((q, r) => {
       if (await page.$('[data-a=tat-limpa-ok]')) { await click('[data-a=tat-limpa-ok]'); continue; }
       if (c) await shot(c.id);
       await page.evaluate(() => robo(2));
+      if (process.env.DBG && i % 20 === 0) console.log(i, JSON.stringify(await page.evaluate(() => T && ({ rod: T.rodada, fase: T.fase, limpa: T.limpa, hero: T.heroi, mov: T.movRest, mao: T.mao.length, hp: P.hp, et: T.etapa, porta: T.porta && [T.porta.c, T.porta.r, T.porta.acessivel], fim: T.fim, t: document.getElementById('tut') && document.getElementById('tut').dataset.passo }))));
     }
     throw new Error('o cenário não terminou');
   }
