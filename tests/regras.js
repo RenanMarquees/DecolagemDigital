@@ -412,10 +412,9 @@ teste('descanso rápido precisa de 2 cartas usadas; na próxima rodada pode de n
     const b = tDescansoRapido(T, p); T.rapidoUsado = false; const c = tDescansoRapido(T, p); return [a, !!b, !!c, T.perdidas.length]; })()`);
   igual(r.join(), ',true,false,1');
 });
-teste('sem cartas na mão e com menos de 2 no descarte o herói NÃO desmaia: improvisa com uma carta básica (que não vai para o descarte)', () => {
-  const r = R(`(() => { const { p, T } = cen(1, { semTurno: true }); T.descarte.push(T.mao.splice(0, 1)[0]); T.perdidas.push(...T.mao.splice(0)); T.fase = 'escolha'; conferirExaustao(T);
-    const out = [T.fim, T.mao.length, T.mao[0].id]; const ok = tEscolherCarta(T, p, 'improviso'); out.push(ok, T.descarte.length, T.movRest); return out; })()`);
-  igual(r.join(), ',1,improviso,true,1,2');
+teste('sem cartas na mão e com menos de 2 no descarte o herói desmaia (derrota)', () => {
+  const r = R(`(() => { const { p, T } = cen(1, { semTurno: true }); T.descarte.push(T.mao.splice(0, 1)[0]); T.perdidas.push(...T.mao.splice(0)); T.fase = 'escolha'; conferirExaustao(T); return [T.fim, T.log[T.log.length - 1].msg.includes('exaustão')]; })()`);
+  igual(r.join(), 'derrota,true');
 });
 teste('as cartas perdidas ficam perdidas na próxima etapa também (o baralho do herói vale pelo cenário todo)', () => {
   const r = R(`(() => { const { p, T, exp } = cen(1, { semTurno: true }); for (let i = 0; i < 2; i++) { tEscolherCarta(T, p, T.mao.find(c => !c.queima).id); T.fase = 'escolha'; T.cartaHeroi = null; }

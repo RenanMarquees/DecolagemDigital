@@ -977,7 +977,7 @@ function tEscolherCarta(T, p, id, perder, id2) {
     }
     carta = T.mao.splice(i, 1)[0];
     if (id2 !== undefined && id2 !== null) carta2 = T.mao.splice(T.mao.findIndex(c => c.id === id2), 1)[0];
-    for (const c of [carta, carta2]) if (c && !c.improviso) (c.queima ? T.perdidas : T.descarte).push(c);      // o improviso não vai para o descarte      // carta que queima some para sempre (neste cenário)
+    for (const c of [carta, carta2]) if (c) (c.queima ? T.perdidas : T.descarte).push(c);      // carta que queima some para sempre (neste cenário)      // carta que queima some para sempre (neste cenário)
   }
   T.cartaHeroi = carta;
   T.modo2 = !!carta2;
@@ -1275,13 +1275,11 @@ function finalizarRodada(T, p) {
   conferirExaustao(T);
   if (!T.fim) tirarFoto(T, T.exp.jogador);
 }
-/** Sem cartas na mão e com menos de 2 no descarte: não dá para descansar. O herói NÃO desmaia: ele improvisa com uma carta básica (anda 2, ataca 1) até conseguir se recuperar. */
-const CARTA_IMPROVISO = { id: 'improviso', nome: 'Improviso', ini: 60, mov: 2, atq: 1, improviso: true };
+/** Sem cartas na mão e com menos de 2 no descarte: não dá mais para jogar nem descansar. O herói desmaia. */
 function conferirExaustao(T) {
   if (T.fim || T.fase !== 'escolha') return;
   if (T.mao.length === 0 && T.descarte.length < 2) {
-    T.mao.push({ ...CARTA_IMPROVISO });
-    logar(T, '😮‍💨 Você ficou sem cartas e improvisa: uma carta básica (anda 2, ataca 1).', 'aviso');
+    T.fim = 'derrota'; logar(T, '😵 Você ficou sem cartas e desmaia de exaustão!', 'erro');
   }
 }
 
