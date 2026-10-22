@@ -30,7 +30,7 @@ const srv = http.createServer((q, r) => {
     const medir = () => page.evaluate(() => {
       const r = s => { const e = document.querySelector(s); return e ? e.getBoundingClientRect() : null; };
       const palco = r('.palco'), dock = r('#dock'), h = Cena3D.telaDe(T.heroi.c, T.heroi.r), cv = r('#cena3d');
-      return { palco, dock, heroi: h && { x: h.x - cv.left, y: h.y - cv.top }, rola: document.documentElement.scrollHeight > innerHeight + 2, mapaBtns: r('.mapa-botoes'), vp: { w: innerWidth, h: innerHeight } };
+      return { palco, dock, heroi: h && { x: h.x - cv.left, y: h.y - cv.top }, rola: document.documentElement.scrollHeight > innerHeight + 2, vp: { w: innerWidth, h: innerHeight } };
     });
     for (const fase of ['escolha', 'turno']) {
       if (fase === 'turno') { await page.click('.cartaH >> nth=0'); await page.click('.cartaH >> nth=1'); await page.click('[data-a=tat-jogar]'); await page.waitForFunction(() => T.fase === 'heroi' && !OCUPADO, null, { timeout: 20000 }); await page.waitForTimeout(400); }

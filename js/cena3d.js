@@ -7,7 +7,7 @@
      - árvores, colunas, cristais... feitos de formas 3D
      - miniaturas em pé sobre bases coloridas, com animação (respirar, andar, golpear, apanhar)
      - armadilhas, moedas, baú e porta no chão
-   Controles: arrastar = mover a câmera · pinça (dois dedos) = zoom · girar dois dedos = girar · tocar = escolher hexágono
+   Câmera: fixa, vista quase de cima, com o mapa inteiro na tela · tocar = escolher hexágono
 
    Este arquivo só DESENHA. As regras ficam em tatica.js, e a ui.js manda o estado para cá.
    ============================================================ */
@@ -286,7 +286,8 @@ const Cena3D = (() => {
       onHex: opcoes.onHex || (() => {}),
       tiles: new Map(), ov: new Map(), unid: new Map(), arm: new Map(), moedas: new Map(), saindo: [],
       pick: [], cores: new Map(), porta: null, bau: null, saida: null,
-      cam: { x: 0, z: 0, dist: 15, yaw: 0, elev: 0.95, alvoX: 0, alvoZ: 0, alvoDist: 15, alvoYaw: 0 },
+      fixa: true,      // câmera fixa, vista quase de cima, com o mapa inteiro na tela (sem zoom, sem arrastar, sem girar)
+      cam: { x: 0, z: 0, dist: 15, yaw: 0, elev: 1.3, alvoX: 0, alvoZ: 0, alvoDist: 15, alvoYaw: 0 },
       limites: { x0: 0, x1: 0, z0: 0, z1: 0 },
       mats: { alc: null, alvo: null, perigo: null, porta: null }, fxCamada: null, ro: null, ponteiros: new Map(),
       toque: null, ultimoSync: null, mg: { t: 70, b: 130, r: 0 },
@@ -391,32 +392,24 @@ const Cena3D = (() => {
    *  (fora da faixa do topo, dos atalhos de baixo/lateral e dos botões de zoom). */
   function enquadrar() {
     if (!E) return;
-    const T = E.T, vs = T.inim.filter(e => e.vivo);
-    const pts = [T.heroi, ...vs].map(u => pos3d(u.c, u.r));
-    const cxm = pts.slice(1).reduce((a, p) => a + p.x, 0) / Math.max(1, pts.length - 1), czm = pts.slice(1).reduce((a, p) => a + p.z, 0) / Math.max(1, pts.length - 1);
-    const ph0 = pts[0], ini = pts.length > 1 ? { x: ph0.x * 0.55 + cxm * 0.45, z: ph0.z * 0.55 + czm * 0.45 } : ph0;
+    // o mapa INTEIRO, visto de cima: afasta a câmera até todos os hexágonos caberem na parte livre da tela
+    const celulas = [...E.tiles.keys()].map(k => { const [c, r] = k.split(',').map(Number); return pos3d(c, r); });
+    const xs = celulas.map(p => p.x), zs = celulas.map(p => p.z);
+    const ini = { x: (Math.min(...xs) + Math.max(...xs)) / 2, z: (Math.min(...zs) + Math.max(...zs)) / 2 };
     const L = livre();
-    Object.assign(E.cam, { x: ini.x, z: ini.z, alvoX: ini.x, alvoZ: ini.z });
+    Object.assign(E.cam, { x: ini.x, z: ini.z, alvoX: ini.x, alvoZ: ini.z, yaw: 0, alvoYaw: 0, elev: 1.3 });
     aplicarOffset();
-    const cabeEm = (d, lista) => { E.cam.dist = E.cam.alvoDist = d; posicionarCamera(); E.camera.updateMatrixWorld();
-      return lista.every(p => [0, 1.9].every(y => { const v = new THREE.Vector3(p.x, y, p.z).project(E.camera); return Math.abs(v.x) < L.hw && Math.abs(v.y) < L.hh; })); };
-    let achou = false;
-    for (let d = 7; d <= 30 && !achou; d += 1) achou = cabeEm(d, pts);
-    if (!achou) {
-      // tela estreita demais para todo mundo: garante o herói (e o inimigo mais perto) e deixa o resto para arrastar
-      const perto = pts.slice(1).sort((a, b) => Math.hypot(a.x - ph0.x, a.z - ph0.z) - Math.hypot(b.x - ph0.x, b.z - ph0.z))[0];
-      const grupo = perto ? [ph0, perto] : [ph0];
-      const m = grupo.length > 1 ? { x: (ph0.x + perto.x) / 2, z: (ph0.z + perto.z) / 2 } : ph0;
-      Object.assign(E.cam, { x: m.x, z: m.z, alvoX: m.x, alvoZ: m.z });
-      for (let d = 7; d <= 22 && !(achou = cabeEm(d, grupo)); d += 1);
-      if (!achou) { Object.assign(E.cam, { x: ph0.x, z: ph0.z, alvoX: ph0.x, alvoZ: ph0.z }); cabeEm(24, [ph0]); }
-    }
-    ajustarLimites(); posicionarCamera();
+    const cantos = [[Math.min(...xs) - 0.7, Math.min(...zs) - 0.7], [Math.max(...xs) + 0.7, Math.min(...zs) - 0.7], [Math.min(...xs) - 0.7, Math.max(...zs) + 0.7], [Math.max(...xs) + 0.7, Math.max(...zs) + 0.7]].map(([x, z]) => ({ x, z }));
+    const cabeEm = d => { E.cam.dist = E.cam.alvoDist = d; posicionarCamera(); E.camera.updateMatrixWorld();
+      return cantos.every(p => [0, 1.2].every(y => { const v = new THREE.Vector3(p.x, y, p.z).project(E.camera); return Math.abs(v.x) < L.hw && Math.abs(v.y) < L.hh; })); };
+    let d = 6;
+    while (d < 40 && !cabeEm(d)) d += 0.5;
+    E.cam.dist = E.cam.alvoDist = d; posicionarCamera();
   }
   /** Parte da tela que não está coberta por painéis nem pelos botões de zoom (em pixels e em fração da tela). */
   function livre() {
     const W = Math.max(100, E.cont.clientWidth), H = Math.max(100, E.cont.clientHeight), mg = E.mg;
-    const x0 = 8, x1 = W - mg.r - 64, y0 = mg.t + 12, y1 = H - mg.b - 12;
+    const x0 = 8, x1 = W - mg.r - 8, y0 = mg.t + 8, y1 = H - mg.b - 8;
     return { cx: (x0 + x1) / 2, cy: (y0 + y1) / 2, hw: Math.max(0.2, (x1 - x0) / W), hh: Math.max(0.2, (y1 - y0) / H), W, H };
   }
   /** Desloca a imagem para o centro da área livre (assim o herói não fica escondido atrás do painel). */
@@ -444,7 +437,7 @@ const Cena3D = (() => {
   function ajustarLimites() {
     const c = E.cam, l = E.limites;
     c.alvoX = Math.min(l.x1, Math.max(l.x0, c.alvoX)); c.alvoZ = Math.min(l.z1, Math.max(l.z0, c.alvoZ));
-    c.alvoDist = Math.min(30, Math.max(6, c.alvoDist));
+    c.alvoDist = Math.min(40, Math.max(6, c.alvoDist));
   }
   function posicionarCamera() {
     const c = E.cam, cosE = Math.cos(c.elev);
@@ -471,14 +464,14 @@ const Cena3D = (() => {
   function zoomPor(fator) { E.cam.alvoDist /= fator; ajustarLimites(); }
 
   function centralizar(c, r, suave = true) {
-    if (!E) return;
+    if (!E || E.fixa) return;
     const p = pos3d(c, r);
     E.cam.alvoX = p.x; E.cam.alvoZ = p.z; ajustarLimites();
     if (!suave) { E.cam.x = E.cam.alvoX; E.cam.z = E.cam.alvoZ; posicionarCamera(); }
   }
   /** Só mexe a câmera se o hexágono estiver perto da borda da tela. */
   function garantirVisivel(c, r) {
-    if (!E) return;
+    if (!E || E.fixa) return;
     const t = telaDe(c, r), rect = E.cv.getBoundingClientRect(), mg = E.mg;
     if (!t || t.x < rect.left + 40 || t.x > rect.right - 64 - mg.r || t.y < rect.top + mg.t + 20 || t.y > rect.bottom - mg.b - 20) centralizar(c, r);
   }
@@ -503,8 +496,8 @@ const Cena3D = (() => {
       p.x = ev.clientX; p.y = ev.clientY;
       if (pts.size === 1) {
         if (E.toque && !E.toque.moveu && Math.hypot(ev.clientX - E.toque.x, ev.clientY - E.toque.y) > 8) E.toque.moveu = true;
-        if (E.toque && E.toque.moveu) arrastar(dx, dy);
-      } else if (pts.size === 2 && ref) {
+        if (E.toque && E.toque.moveu && !E.fixa) arrastar(dx, dy);
+      } else if (pts.size === 2 && ref && !E.fixa) {
         const d = dist2(), a = ang2(), m = meio2();
         if (ref.d > 0) zoomPor(d / ref.d);                        // pinça = zoom
         let da = a - ref.a; if (da > Math.PI) da -= 2 * Math.PI; if (da < -Math.PI) da += 2 * Math.PI;
@@ -521,7 +514,7 @@ const Cena3D = (() => {
     };
     cv.addEventListener('pointerup', soltar);
     cv.addEventListener('pointercancel', ev => { pts.delete(ev.pointerId); ref = null; E.toque = null; });
-    cv.addEventListener('wheel', ev => { ev.preventDefault(); zoomPor(ev.deltaY < 0 ? 1.12 : 1 / 1.12); }, { passive: false });
+    cv.addEventListener('wheel', ev => { ev.preventDefault(); if (!E.fixa) zoomPor(ev.deltaY < 0 ? 1.12 : 1 / 1.12); }, { passive: false });
   }
 
   /** Descobre qual hexágono foi tocado (acertando a miniatura ou o chão). */

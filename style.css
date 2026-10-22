@@ -465,3 +465,52 @@ b { font-weight: 700; }
 
 .banner-bat { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; padding: 10px 12px; margin-bottom: 10px; border-radius: 12px; background: #3a2a10; border: 1.5px solid #ffb27a; font-size: .85rem; }
 .previa { display: block; color: #9fd1ff; margin-top: 2px; }
+
+/* ---------- Ciclo 9: tela limpa (mapa fixo de cima + barra única + gaveta com abas) ---------- */
+.sobre-topo { padding-right: 6px; }
+.sobre-topo .obj small { display: none; }
+.ini-faixa { display: flex; gap: 6px; flex-wrap: wrap; }
+.ini-chip .ef { display: none; }
+.ini-chip.chip-arm .ef, .ini-chip.chip-estr .ef { display: inline; }
+.dock { gap: 6px; }
+.barra-unica { display: flex; gap: 6px; align-items: stretch; }
+.barra-unica .ac { flex: 1 1 0; min-width: 0; min-height: 46px; }
+.barra-unica .ac b { font-size: 1.05rem; }
+.vida-chip { display: flex; align-items: center; gap: 3px; padding: 0 10px; border-radius: 12px; background: #0d0b14cc; border: 1.5px solid var(--borda); font-size: 1.05rem; white-space: nowrap; }
+.vida-chip b { font-size: 1.25rem; }
+.vida-chip small { color: var(--suave); }
+.vida-chip.baixa { border-color: var(--ruim); }
+.aguarde-i { flex: 1; display: grid; place-items: center; color: var(--suave); font-size: .85rem; }
+.balao { position: relative; padding: 8px 30px 8px 10px; border-radius: 12px; background: #1c1830f2; border: 2px solid var(--cor, #e5484d); font-size: .8rem; line-height: 1.3; }
+.balao .bal-vida { color: var(--ouro); margin-left: 4px; }
+.balao small { display: block; color: var(--suave); }
+.balao .btn-x { position: absolute; top: 4px; right: 4px; }
+/* gaveta: folha que sobe de baixo (mapa fica visível em cima) */
+.gaveta { inset: auto 0 0 0; max-height: 46%; border-radius: 18px 18px 0 0; border: 0; border-top: 2px solid var(--ouro); padding: 8px 10px 10px; gap: 6px; overflow: hidden; }
+.gaveta.aberta { display: flex; }
+.gaveta-cab { gap: 6px; }
+.abas { display: flex; gap: 4px; flex: 1; overflow-x: auto; }
+.aba { flex: 1 0 auto; padding: 8px 10px; border-radius: 10px; background: var(--painel2); border: 1px solid var(--borda); font-size: .78rem; white-space: nowrap; }
+.aba.on { background: #3b2a78; border-color: #8b5cf6; color: #fff; font-weight: 700; }
+.gaveta-corpo { flex: 1 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; padding-bottom: 4px; }
+.gaveta .mao { flex-wrap: wrap; overflow: visible; }
+.gaveta .cartaH { flex: 0 0 calc(33.333% - 5px); min-height: 72px; padding: 5px 5px 5px 7px; }
+.gaveta .cartaH b { font-size: .72rem; }
+.gaveta .cartaH .meta { font-size: .66rem; padding: 2px 4px; }
+.mao-rodape { position: sticky; bottom: 0; display: flex; gap: 6px; justify-content: flex-end; align-items: center; padding: 6px 0 0; background: linear-gradient(180deg, #130f2000, #130f20 30%); }
+.mao-rodape .btn.jogar { flex: 1; }
+.palco .modcarta { top: 26%; }
+@media (orientation: landscape) and (max-height: 520px) {
+  .gaveta { inset: 0 0 0 auto; width: min(330px, 42%); max-height: none; border-radius: 0; border-top: 0; border-left: 2px solid var(--ouro); }
+  .sobre-topo { padding-right: min(336px, 43%); }
+  .palco .modcarta { top: 48%; }
+}
+.hud-heroi.barra-unica { flex-direction: row; padding: 0; border: 0; background: none; gap: 6px; }
+.gaveta-corpo { padding-bottom: 8px; }
+.mao-rodape .btn { white-space: nowrap; }
+@media (orientation: landscape) and (max-height: 520px) {
+  .ini-faixa { flex-wrap: nowrap; overflow: hidden; }
+  .ini-chip { transform: scale(.85); transform-origin: left center; margin-right: -6px; }
+  .sobre-topo .obj { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: .7rem; }
+  .mao-rodape .btn { font-size: .72rem; padding: 6px 8px; }
+}

@@ -60,41 +60,41 @@ const srv = http.createServer((q, r) => {
   if (!/Limpe a sala/.test(await page.textContent('#obj'))) throw new Error('o objetivo não aparece');
   if (await page.evaluate(() => document.documentElement.scrollHeight > innerHeight + 2)) throw new Error('a tela de batalha não deveria rolar (tudo cabe sem descer)');
   // tudo o que importa tem que estar visível sem rolar: botões de ação/cartas dentro da tela
-  const forado = await page.evaluate(() => [...document.querySelectorAll('.btn-mapa, .cartaH, #dock .btn, .ini-faixa')].filter(e => { const r = e.getBoundingClientRect(); return r.bottom > innerHeight + 1 || r.top < 0; }).map(e => e.className));
+  const forado = await page.evaluate(() => [...document.querySelectorAll('.ac, .aba, .ini-faixa, .gaveta, .vida-chip')].filter(e => { const r = e.getBoundingClientRect(); return r.bottom > innerHeight + 1 || r.top < 0; }).map(e => e.className));
   if (forado.length) throw new Error('elementos fora da tela: ' + forado.join(', '));
-  // detalhes (📋): cartas completas dos inimigos
-  await click('[data-a=tat-gaveta] >> nth=0');
+  // aba Monstros da gaveta: cartas completas dos inimigos (ocultas antes de escolher a sua)
+  await click('[data-a=tat-aba][data-aba=monstros] >> nth=0');
   if (!(await page.$('.gaveta .carta-inim.oculta')) || (await page.$$('.gaveta .carta-inim .efeitos li')).length) throw new Error('as cartas dos inimigos deveriam estar OCULTAS antes de escolher a sua');
   if (!(await page.$('.ini-chip.oculta'))) throw new Error('a faixa de iniciativa deveria mostrar "?" nos monstros');
   await shot('06b-detalhes');
   await click('.gaveta [data-a=tat-gaveta]');
   if (await page.$('.gaveta.aberta')) throw new Error('o painel de detalhes não fechou');
+  await click('[data-a=tat-gaveta-cartas]');
+  if (!(await page.$('.gaveta.aberta .cartaH'))) throw new Error('o botão Cartas deveria abrir a gaveta com a mão');
 
-  // zoom com os botões
+  // câmera FIXA, vista de cima, com o MAPA INTEIRO na tela: pinça e arrastar não mexem em nada
   const d0 = (await page.evaluate(() => Cena3D.estado())).dist;
-  await click('[data-a=tat-zoom-mais]'); await page.waitForTimeout(700);
-  const d1 = (await page.evaluate(() => Cena3D.estado())).dist;
-  if (!(d1 < d0)) throw new Error(`o botão + deveria aproximar (${d0} -> ${d1})`);
-
-  // pinça com dois dedos (afastar os dedos aproxima a câmera)
   const cdp = await page.context().newCDPSession(page);
   const caixa = await (await page.$('#cena3d')).boundingBox();
-  const cx = caixa.x + caixa.width / 2, cy = caixa.y + caixa.height * 0.38;   // acima do painel de baixo
+  const cx = caixa.x + caixa.width / 2, cy = caixa.y + caixa.height * 0.25;
   const dedos = (a) => [{ x: cx - a, y: cy, id: 1 }, { x: cx + a, y: cy, id: 2 }];
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: dedos(30) });
   for (const a of [45, 60, 80, 100]) await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: dedos(a) });
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
-  await page.waitForTimeout(800);
-  const d2 = (await page.evaluate(() => Cena3D.estado())).dist;
-  if (!(d2 < d1)) throw new Error(`a pinça de afastar os dedos deveria aproximar (${d1} -> ${d2})`);
-  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: dedos(100) });
-  for (const a of [80, 60, 40, 25]) await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: dedos(a) });
-  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
-  await page.waitForTimeout(800);
-  const d3 = (await page.evaluate(() => Cena3D.estado())).dist;
-  if (!(d3 > d2)) throw new Error(`a pinça de juntar os dedos deveria afastar (${d2} -> ${d3})`);
-  await click('[data-a=tat-centro]'); await page.waitForTimeout(900);
-  await shot('07-zoom');
+  await page.waitForTimeout(600);
+  const d1 = (await page.evaluate(() => Cena3D.estado())).dist;
+  if (Math.abs(d1 - d0) > 0.01) throw new Error(`a câmera é fixa: a pinça não deveria dar zoom (${d0} -> ${d1})`);
+  const fora = await page.evaluate(() => {
+    const out = [], g = T.g, topoGaveta = document.getElementById('gaveta').getBoundingClientRect().top;
+    for (let r = 0; r < g.rows; r++) for (let c = 0; c < g.cols; c++) {
+      if (g.cel[r][c] === '#') continue;
+      const t = Cena3D.telaDe(c, r);
+      if (!t || t.x < 4 || t.x > innerWidth - 4 || t.y < 40 || t.y > topoGaveta) out.push(c + ',' + r);
+    }
+    return out;
+  });
+  if (fora.length) throw new Error('o mapa deveria caber inteiro acima da gaveta; fora: ' + fora.join(' '));
+  await shot('07-mapa-inteiro');
 
   // escolhe uma carta (toque marca, ▶ Jogar confirma) e joga a rodada
   await click('.cartaH >> nth=0');
@@ -104,7 +104,7 @@ const srv = http.createServer((q, r) => {
   await click('[data-a=tat-jogar]');
   await page.waitForFunction(() => T && T.fase === 'heroi' && !OCUPADO, null, { timeout: 20000 });
   await shot('07b-turno');
-  await click('[data-a=tat-gaveta] >> nth=0');
+  await click('[data-a=tat-aba][data-aba=monstros] >> nth=0');
   if ((await page.$$('.gaveta .carta-inim .efeitos li')).length < 2) throw new Error('depois de escolher, a carta do inimigo deveria ser revelada com os efeitos');
   await click('.gaveta [data-a=tat-gaveta]');
   if ((await page.$$('.turno2 .m2')).length !== 4) throw new Error('no turno deveriam aparecer as 4 metades (2 cartas)');
@@ -112,13 +112,13 @@ const srv = http.createServer((q, r) => {
   if (!(await page.$('[data-a=tat-atacar]')) || !(await page.$('[data-a=tat-fim]'))) throw new Error('os atalhos de ação (atacar/encerrar) deveriam aparecer sobre o mapa');
 
   // toque real num hexágono azul: o herói anda
-  await click('[data-a=tat-centro]'); await page.waitForTimeout(900);
+  await page.waitForTimeout(300);
   const alvo = await page.evaluate(() => {
     const campo = tAlcance(T).filter(h => !h.armadilhas && !(h.c === T.heroi.c && h.r === T.heroi.r));
     const r = document.getElementById('cena3d').getBoundingClientRect(), dk = document.getElementById('dock').getBoundingClientRect();
     for (const h of campo.sort((a, b) => dist(T.heroi, b) - dist(T.heroi, a))) {
       const t = Cena3D.telaDe(h.c, h.r);
-      if (t && t.x > r.left + 20 && t.x < r.right - 70 && t.y > r.top + 110 && t.y < dk.top - 20) return { c: h.c, r: h.r, x: t.x, y: t.y };
+      if (t && t.x > r.left + 20 && t.x < r.right - 70 && t.y > r.top + 40 && t.y < dk.top - 10) return { c: h.c, r: h.r, x: t.x, y: t.y };
     }
     return null;
   });
@@ -131,8 +131,9 @@ const srv = http.createServer((q, r) => {
   await shot('08-moveu');
 
   await click('[data-a=tat-itens]');
+  if (!(await page.$('.gaveta.aberta [data-a=tat-item], .gaveta.aberta .vazio'))) throw new Error('Itens deveria abrir a aba de itens');
   await shot('09-mochila');
-  await click('[data-a=tat-voltar]');
+  await click('.gaveta [data-a=tat-gaveta]');
   // encerra o turno: os inimigos jogam e a rodada avança
   await click('[data-a=tat-fim]');
   await page.waitForFunction(() => T && T.rodada >= 2 && T.fase === 'escolha' && !OCUPADO, null, { timeout: 20000 });
