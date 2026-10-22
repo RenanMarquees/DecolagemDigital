@@ -22,6 +22,7 @@ const srv = http.createServer((q, r) => {
   await page.addInitScript('window.TESTE_RAPIDO = true;');
   await page.goto(`http://localhost:${srv.address().port}/`);
   await page.evaluate(ROBO);
+  await page.evaluate(() => { window.ROBO_INVENCIVEL = true; });   // o teste confere os cartões do tutorial, não a dificuldade: o robô não precisa sobreviver
   const click = s => page.click(s);
   const cartao = () => page.evaluate(() => { const c = document.getElementById('tut'); return c ? { id: c.dataset.passo, ok: !!c.querySelector('[data-a=tut-ok]'), alto: c.getBoundingClientRect().height } : null; });
   const visto = new Set();
