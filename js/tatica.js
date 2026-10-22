@@ -1245,14 +1245,14 @@ function agirInimigo(T, p, d, e) {
   if (e.dorme) { logar(T, `😴 ${e.nome} continua dormindo.`, 'info'); return; }
   if (temCond(e.efeitos, 'atordoado')) { logar(T, `💫 ${e.nome} está atordoado e perde o turno.`, 'dano'); fim(); return; }
   const furioso = e.jeito === 'berserker' && e.hp < e.hpMax * 0.5;
-  const covarde = e.jeito === 'covarde' && e.hp < e.hpMax * 0.4;
+  const covarde = e.jeito === 'covarde' && e.hp < e.hpMax * 0.4 && (e.fugas || 0) < 3;      // depois de 3 fugas ele se cansa e luta
   apoioDaCarta(T, e, carta);
   const alc = Math.max(1, e.alc + (carta.alc || 0));
   let paralisado = false;
   const imob = temCond(e.efeitos, 'imobilizado'), desarm = temCond(e.efeitos, 'desarmado');
   if (covarde && carta.mov !== undefined && !imob) {                // covarde ferido: foge em vez de lutar
     const mov = Math.max(1, e.mov + carta.mov);
-    if (fugirDoHeroi(T, p, e, mov)) { logar(T, `🐔 ${e.nome} foge de você!`, 'info'); dispararArmadilha(T, p, e, e.c, e.r); fim(); return; }
+    if (fugirDoHeroi(T, p, e, mov)) { e.fugas = (e.fugas || 0) + 1; logar(T, `🐔 ${e.nome} foge de você!`, 'info'); dispararArmadilha(T, p, e, e.c, e.r); fim(); return; }
   }
   const ferido = e.jeito === 'curandeiro' ? combatentes(T).filter(x => x !== e && x.hp < x.hpMax && dist(x, e) > 1).sort((a, b) => (a.hp / a.hpMax) - (b.hp / b.hpMax))[0] : null;
   if (ferido && !imob && carta.mov !== undefined && !podeAtacarHeroi(T, e, e, alc)) {      // curandeiro: vai até o aliado ferido

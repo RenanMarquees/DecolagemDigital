@@ -22,7 +22,7 @@ module.exports = `window.robo = async function (maxIter = 400) {
       const pontosAtq = c => usa(c, x => (x.topo && x.topo.atq) || 0) * 3 + (c.queima ? -2 : 0), pontosMov = c => usa(c, x => (x.base && x.base.mov) || 0);
       const porAtq = [...mao].sort((a, b) => pontosAtq(b) - pontosAtq(a) || a.ini - b.ini);
       const porMov = [...mao].sort((a, b) => pontosMov(b) - pontosMov(a) || a.ini - b.ini);
-      const precisa = Math.min(2, mao.length);
+      const precisa = T.limpa ? 1 : Math.min(2, mao.length);
       let a = T.limpa ? porMov[0] : porAtq[0], b = (T.limpa ? porMov : porMov).find(c => c !== a);
       if (precisa === 2 && !b) b = mao.find(c => c !== a);
       ACOES['tat-carta']({ dataset: { id: a.id } });

@@ -436,7 +436,7 @@ function previaDasCartas() {
   const cartas = CARTAS_SEL.map(id => T.mao.find(c => c.id === id)).filter(Boolean);
   let mov = 0, alc = 1;
   for (const c of cartas) {
-    const m = T.mao.length === 1 ? { base: { mov: c.mov }, topo: { alc: c.alc } } : metadesDaCarta(c);
+    const m = T.mao.length === 1 || T.limpa ? { base: { mov: c.mov }, topo: { alc: c.alc } } : metadesDaCarta(c);
     mov = Math.max(mov, (m.base && m.base.mov) || 0); if (m.topo && m.topo.atq !== undefined || (m.topo && m.topo.alc)) alc = Math.max(alc, (m.topo && m.topo.alc) || 1);
   }
   const d = derivados(P), movTot = mov ? mov + d.mov : 0, alcTot = alc + (alc > 1 ? d.alc : 0);
@@ -663,7 +663,7 @@ function maoHtml() {
   const ordenada = [...T.mao].sort((a, b) => a.ini - b.ini);
   const sel = CARTA_SEL === 'descanso' ? CARTA_DESCANSO : null;
   const escolhidas = CARTAS_SEL.map(id => T.mao.find(c => c.id === id)).filter(Boolean);
-  const precisa = Math.min(2, T.mao.length);                           // com 1 carta só na mão, vale a carta inteira
+  const precisa = T.limpa ? 1 : Math.min(2, T.mao.length);           // sala limpa (só andar) ou 1 carta na mão: vale a carta inteira
   const pronto = !sel && escolhidas.length === precisa && precisa > 0;
   const naSaida = T.heroi.c === T.saida.c && T.heroi.r === T.saida.r;
   const podeDescansar = T.descarte.length >= 2;
@@ -673,7 +673,7 @@ function maoHtml() {
     : (naSaida && !T.chefeId && !T.limpa && !escolhidas.length ? '<button class="btn link peq" data-a="tat-fugir">🚪 Fugir</button>' : '');
   const pv = !sel && escolhidas.length ? previaDasCartas() : null;
   const previa = pv ? ` <span class="previa">👁️ Prévia no mapa: anda até ${pv.mov} · ataca a ${pv.alcance} de alcance (azul = onde chega, vermelho = quem alcança).</span>` : '';
-  const dica = sel ? '' : precisa === 2 ? `<span class="dica-2">Toque em <b>2 cartas</b>: ① dá a iniciativa; use a metade de cima de uma e a de baixo da outra (ou as duas de cima...).${escolhidas.length ? ` ${escolhidas.length}/2` : ''}${previa}</span>` : `<span class="dica-2">Última carta: vale ela inteira.${previa}</span>`;
+  const dica = sel ? '' : precisa === 2 ? `<span class="dica-2">Toque em <b>2 cartas</b>: ① dá a iniciativa; use a metade de cima de uma e a de baixo da outra (ou as duas de cima...).${escolhidas.length ? ` ${escolhidas.length}/2` : ''}${previa}</span>` : `<span class="dica-2">${T.limpa ? 'Sala limpa: jogue UMA carta só para andar.' : 'Última carta: vale ela inteira.'}${previa}</span>`;
   return `<div class="mao-topo"><span>🃏 ${T.mao.length} na mão · ${T.descarte.length} usadas · ${T.perdidas.length} perdidas</span>
       <span class="mao-bts"><button class="btn link peq" data-a="tat-itens">🎒 ${P.equip.mochila.length}</button><button class="btn peq sec" data-a="tat-rapido" ${podeDescansar && !T.rapidoUsado ? '' : 'disabled'} title="Perde 1 carta usada ao acaso; as outras voltam para a mão e você joga nesta rodada">⚡ Descanso rápido</button>${botao}</span></div>
     ${dica}
@@ -1146,7 +1146,8 @@ const ACOES = {
     if (id === 'descanso') { CARTA_SEL = CARTA_SEL === 'descanso' ? null : 'descanso'; CARTAS_SEL = []; atualizarHud(); return; }
     CARTA_SEL = null;
     if (CARTAS_SEL.includes(id)) CARTAS_SEL = CARTAS_SEL.filter(x => x !== id);       // 2º toque na mesma carta desmarca
-    else if (CARTAS_SEL.length < 2) CARTAS_SEL.push(id);
+    else if (CARTAS_SEL.length < (T.limpa ? 1 : 2)) CARTAS_SEL.push(id);
+    else if (T.limpa) CARTAS_SEL = [id];
     else CARTAS_SEL = [CARTAS_SEL[0], id];
     atualizarHud();
   },
@@ -1157,7 +1158,7 @@ const ACOES = {
       if (T.descarte.length < 2) { toast('Para descansar você precisa de pelo menos 2 cartas usadas.'); return; }
       ESCOLHENDO_PERDA = true; atualizarHud(); return;
     }
-    const precisa = Math.min(2, T.mao.length);
+    const precisa = T.limpa ? 1 : Math.min(2, T.mao.length);
     if (CARTAS_SEL.length !== precisa || !precisa) { toast('Escolha 2 cartas: use a metade de cima de uma e a de baixo da outra.'); return; }
     jogarCartaEscolhida(CARTAS_SEL[0], undefined, CARTAS_SEL[1]);
   },

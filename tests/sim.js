@@ -229,7 +229,7 @@ const robo = `(function () {
       if (!T.mao.length || (T.mao.length <= 1 && T.descarte.length >= 3 && !T.rapidoUsado)) { if (T.descarte.length >= 2) tDescansoRapido(T, p); }
       if (T.fase === 'escolha') {
         if (!T.mao.length) tEscolherCarta(T, p, 'descanso', cartaMenosUtil(T, p) && cartaMenosUtil(T, p).id);
-        else { const ord = [...T.mao].sort((a, b) => (b.mov || 0) - (a.mov || 0)); tEscolherCarta(T, p, ord[0].id, undefined, ord.length > 1 ? ord[1].id : undefined); }
+        else { const ord = [...T.mao].sort((a, b) => (b.mov || 0) - (a.mov || 0)); tEscolherCarta(T, p, ord[0].id, undefined, undefined); }
       }
     }
     while (T.fase === 'inimigos' && !T.fim) tProximoInimigo(T, p);
