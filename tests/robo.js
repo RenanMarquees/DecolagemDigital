@@ -40,7 +40,7 @@ module.exports = `window.robo = async function (maxIter = 400) {
         const perto = mm.topo && mm.topo.atq && alvosVivos.some(e => dist(e, T.heroi) <= (mm.topo.alc || 1));
         const nota = T.limpa ? ((mm.base && mm.base.mov) || 0) : perto ? 100 + mm.topo.atq : ((mm.base && mm.base.mov) || 0) * 2 + (mm.topo && mm.topo.cura && P.hp < derivados(P).hpMax * 0.6 ? 30 : 0);
         const q = T.limpa ? 'base' : perto ? 'topo' : ((mm.base && mm.base.mov) ? 'base' : (mm.topo ? 'topo' : 'base'));
-        if ((q === 'base' ? mm.base : mm.topo) && (!melhor || nota > melhor.nota)) melhor = { c, q, nota };
+        if ((q === 'base' ? mm.base : mm.topo) && metadePermitida(T, c, q) && (!melhor || nota > melhor.nota)) melhor = { c, q, nota };
       }
       if (!melhor) { await fim(); continue; }
       ACOES['tat-metade']({ dataset: { id: melhor.c.id, q: melhor.q } });

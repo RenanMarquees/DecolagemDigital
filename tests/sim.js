@@ -68,7 +68,7 @@ const robo = `(function () {
     const d = derivados(p), quem = alvosDoRobo(T), perto = menorDist(T.heroi, quem), frac = p.hp / d.hpMax, bau = querBau(T, p);
     const colado = quem.some(e => dist(e, T.heroi) <= 2);
     let best = -1;
-    for (const [qa, qb] of [['topo', 'base'], ['base', 'topo'], ['topo', 'topo'], ['base', 'base']]) {
+    for (const [qa, qb] of [['topo', 'base'], ['base', 'topo']]) {      // a regra do X: cima de uma + baixo da outra
       const hs = [metadesDaCarta(A)[qa], metadesDaCarta(B)[qb]].filter(Boolean);
       let mov = 0;
       for (const h of hs) if (h.mov) mov += h.mov + d.mov;
@@ -95,7 +95,7 @@ const robo = `(function () {
       const m = metadesDaCarta(c);
       for (const q of ['topo', 'base']) {
         const h = m[q];
-        if (!h) continue;
+        if (!h || !metadePermitida(T, c, q)) continue;
         let sc = Math.random() * 0.3;
         if (h.atq && !bau) {
           const alc = alcDe(h, d);

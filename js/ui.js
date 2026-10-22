@@ -673,7 +673,7 @@ function maoHtml() {
     : (naSaida && !T.chefeId && !T.limpa && !escolhidas.length ? '<button class="btn link peq" data-a="tat-fugir">🚪 Fugir</button>' : '');
   const pv = !sel && escolhidas.length ? previaDasCartas() : null;
   const previa = pv ? ` <span class="previa">👁️ Prévia no mapa: anda até ${pv.mov} · ataca a ${pv.alcance} de alcance (azul = onde chega, vermelho = quem alcança).</span>` : '';
-  const dica = sel ? '' : precisa === 2 ? `<span class="dica-2">Toque em <b>2 cartas</b>: ① dá a iniciativa; use a metade de cima de uma e a de baixo da outra (ou as duas de cima...).${escolhidas.length ? ` ${escolhidas.length}/2` : ''}${previa}</span>` : `<span class="dica-2">${T.limpa ? 'Sala limpa: jogue UMA carta só para andar.' : 'Última carta: vale ela inteira.'}${previa}</span>`;
+  const dica = sel ? '' : precisa === 2 ? `<span class="dica-2">Toque em <b>2 cartas</b>: ① dá a iniciativa; use a metade de cima de uma e a de baixo da outra (em X).${escolhidas.length ? ` ${escolhidas.length}/2` : ''}${previa}</span>` : `<span class="dica-2">${T.limpa ? 'Sala limpa: jogue UMA carta só para andar.' : 'Última carta: vale ela inteira.'}${previa}</span>`;
   return `<div class="mao-topo"><span>🃏 ${T.mao.length} na mão · ${T.descarte.length} usadas · ${T.perdidas.length} perdidas</span>
       <span class="mao-bts"><button class="btn link peq" data-a="tat-itens">🎒 ${P.equip.mochila.length}</button><button class="btn peq sec" data-a="tat-rapido" ${podeDescansar && !T.rapidoUsado ? '' : 'disabled'} title="Perde 1 carta usada ao acaso; as outras voltam para a mão e você joga nesta rodada">⚡ Descanso rápido</button>${botao}</span></div>
     ${dica}

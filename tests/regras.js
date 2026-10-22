@@ -851,13 +851,15 @@ teste('custo de vida não pode matar: sem vida suficiente a metade não é usada
     return [tAtivarMetade(T, p, 'x0', 'topo'), p.hp]; })()`);
   igual(r.join(), 'false,2');
 });
-teste('elementos: uma carta cria 🔥 e outra gasta para ganhar +2 de dano (some depois de gasto e esmaece com as rodadas)', () => {
+teste('elementos: uma carta cria 🔥 e outra (na rodada seguinte) gasta para ganhar +2 de dano; some depois de gasto e esmaece com as rodadas', () => {
   const r = R(`(() => { const { p, T } = cen(1, { semTurno: true }); const e = T.inim[0]; pe(e, 1, 10); e.hp = e.hpMax = 50; e.def = 0;
-    dois(T, p, { mov: 2, atq: 2, elem: 'fogo' }, { mov: 1, atq: 3, usaElem: { elem: 'fogo', atq: 2 } });
-    tAtivarMetade(T, p, 'x0', 'topo'); tAtacar(T, p, e.uid); const criou = T.elementos.fogo;
-    tAtivarMetade(T, p, 'x1', 'topo'); tAtacar(T, p, e.uid); const gasto = T.elementos.fogo;
-    return [criou, gasto, 50 - e.hp]; })()`);
-  igual(r.join(), '2,0,7');
+    dois(T, p, { mov: 2, atq: 2, elem: 'fogo' }, { mov: 1 });
+    tAtivarMetade(T, p, 'x0', 'topo'); tAtacar(T, p, e.uid); const criou = T.elementos.fogo; tAtivarMetade(T, p, 'x1', 'base');
+    T.fase = 'inimigos'; T.fila = []; finalizarRodada(T, p); const meio = T.elementos.fogo;
+    dois(T, p, { mov: 1, atq: 3, usaElem: { elem: 'fogo', atq: 2 } }, { mov: 1 });
+    tAtivarMetade(T, p, 'x0', 'topo'); tAtacar(T, p, e.uid); const gasto = T.elementos.fogo;
+    return [criou, meio, gasto, 50 - e.hp]; })()`);
+  igual(r.join(), '2,1,0,7');
   const r2 = R(`(() => { const { p, T } = cen(1, { semTurno: true }); T.elementos.gelo = 2; T.fase = 'inimigos'; T.fila = []; finalizarRodada(T, p); const a = T.elementos.gelo; T.fase = 'inimigos'; finalizarRodada(T, p); return [a, T.elementos.gelo]; })()`);
   igual(r2.join(), '1,0');
 });
@@ -1053,6 +1055,15 @@ teste('desvantagem só vale se o alvo atacado estiver colado: com um monstro ao 
     { const { p, T } = cen(1, { carta: { alc: 4, mov: 0, atq: 3, alvo: 'vizinhos' } }); const a = T.inim[0], b = T.inim[1]; pe(a, 1, 10); pe(b, 4, 10); a.hp = a.hpMax = b.hp = b.hpMax = 99; tAtacar(T, p, b.uid); out.push(T.modFx[0].desv); }
     SORTE.ativa = false; return out; })()`);
   igual(r.join(), 'true,false,false');
+});
+
+teste('a regra do X: depois da metade de CIMA de uma carta só vale a de BAIXO da outra (e vice-versa); sem a metade exigida, vale qualquer uma', () => {
+  const r = R(`(() => { const out = [];
+    { const { p, T } = cen(1, { semTurno: true }); dois(T, p, { mov: 2, atq: 3 }, { mov: 3, atq: 1 }); out.push(tAtivarMetade(T, p, 'x0', 'topo'), tAtivarMetade(T, p, 'x1', 'topo'), tAtivarMetade(T, p, 'x1', 'base')); }
+    { const { p, T } = cen(1, { semTurno: true }); dois(T, p, { mov: 2, atq: 3 }, { mov: 3, atq: 1 }); out.push(tAtivarMetade(T, p, 'x0', 'base'), tAtivarMetade(T, p, 'x1', 'base'), tAtivarMetade(T, p, 'x1', 'topo')); }
+    { const { p, T } = cen(1, { semTurno: true }); dois(T, p, { mov: 2, atq: 3 }, { mov: 5 }); out.push(tAtivarMetade(T, p, 'x0', 'base'), tAtivarMetade(T, p, 'x1', 'base')); }   // a outra carta não tem metade de cima: vale
+    return out; })()`);
+  igual(r.join(), 'true,false,true,true,false,true,true,true');
 });
 
 console.log(`\n${ok} testes passaram${falhas.length ? `, ${falhas.length} FALHARAM: ${falhas.join('; ')}` : ''}.`);

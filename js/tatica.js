@@ -1032,6 +1032,15 @@ function iniciarTurnoHeroi(T, p) {
   }
 }
 
+/** A regra do X: se a primeira metade usada foi a de CIMA de uma carta, a segunda tem de ser a de BAIXO da outra (e vice-versa).
+ *  Se a outra carta não tiver a metade exigida, vale qualquer uma. Devolve false quando a metade `q` da carta não é permitida agora. */
+function metadePermitida(T, carta, q) {
+  const usadas = Object.values(T.usadas || {});
+  if (usadas.length !== 1) return true;
+  const quer = usadas[0] === 'topo' ? 'base' : 'topo';
+  return q === quer || !metadesDaCarta(carta)[quer];
+}
+
 /** Usa UMA metade de uma das duas cartas jogadas ('topo' = ataque/cura, 'base' = movimento/escudo). A outra metade dessa carta se perde. */
 function tAtivarMetade(T, p, cartaId, qual) {
   if (T.fase !== 'heroi' || T.fim || T.livre || !T.modo2 || T.forcaFila.length) return false;
@@ -1039,6 +1048,7 @@ function tAtivarMetade(T, p, cartaId, qual) {
   if (i < 0) { logar(T, 'Essa carta já foi usada neste turno.', 'erro'); return false; }
   const carta = T.pendentes[i], h = metadesDaCarta(carta)[qual];
   if (!h) { logar(T, 'Essa metade da carta não faz nada.', 'erro'); return false; }
+  if (!metadePermitida(T, carta, qual)) { logar(T, `Siga o X: você usou a metade de ${qual === 'topo' ? 'baixo' : 'cima'} da outra carta, então use a de ${qual === 'topo' ? 'baixo' : 'cima'} desta.`, 'erro'); return false; }
   if (h.custo && h.custo.vida && p.hp <= h.custo.vida) { logar(T, `Você não tem vida para pagar o custo (${h.custo.vida}).`, 'erro'); return false; }
   const d = derivados(p);
   const ativa = { ...h, nome: carta.nome, ini: carta.ini };
