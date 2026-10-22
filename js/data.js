@@ -26,7 +26,7 @@ const CLASSES = {
     desc: 'Rápido e preciso. Cartas de longo alcance e de movimento: acerta de longe e some.',
   },
   oraculo: {
-    nome: 'Oráculo', icone: '🔮', hpBase: 8, hpNivel: 0.7,
+    nome: 'Oráculo', icone: '🔮', hpBase: 9, hpNivel: 0.8,
     desc: 'Mestre da magia. Cartas de raio, de cura e de área: fere vários inimigos e cuida de si.',
   },
 };
