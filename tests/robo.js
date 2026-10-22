@@ -33,7 +33,7 @@ module.exports = `window.robo = async function (maxIter = 400) {
     if (T.fase !== 'heroi' || OCUPADO) { await new Promise(r => setTimeout(r, 5)); continue; }
     if (T.modo2 && T.pendentes.length && T.acaoUsada && T.movRest === 0 && !T.forcaFila.length) {          // duas cartas: escolhe a próxima metade a usar
       const estrs = T.objetivo === 'destruir' && T.ultimaEtapa ? vivos(T).filter(e => e.estrutura) : [];
-      const alvosVivos = estrs.length ? estrs : (combatentes(T).length ? combatentes(T) : vivos(T));
+      const alvosVivos = estrs.length ? [...estrs, ...combatentes(T)] : (combatentes(T).length ? combatentes(T) : vivos(T));   // estruturas primeiro, mas bate em quem estiver no caminho
       let melhor = null;
       for (const c of T.pendentes) {
         const mm = metadesDaCarta(c);
