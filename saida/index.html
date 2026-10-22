@@ -468,6 +468,55 @@ b { font-weight: 700; }
 .banner-bat { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; padding: 10px 12px; margin-bottom: 10px; border-radius: 12px; background: #3a2a10; border: 1.5px solid #ffb27a; font-size: .85rem; }
 .previa { display: block; color: #9fd1ff; margin-top: 2px; }
 
+/* ---------- Ciclo 9: tela limpa (mapa fixo de cima + barra única + gaveta com abas) ---------- */
+.sobre-topo { padding-right: 6px; }
+.sobre-topo .obj small { display: none; }
+.ini-faixa { display: flex; gap: 6px; flex-wrap: wrap; }
+.ini-chip .ef { display: none; }
+.ini-chip.chip-arm .ef, .ini-chip.chip-estr .ef { display: inline; }
+.dock { gap: 6px; }
+.barra-unica { display: flex; gap: 6px; align-items: stretch; }
+.barra-unica .ac { flex: 1 1 0; min-width: 0; min-height: 46px; }
+.barra-unica .ac b { font-size: 1.05rem; }
+.vida-chip { display: flex; align-items: center; gap: 3px; padding: 0 10px; border-radius: 12px; background: #0d0b14cc; border: 1.5px solid var(--borda); font-size: 1.05rem; white-space: nowrap; }
+.vida-chip b { font-size: 1.25rem; }
+.vida-chip small { color: var(--suave); }
+.vida-chip.baixa { border-color: var(--ruim); }
+.aguarde-i { flex: 1; display: grid; place-items: center; color: var(--suave); font-size: .85rem; }
+.balao { position: relative; padding: 8px 30px 8px 10px; border-radius: 12px; background: #1c1830f2; border: 2px solid var(--cor, #e5484d); font-size: .8rem; line-height: 1.3; }
+.balao .bal-vida { color: var(--ouro); margin-left: 4px; }
+.balao small { display: block; color: var(--suave); }
+.balao .btn-x { position: absolute; top: 4px; right: 4px; }
+/* gaveta: folha que sobe de baixo (mapa fica visível em cima) */
+.gaveta { inset: auto 0 0 0; max-height: 46%; border-radius: 18px 18px 0 0; border: 0; border-top: 2px solid var(--ouro); padding: 8px 10px 10px; gap: 6px; overflow: hidden; }
+.gaveta.aberta { display: flex; }
+.gaveta-cab { gap: 6px; }
+.abas { display: flex; gap: 4px; flex: 1; overflow-x: auto; }
+.aba { flex: 1 0 auto; padding: 8px 10px; border-radius: 10px; background: var(--painel2); border: 1px solid var(--borda); font-size: .78rem; white-space: nowrap; }
+.aba.on { background: #3b2a78; border-color: #8b5cf6; color: #fff; font-weight: 700; }
+.gaveta-corpo { flex: 1 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; padding-bottom: 4px; }
+.gaveta .mao { flex-wrap: wrap; overflow: visible; }
+.gaveta .cartaH { flex: 0 0 calc(33.333% - 5px); min-height: 72px; padding: 5px 5px 5px 7px; }
+.gaveta .cartaH b { font-size: .72rem; }
+.gaveta .cartaH .meta { font-size: .66rem; padding: 2px 4px; }
+.mao-rodape { position: sticky; bottom: 0; display: flex; gap: 6px; justify-content: flex-end; align-items: center; padding: 6px 0 0; background: linear-gradient(180deg, #130f2000, #130f20 30%); }
+.mao-rodape .btn.jogar { flex: 1; }
+.palco .modcarta { top: 26%; }
+@media (orientation: landscape) and (max-height: 520px) {
+  .gaveta { inset: 0 0 0 auto; width: min(330px, 42%); max-height: none; border-radius: 0; border-top: 0; border-left: 2px solid var(--ouro); }
+  .sobre-topo { padding-right: min(336px, 43%); }
+  .palco .modcarta { top: 48%; }
+}
+.hud-heroi.barra-unica { flex-direction: row; padding: 0; border: 0; background: none; gap: 6px; }
+.gaveta-corpo { padding-bottom: 8px; }
+.mao-rodape .btn { white-space: nowrap; }
+@media (orientation: landscape) and (max-height: 520px) {
+  .ini-faixa { flex-wrap: nowrap; overflow: hidden; }
+  .ini-chip { transform: scale(.85); transform-origin: left center; margin-right: -6px; }
+  .sobre-topo .obj { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: .7rem; }
+  .mao-rodape .btn { font-size: .72rem; padding: 6px 8px; }
+}
+
 </style>
 <div id="app"></div>
 <div id="modal"></div>
@@ -1091,14 +1140,13 @@ const ELEMENTOS = {
 const JEITOS_IA = {
   bando:      { icone: '🐺', nome: 'Bando',      desc: '+1 de ataque por aliado colado nele (até +2).' },
   guardiao:   { icone: '🛡️', nome: 'Guardião',   desc: 'não sai de perto de onde começou (3 hexágonos) e tem escudo 1.' },
-  covarde:    { icone: '🐔', nome: 'Covarde',    desc: 'com menos de 40% de vida, foge de você.' },
   berserker:  { icone: '😡', nome: 'Furioso',    desc: 'com menos de 50% de vida ganha +2 de ataque e +1 de movimento.' },
   adormecido: { icone: '😴', nome: 'Dorminhoco', desc: 'dorme até você chegar a 3 hexágonos ou até ser ferido.' },
   curandeiro: { icone: '💚', nome: 'Curandeiro', desc: 'procura aliados feridos para curá-los, ficando longe de você.' },
 };
 const JEITO_IA = {
-  draugr: 'bando', lobo_gelo: 'bando', troll_gelo: 'guardiao', harpia: 'covarde', satiro: 'curandeiro', ciclope: 'guardiao',
-  minotauro: 'berserker', alma_penada: 'curandeiro', diabrete: 'covarde', cerbero: 'berserker', demonio: 'bando',
+  draugr: 'bando', lobo_gelo: 'bando', troll_gelo: 'guardiao', harpia: 'berserker', satiro: 'curandeiro', ciclope: 'guardiao',
+  minotauro: 'berserker', alma_penada: 'curandeiro', diabrete: 'bando', cerbero: 'berserker', demonio: 'bando',
   escaravelho: 'bando', mumia: 'adormecido', chacal: 'berserker', serpente: 'adormecido',
 };
 
@@ -3773,7 +3821,7 @@ function tEscolherCarta(T, p, id, perder, id2) {
     }
     carta = T.mao.splice(i, 1)[0];
     if (id2 !== undefined && id2 !== null) carta2 = T.mao.splice(T.mao.findIndex(c => c.id === id2), 1)[0];
-    for (const c of [carta, carta2]) if (c) (c.queima ? T.perdidas : T.descarte).push(c);      // carta que queima some para sempre (neste cenário)
+    for (const c of [carta, carta2]) if (c) (c.queima ? T.perdidas : T.descarte).push(c);      // carta que queima some para sempre (neste cenário)      // carta que queima some para sempre (neste cenário)
   }
   T.cartaHeroi = carta;
   T.modo2 = !!carta2;
@@ -3828,6 +3876,15 @@ function iniciarTurnoHeroi(T, p) {
   }
 }
 
+/** A regra do X: se a primeira metade usada foi a de CIMA de uma carta, a segunda tem de ser a de BAIXO da outra (e vice-versa).
+ *  Se a outra carta não tiver a metade exigida, vale qualquer uma. Devolve false quando a metade `q` da carta não é permitida agora. */
+function metadePermitida(T, carta, q) {
+  const usadas = Object.values(T.usadas || {});
+  if (usadas.length !== 1) return true;
+  const quer = usadas[0] === 'topo' ? 'base' : 'topo';
+  return q === quer || !metadesDaCarta(carta)[quer];
+}
+
 /** Usa UMA metade de uma das duas cartas jogadas ('topo' = ataque/cura, 'base' = movimento/escudo). A outra metade dessa carta se perde. */
 function tAtivarMetade(T, p, cartaId, qual) {
   if (T.fase !== 'heroi' || T.fim || T.livre || !T.modo2 || T.forcaFila.length) return false;
@@ -3835,6 +3892,7 @@ function tAtivarMetade(T, p, cartaId, qual) {
   if (i < 0) { logar(T, 'Essa carta já foi usada neste turno.', 'erro'); return false; }
   const carta = T.pendentes[i], h = metadesDaCarta(carta)[qual];
   if (!h) { logar(T, 'Essa metade da carta não faz nada.', 'erro'); return false; }
+  if (!metadePermitida(T, carta, qual)) { logar(T, `Siga o X: você usou a metade de ${qual === 'topo' ? 'baixo' : 'cima'} da outra carta, então use a de ${qual === 'topo' ? 'baixo' : 'cima'} desta.`, 'erro'); return false; }
   if (h.custo && h.custo.vida && p.hp <= h.custo.vida) { logar(T, `Você não tem vida para pagar o custo (${h.custo.vida}).`, 'erro'); return false; }
   const d = derivados(p);
   const ativa = { ...h, nome: carta.nome, ini: carta.ini };
@@ -4001,21 +4059,6 @@ function apoioDaCarta(T, e, carta) {
   }
 }
 
-/** Hexágono vizinho (a até `mov` passos) que mais AFASTA o inimigo do herói. */
-function fugirDoHeroi(T, p, e, mov) {
-  const ocupadoPorOutro = (c, r) => T.inim.some(x => x.vivo && x !== e && x.c === c && x.r === r);
-  const nos = bfs(T.g, e, mov, (c, r) => (c === T.heroi.c && r === T.heroi.r) || ocupadoPorOutro(c, r), (c, r) => temArmadilha(T, c, r));
-  let melhor = null;
-  for (const n of nos.values()) {
-    if (n.d === 0 || temArmadilha(T, n.c, n.r)) continue;
-    const s = dist(n, T.heroi) * 10 - n.d;
-    if (!melhor || s > melhor.s) melhor = { n, s };
-  }
-  if (!melhor || dist(melhor.n, T.heroi) <= dist(e, T.heroi)) return false;
-  e.c = melhor.n.c; e.r = melhor.n.r;
-  return true;
-}
-
 /** Anda `mov` passos em direção a `alvo` (um aliado ferido, por exemplo), sem pisar em armadilha. */
 function andarAte(T, e, alvo, mov) {
   const ocupadoPorOutro = (c, r) => T.inim.some(x => x.vivo && x !== e && x.c === c && x.r === r) || (c === T.heroi.c && r === T.heroi.r);
@@ -4041,15 +4084,10 @@ function agirInimigo(T, p, d, e) {
   if (e.dorme) { logar(T, `😴 ${e.nome} continua dormindo.`, 'info'); return; }
   if (temCond(e.efeitos, 'atordoado')) { logar(T, `💫 ${e.nome} está atordoado e perde o turno.`, 'dano'); fim(); return; }
   const furioso = e.jeito === 'berserker' && e.hp < e.hpMax * 0.5;
-  const covarde = e.jeito === 'covarde' && e.hp < e.hpMax * 0.4 && (e.fugas || 0) < 3;      // depois de 3 fugas ele se cansa e luta
   apoioDaCarta(T, e, carta);
   const alc = Math.max(1, e.alc + (carta.alc || 0));
   let paralisado = false;
   const imob = temCond(e.efeitos, 'imobilizado'), desarm = temCond(e.efeitos, 'desarmado');
-  if (covarde && carta.mov !== undefined && !imob) {                // covarde ferido: foge em vez de lutar
-    const mov = Math.max(1, e.mov + carta.mov);
-    if (fugirDoHeroi(T, p, e, mov)) { e.fugas = (e.fugas || 0) + 1; logar(T, `🐔 ${e.nome} foge de você!`, 'info'); dispararArmadilha(T, p, e, e.c, e.r); fim(); return; }
-  }
   const ferido = e.jeito === 'curandeiro' ? combatentes(T).filter(x => x !== e && x.hp < x.hpMax && dist(x, e) > 1).sort((a, b) => (a.hp / a.hpMax) - (b.hp / b.hpMax))[0] : null;
   if (ferido && !imob && carta.mov !== undefined && !podeAtacarHeroi(T, e, e, alc)) {      // curandeiro: vai até o aliado ferido
     if (andarAte(T, e, ferido, Math.max(1, e.mov + carta.mov))) { logar(T, `💚 ${e.nome} corre até ${ferido.nome} para ajudar.`, 'info'); dispararArmadilha(T, p, e, e.c, e.r); }
@@ -10132,7 +10170,7 @@ Modelos3D.registrar({
      - árvores, colunas, cristais... feitos de formas 3D
      - miniaturas em pé sobre bases coloridas, com animação (respirar, andar, golpear, apanhar)
      - armadilhas, moedas, baú e porta no chão
-   Controles: arrastar = mover a câmera · pinça (dois dedos) = zoom · girar dois dedos = girar · tocar = escolher hexágono
+   Câmera: fixa, vista quase de cima, com o mapa inteiro na tela · tocar = escolher hexágono
 
    Este arquivo só DESENHA. As regras ficam em tatica.js, e a ui.js manda o estado para cá.
    ============================================================ */
@@ -10411,7 +10449,8 @@ const Cena3D = (() => {
       onHex: opcoes.onHex || (() => {}),
       tiles: new Map(), ov: new Map(), unid: new Map(), arm: new Map(), moedas: new Map(), saindo: [],
       pick: [], cores: new Map(), porta: null, bau: null, saida: null,
-      cam: { x: 0, z: 0, dist: 15, yaw: 0, elev: 0.95, alvoX: 0, alvoZ: 0, alvoDist: 15, alvoYaw: 0 },
+      fixa: true,      // câmera fixa, vista quase de cima, com o mapa inteiro na tela (sem zoom, sem arrastar, sem girar)
+      cam: { x: 0, z: 0, dist: 15, yaw: 0, elev: 1.3, alvoX: 0, alvoZ: 0, alvoDist: 15, alvoYaw: 0 },
       limites: { x0: 0, x1: 0, z0: 0, z1: 0 },
       mats: { alc: null, alvo: null, perigo: null, porta: null }, fxCamada: null, ro: null, ponteiros: new Map(),
       toque: null, ultimoSync: null, mg: { t: 70, b: 130, r: 0 },
@@ -10516,32 +10555,24 @@ const Cena3D = (() => {
    *  (fora da faixa do topo, dos atalhos de baixo/lateral e dos botões de zoom). */
   function enquadrar() {
     if (!E) return;
-    const T = E.T, vs = T.inim.filter(e => e.vivo);
-    const pts = [T.heroi, ...vs].map(u => pos3d(u.c, u.r));
-    const cxm = pts.slice(1).reduce((a, p) => a + p.x, 0) / Math.max(1, pts.length - 1), czm = pts.slice(1).reduce((a, p) => a + p.z, 0) / Math.max(1, pts.length - 1);
-    const ph0 = pts[0], ini = pts.length > 1 ? { x: ph0.x * 0.55 + cxm * 0.45, z: ph0.z * 0.55 + czm * 0.45 } : ph0;
+    // o mapa INTEIRO, visto de cima: afasta a câmera até todos os hexágonos caberem na parte livre da tela
+    const celulas = [...E.tiles.keys()].map(k => { const [c, r] = k.split(',').map(Number); return pos3d(c, r); });
+    const xs = celulas.map(p => p.x), zs = celulas.map(p => p.z);
+    const ini = { x: (Math.min(...xs) + Math.max(...xs)) / 2, z: (Math.min(...zs) + Math.max(...zs)) / 2 };
     const L = livre();
-    Object.assign(E.cam, { x: ini.x, z: ini.z, alvoX: ini.x, alvoZ: ini.z });
+    Object.assign(E.cam, { x: ini.x, z: ini.z, alvoX: ini.x, alvoZ: ini.z, yaw: 0, alvoYaw: 0, elev: 1.3 });
     aplicarOffset();
-    const cabeEm = (d, lista) => { E.cam.dist = E.cam.alvoDist = d; posicionarCamera(); E.camera.updateMatrixWorld();
-      return lista.every(p => [0, 1.9].every(y => { const v = new THREE.Vector3(p.x, y, p.z).project(E.camera); return Math.abs(v.x) < L.hw && Math.abs(v.y) < L.hh; })); };
-    let achou = false;
-    for (let d = 7; d <= 30 && !achou; d += 1) achou = cabeEm(d, pts);
-    if (!achou) {
-      // tela estreita demais para todo mundo: garante o herói (e o inimigo mais perto) e deixa o resto para arrastar
-      const perto = pts.slice(1).sort((a, b) => Math.hypot(a.x - ph0.x, a.z - ph0.z) - Math.hypot(b.x - ph0.x, b.z - ph0.z))[0];
-      const grupo = perto ? [ph0, perto] : [ph0];
-      const m = grupo.length > 1 ? { x: (ph0.x + perto.x) / 2, z: (ph0.z + perto.z) / 2 } : ph0;
-      Object.assign(E.cam, { x: m.x, z: m.z, alvoX: m.x, alvoZ: m.z });
-      for (let d = 7; d <= 22 && !(achou = cabeEm(d, grupo)); d += 1);
-      if (!achou) { Object.assign(E.cam, { x: ph0.x, z: ph0.z, alvoX: ph0.x, alvoZ: ph0.z }); cabeEm(24, [ph0]); }
-    }
-    ajustarLimites(); posicionarCamera();
+    const cantos = [[Math.min(...xs) - 0.7, Math.min(...zs) - 0.7], [Math.max(...xs) + 0.7, Math.min(...zs) - 0.7], [Math.min(...xs) - 0.7, Math.max(...zs) + 0.7], [Math.max(...xs) + 0.7, Math.max(...zs) + 0.7]].map(([x, z]) => ({ x, z }));
+    const cabeEm = d => { E.cam.dist = E.cam.alvoDist = d; posicionarCamera(); E.camera.updateMatrixWorld();
+      return cantos.every(p => [0, 1.2].every(y => { const v = new THREE.Vector3(p.x, y, p.z).project(E.camera); return Math.abs(v.x) < L.hw && Math.abs(v.y) < L.hh; })); };
+    let d = 6;
+    while (d < 40 && !cabeEm(d)) d += 0.5;
+    E.cam.dist = E.cam.alvoDist = d; posicionarCamera();
   }
   /** Parte da tela que não está coberta por painéis nem pelos botões de zoom (em pixels e em fração da tela). */
   function livre() {
     const W = Math.max(100, E.cont.clientWidth), H = Math.max(100, E.cont.clientHeight), mg = E.mg;
-    const x0 = 8, x1 = W - mg.r - 64, y0 = mg.t + 12, y1 = H - mg.b - 12;
+    const x0 = 8, x1 = W - mg.r - 8, y0 = mg.t + 8, y1 = H - mg.b - 8;
     return { cx: (x0 + x1) / 2, cy: (y0 + y1) / 2, hw: Math.max(0.2, (x1 - x0) / W), hh: Math.max(0.2, (y1 - y0) / H), W, H };
   }
   /** Desloca a imagem para o centro da área livre (assim o herói não fica escondido atrás do painel). */
@@ -10569,7 +10600,7 @@ const Cena3D = (() => {
   function ajustarLimites() {
     const c = E.cam, l = E.limites;
     c.alvoX = Math.min(l.x1, Math.max(l.x0, c.alvoX)); c.alvoZ = Math.min(l.z1, Math.max(l.z0, c.alvoZ));
-    c.alvoDist = Math.min(30, Math.max(6, c.alvoDist));
+    c.alvoDist = Math.min(40, Math.max(6, c.alvoDist));
   }
   function posicionarCamera() {
     const c = E.cam, cosE = Math.cos(c.elev);
@@ -10596,14 +10627,14 @@ const Cena3D = (() => {
   function zoomPor(fator) { E.cam.alvoDist /= fator; ajustarLimites(); }
 
   function centralizar(c, r, suave = true) {
-    if (!E) return;
+    if (!E || E.fixa) return;
     const p = pos3d(c, r);
     E.cam.alvoX = p.x; E.cam.alvoZ = p.z; ajustarLimites();
     if (!suave) { E.cam.x = E.cam.alvoX; E.cam.z = E.cam.alvoZ; posicionarCamera(); }
   }
   /** Só mexe a câmera se o hexágono estiver perto da borda da tela. */
   function garantirVisivel(c, r) {
-    if (!E) return;
+    if (!E || E.fixa) return;
     const t = telaDe(c, r), rect = E.cv.getBoundingClientRect(), mg = E.mg;
     if (!t || t.x < rect.left + 40 || t.x > rect.right - 64 - mg.r || t.y < rect.top + mg.t + 20 || t.y > rect.bottom - mg.b - 20) centralizar(c, r);
   }
@@ -10628,8 +10659,8 @@ const Cena3D = (() => {
       p.x = ev.clientX; p.y = ev.clientY;
       if (pts.size === 1) {
         if (E.toque && !E.toque.moveu && Math.hypot(ev.clientX - E.toque.x, ev.clientY - E.toque.y) > 8) E.toque.moveu = true;
-        if (E.toque && E.toque.moveu) arrastar(dx, dy);
-      } else if (pts.size === 2 && ref) {
+        if (E.toque && E.toque.moveu && !E.fixa) arrastar(dx, dy);
+      } else if (pts.size === 2 && ref && !E.fixa) {
         const d = dist2(), a = ang2(), m = meio2();
         if (ref.d > 0) zoomPor(d / ref.d);                        // pinça = zoom
         let da = a - ref.a; if (da > Math.PI) da -= 2 * Math.PI; if (da < -Math.PI) da += 2 * Math.PI;
@@ -10646,7 +10677,7 @@ const Cena3D = (() => {
     };
     cv.addEventListener('pointerup', soltar);
     cv.addEventListener('pointercancel', ev => { pts.delete(ev.pointerId); ref = null; E.toque = null; });
-    cv.addEventListener('wheel', ev => { ev.preventDefault(); zoomPor(ev.deltaY < 0 ? 1.12 : 1 / 1.12); }, { passive: false });
+    cv.addEventListener('wheel', ev => { ev.preventDefault(); if (!E.fixa) zoomPor(ev.deltaY < 0 ? 1.12 : 1 / 1.12); }, { passive: false });
   }
 
   /** Descobre qual hexágono foi tocado (acertando a miniatura ou o chão). */
@@ -10982,30 +11013,30 @@ const Tutorial = (() => {
       texto: 'Aqui você vê a história, o OBJETIVO (derrotar todos os inimigos), quantas etapas o cenário tem (salas separadas por portas) e a DIFICULDADE. O nível do cenário cresce com o seu nível. Para aprender, Fácil é perfeito. Toque em Começar.',
       destaque: '.caixa-obj', esperar: () => feito('iniciou1') },
     { id: 'b_mapa', tela: 'batalha', quando: () => naBatalha(1), titulo: '🗺️ O campo de batalha',
-      texto: 'Isto é um mapa em 3D feito de hexágonos. Arraste com 1 dedo para mover a câmera. Com 2 dedos: afaste/aproxime para dar zoom e gire para mudar o ângulo. Os botões ＋ − ↻ fazem o mesmo, e 🎯 volta para o seu herói.',
-      destaque: '.mapa-botoes', botao: 'Entendi' },
+      texto: 'Isto é o mapa, visto de cima e sempre INTEIRO na tela (não precisa de zoom nem de arrastar). Você é o herói da base dourada; os números sobre as miniaturas são a vida. Toque num hexágono azul para andar e num monstro para ver a ficha dele.',
+      destaque: '#cena3d', botao: 'Entendi' },
     { id: 'b_objetivo', tela: 'batalha', quando: () => naBatalha(1), titulo: '🎯 O objetivo',
       texto: 'Aqui em cima fica sempre o OBJETIVO do cenário e o seu andamento. Neste: derrotar todos os inimigos. Ao cumprir, você vence.',
       destaque: '#obj', botao: 'Entendi' },
     { id: 'b_iniciativa', tela: 'batalha', quando: () => naBatalha(1), titulo: '⚡ Ordem de iniciativa',
-      texto: 'Esta faixa lá em cima mostra QUEM JOGA PRIMEIRO. Cada carta tem um número de iniciativa: o menor joga antes. Mas atenção: as cartas dos monstros ficam OCULTAS ("?") até você escolher a sua — não dá para planejar em cima delas! Depois que você joga, elas são reveladas numa fileira embaixo, bem legíveis (👣 anda, ⚔️ dano, 🎯 alcance, ❤️ vida) e a ordem aparece. A vida de todos é um número: o seu fica no painel e o dos monstros em cima deles.',
+      texto: 'Estas bolinhas lá em cima mostram QUEM JOGA PRIMEIRO: o menor número joga antes. As cartas dos monstros ficam OCULTAS ("?") até você escolher as suas. Depois elas são reveladas: toque numa bolinha (ou num monstro no mapa) para ver a carta dele (👣 anda, ⚔️ dano, 🎯 alcance). A vida de todos é um número: a sua fica na barra de baixo e a dos monstros em cima deles.',
       destaque: '.ini-faixa', botao: 'Entendi' },
     { id: 'b_escolher', tela: 'batalha', quando: () => naBatalha(1) && T.fase === 'escolha', titulo: '🃏 Escolha 2 cartas',
       texto: 'Embaixo estão as SUAS cartas (a mão). Em cada rodada você joga DUAS: toque em duas e depois em ▶ Jogar. Cada carta tem duas metades: a de CIMA (ataque ou cura) e a de BAIXO (movimento e escudo); você usa uma metade de cada carta. A primeira carta marcada (①) dá a sua iniciativa (número dourado). Ao marcar, o mapa mostra uma PRÉVIA do que você alcançaria. Cartas jogadas vão para o descarte. Para recuperá-las, descanse (precisa de 2 cartas usadas): 💤 Descanso longo (iniciativa 99, cura 3 e VOCÊ escolhe a carta usada que se perde) ou ⚡ Descanso rápido (perde uma ao acaso, mas você ainda joga na mesma rodada). Cartas perdidas só voltam no próximo cenário; sem cartas, você desmaia!',
       destaque: '.mao', esperar: () => feito('carta') },
     { id: 'b_metades', tela: 'batalha', quando: () => naBatalha(1) && T.fase === 'heroi' && T.modo2 && T.pendentes.length === 2, titulo: '⬆⬇ Use uma metade de cada carta',
-      texto: 'Aqui embaixo estão as duas cartas que você jogou. Toque numa metade para usá-la: ⬆ em cima (ataque ou cura), ⬇ embaixo (andar e escudo). Ao usar uma metade, a outra metade da MESMA carta se perde. Você pode atacar e depois andar, andar e depois atacar, ou atacar duas vezes! Quando as duas cartas forem usadas, o turno acaba.',
+      texto: 'Aqui embaixo estão as duas cartas que você jogou. Toque numa metade para usá-la: ⬆ em cima (ataque ou cura), ⬇ embaixo (andar e escudo). Ao usar uma metade, a outra metade da MESMA carta se perde. Regra do X: se você usou a metade de CIMA de uma carta, tem de usar a de BAIXO da outra (e vice-versa). Então dá para atacar e andar, ou andar e atacar, em qualquer ordem. Quando as duas cartas forem usadas, o turno acaba.',
       destaque: '.turno2', esperar: () => T.pendentes.length < 2 || T.rodada > 1 },
     { id: 'b_mover', tela: 'batalha', quando: () => naBatalha(1) && T.fase === 'heroi' && T.movRest > 0, titulo: '👣 Andar',
       texto: () => `Você é o herói da base dourada. Toque num hexágono azul brilhante para andar até lá (até ${T.movRest} agora). Atenção: você anda UMA vez só por turno — o que sobrar do movimento da carta se perde. Pedras e paredes bloqueiam o caminho.`,
-      destaque: '.pips', esperar: () => T.heroi.c !== T.saida.c || T.heroi.r !== T.saida.r },
+      destaque: '.barra-unica', esperar: () => T.heroi.c !== T.saida.c || T.heroi.r !== T.saida.r },
 
     { id: 'b_atacar', tela: 'batalha', quando: () => naBatalha(1) && T.fase === 'heroi' && !T.acaoUsada && combatentes(T).length > 0, titulo: '⚔️ Atacar',
       texto: 'Chegue perto de um inimigo e toque nele no mapa (ou no botão ⚔️ Atacar aqui embaixo). Os alvos ao alcance ficam com brilho vermelho. O dano é sempre o mesmo número da carta, sem sorte. Você pode andar antes e depois de atacar.',
       destaque: '[data-a=tat-atacar]', esperar: () => T.acaoUsada || T.rodada > 1 },
     { id: 'b_modcarta', tela: 'batalha', quando: () => naBatalha(1) && T.log.some(l => l.msg.startsWith('🎴 Carta do seu ataque')), titulo: '🎴 A carta da sorte',
-      texto: 'Cada ataque vira UMA carta do baralho, sozinha (você viu ela aparecer no mapa): +N soma dano, −N tira, ×2 dobra e ✖ faz o ataque falhar. Os monstros também têm o baralho deles. O baralho só é embaralhado de novo quando sai ×2 ou ✖. Toque em 🎴 (embaixo) ou 📋 para ver as cartas.',
-      destaque: '.baralho-tag', botao: 'Entendi' },
+      texto: 'Cada ataque vira UMA carta do baralho, sozinha (você viu ela aparecer no mapa): +N soma dano, −N tira, ×2 dobra e ✖ faz o ataque falhar. Os monstros também têm o baralho deles. O baralho só é embaralhado de novo quando sai ×2 ou ✖. Para ver os baralhos, abra 🃏 Cartas e a aba 📜 Registro.',
+      destaque: '.barra-unica', botao: 'Entendi' },
     { id: 'b_equip', tela: 'batalha', quando: () => naBatalha(1) && T.fase === 'heroi' && T.rodada >= 2 && equipamentosUsaveis(P).length > 0, titulo: '🛡️ Equipamento de uso único',
       texto: 'Toque em 🎒 Itens: cada peça de equipamento que você veste pode ser USADA 1 vez por cenário, de graça, no seu turno (cura, escudo, mais dano, mais movimento ou alcance). Depois ela fica gasta até o próximo cenário. As poções da mochila são outra coisa: somem ao usar.',
       destaque: '[data-a=tat-itens]', botao: 'Entendi' },
@@ -11016,11 +11047,11 @@ const Tutorial = (() => {
       texto: 'Fique de olho na sua vida ❤️ (o máximo do jogo é 30). Se chegar a zero você cai e perde um pouco de ouro. Os itens da 🎒 Mochila NÃO gastam a sua jogada: use uma poção quando precisar. E se a mão estiver acabando, jogue 💤 Descansar.',
       destaque: '.hud-heroi', botao: 'Entendi' },
     { id: 'b_armadilha', tela: 'batalha', quando: () => naBatalha(1) && T.rodada >= 2 && T.armadilhas.size > 0, titulo: '⚠️ Armadilhas',
-      texto: 'Os símbolos no chão são armadilhas do cenário. Quem pisa dispara: você OU os inimigos. Se o seu caminho passar por uma, o jogo avisa e pede um segundo toque. Dica: empurre os monstros para dentro delas! (O ícone ficou na faixa do topo; o 📋 explica.)',
+      texto: 'Os símbolos no chão são armadilhas do cenário. Quem pisa dispara: você OU os inimigos. Se o seu caminho passar por uma, o jogo avisa e pede um segundo toque. Dica: empurre os monstros para dentro delas! (O ícone ficou na faixa do topo; a aba 👹 Monstros explica.)',
       destaque: '.chip-arm', botao: 'Entendi' },
     { id: 'b_moedas', tela: 'batalha', quando: () => naBatalha(1) && T.moedas.size > 0, titulo: '🪙 Moedas',
       texto: 'Todo monstro derrotado solta moedas no chão. Para pegar, termine o TURNO em cima (⏭️ Encerrar), como no baú. Elas viram ouro só no FIM do cenário: cada moeda vale 2 de ouro (3 a partir do cenário 11). O ouro compra itens com o mercador.',
-      destaque: '.pips', esperar: () => T.moedas.size === 0 || T.livre || !!T.fim },
+      destaque: '.barra-unica', esperar: () => T.moedas.size === 0 || T.livre || !!T.fim },
     { id: 'b_salalimpa', tela: 'batalha', quando: () => cen() === 1 && T.limpa && !T.ultimaEtapa && !T.fim, titulo: '🚪 Sala limpa!',
       texto: 'Você limpou a sala! Mas a porta NÃO abre sozinha: ela só abre quando você CHEGAR nela, usando as suas cartas (a rodada continua, só que sem monstros). Antes, pegue as moedas do chão (terminando o turno em cima delas): o que ficar para trás se perde!',
       destaque: '#obj', botao: 'Entendi' },
@@ -11066,11 +11097,11 @@ const Tutorial = (() => {
       texto: 'Algumas cartas têm um selo 🔥 QUEIMA: são fortes, mas somem para sempre depois de usadas (no cenário). Outras CUSTAM vida (💔). Cartas com +🔥/+❄️/+✨/+🌑 CRIAM um elemento, e cartas com −🔥 etc. GASTAM esse elemento para ganhar dano ou uma condição (dura a rodada em que foi criado e a seguinte). As CONDIÇÕES: 💫 atordoado (perde o turno), 🕸️ imobilizado (não anda), ⛓️ desarmado (não ataca), 🕶️ cego (ataca com desvantagem), 🩸 ferido (perde 1 de vida por rodada até curar). Valem para você e para os monstros!',
       destaque: '.mao', botao: 'Entendi' },
     { id: 'b2_jeito', tela: 'batalha', quando: () => naBatalha(2) && T.fase === 'heroi' && T.rodada >= 2 && combatentes(T).some(e => e.jeito), titulo: '🐺 Cada monstro tem um jeito',
-      texto: 'Além da carta, cada monstro tem um jeito de lutar, com um ícone nas cartas deles e explicado no 📋: 🐺 bando (mais forte em grupo), 🛡️ guardião (não sai do posto), 🐔 covarde (foge quando ferido), 😡 furioso (mais forte quando ferido), 😴 dorminhoco (dorme até você chegar perto) e 💚 curandeiro (cura os aliados e fica longe).',
-      destaque: '.cartas-linha', botao: 'Entendi' },
+      texto: 'Além da carta, cada monstro tem um jeito de lutar, com um ícone nas cartas deles e explicado na aba 👹 Monstros (toque num monstro no mapa para ver a ficha): 🐺 bando (mais forte em grupo), 🛡️ guardião (não sai do posto), 😡 furioso (mais forte quando ferido), 😴 dorminhoco (dorme até você chegar perto) e 💚 curandeiro (cura os aliados e fica longe).',
+      destaque: '.barra-unica', botao: 'Entendi' },
     { id: 'b2_desv', tela: 'batalha', quando: () => naBatalha(2) && T.fase === 'heroi' && T.rodada >= 2, titulo: '⚠️ Desvantagem',
       texto: 'Se a carta que você jogou ataca de LONGE (alcance maior que 1) e o alvo que você ataca está COLADO em você, o ataque sofre desvantagem: viram DUAS cartas de sorte e vale a PIOR. Se houver um monstro ao seu lado mas você atacar OUTRO que está longe, não há desvantagem! Com os monstros que atiram é igual: eles tentam se afastar de você para não sofrer isso.',
-      destaque: '.pips', botao: 'Entendi' },
+      destaque: '.barra-unica', botao: 'Entendi' },
     { id: 'b2_itens', tela: 'batalha', quando: () => naBatalha(2) && T.fase === 'heroi' && T.rodada >= 2, titulo: '🎒 Itens são livres',
       texto: 'Toque em 🎒 Mochila para usar uma poção ou item: isso NÃO conta como a sua jogada, é um complemento. Só cabem os itens que a mochila aguenta (2 no começo, até 5 nos níveis altos). Escudo vem das cartas e dos equipamentos.',
       destaque: '[data-a=tat-itens]', botao: 'Entendi' },
@@ -11096,7 +11127,7 @@ const Tutorial = (() => {
     { id: 'b3_estrutura', tela: 'batalha', quando: () => naBatalha(3) && T.ultimaEtapa && T.inim.some(e => e.vivo && e.estrutura),
       aoMostrar: () => { try { const e = T.inim.find(x => x.vivo && x.estrutura); Cena3D.centralizar(e.c, e.r); } catch (e) { /* sem câmera */ } },
       titulo: '🏗️ Estruturas',
-      texto: 'As torres são ESTRUTURAS: aparecem na faixa do topo (e no 📋) e no objetivo (quantas faltam). Ataque-as como a um inimigo. Elas têm bastante defesa, então cartas de dano alto ajudam. Os monstros da sala continuam atacando você!',
+      texto: 'As torres são ESTRUTURAS: aparecem na faixa do topo (e na aba 👹 Monstros) e no objetivo (quantas faltam). Ataque-as como a um inimigo. Elas têm bastante defesa, então cartas de dano alto ajudam. Os monstros da sala continuam atacando você!',
       destaque: '#obj', botao: 'Entendi' },
     { id: 'b3_dica', tela: 'batalha', quando: () => naBatalha(3) && T.ultimaEtapa && T.rodada >= 2, titulo: '🧠 Dica de estratégia',
       texto: 'Primeiro cuide dos monstros que machucam você; depois destrua as torres com calma. Use a faixa de iniciativa para prever quem vai atacar, e jogue-os nas armadilhas com empurrar/puxar.',
@@ -11546,23 +11577,19 @@ function iniciarBatalha() {
 let CARTA_SEL = null;   // 'descanso' (descanso longo) quando escolhido
 let CARTAS_SEL = [];    // as cartas tocadas na mão (até 2; a primeira dá a iniciativa)
 let GAVETA = false;
+let ABA = 'cartas';          // aba aberta na gaveta: cartas, monstros, itens ou registro
+let AUTO_RODADA = null;      // rodada em que a gaveta de cartas já abriu sozinha
+let INSPECIONADO = null;     // monstro tocado no mapa (balão com a ficha dele)
 let ESCOLHENDO_PERDA = false;   // janela para escolher qual carta se perde no descanso longo
 
 function telaTatica() {
   T.escolhaForca = true;        // empurrar/puxar: o jogador escolhe para onde o inimigo vai
-  CARTA_SEL = null; CARTAS_SEL = []; GAVETA = false; ESCOLHENDO_PERDA = false;
+  CARTA_SEL = null; CARTAS_SEL = []; GAVETA = false; ESCOLHENDO_PERDA = false; AUTO_RODADA = null; INSPECIONADO = null;
   app.innerHTML = `<div class="tela tatica reino-${T.reinoId}">
     <div class="tat-topo"><span class="tat-nome">📍 <b>${esc(T.nomeSala)}</b></span><span id="rod"></span></div>
     <div class="palco">
       <div class="cena3d" id="cena3d"></div>
       <div class="sobre-topo"><div id="iniciativa" class="ini-faixa"></div><div id="obj" class="obj"></div></div>
-      <div class="mapa-botoes">
-        <button class="btn-mapa" data-a="tat-zoom-mais" aria-label="Aproximar">＋</button>
-        <button class="btn-mapa" data-a="tat-zoom-menos" aria-label="Afastar">－</button>
-        <button class="btn-mapa" data-a="tat-girar" aria-label="Girar o mapa">↻</button>
-        <button class="btn-mapa" data-a="tat-centro" aria-label="Centralizar no herói">🎯</button>
-        <button class="btn-mapa" data-a="tat-gaveta" aria-label="Detalhes">📋</button>
-      </div>
       <div id="dock" class="dock"></div>
       <div id="gaveta" class="gaveta"></div>
       <div id="modcarta" class="modcarta"></div>
@@ -11578,6 +11605,7 @@ function telaTatica() {
 function jogarCartaEscolhida(id, perder, id2) {
   CARTA_SEL = null; CARTAS_SEL = []; SUB = 'main'; MODO = null;
   if (!tEscolherCarta(T, P, id, perder, id2)) { atualizarHud(); return; }
+  GAVETA = false; INSPECIONADO = null; ajustarMargens(true);
   Tutorial.evento('carta');
   if (T.fase === 'inimigos') rodarInimigos();      // alguém tem iniciativa menor que a sua
   else { mostrarFxT(); depoisDaAcao(true); }       // você é o primeiro
@@ -11585,13 +11613,13 @@ function jogarCartaEscolhida(id, perder, id2) {
 
 function atualizarTudo() { atualizarTabuleiro(); atualizarHud(); }
 
-/** Diz ao mapa 3D quanto da tela está coberto pelos painéis (para o herói e os inimigos nunca ficarem escondidos). */
 function ajustarMargens(reenquadrar) {
   const palco = document.querySelector('.palco'), dock = document.getElementById('dock'), topo = document.querySelector('.sobre-topo');
   if (!palco || !dock || !Cena3D.ativa()) return;
   const pr = palco.getBoundingClientRect(), dr = dock.getBoundingClientRect(), tr = topo.getBoundingClientRect();
   const lateral = dr.left > pr.left + pr.width * 0.4;                // paisagem: o painel fica na direita
-  Cena3D.margens(Math.max(0, tr.bottom - pr.top), lateral ? 0 : Math.max(0, pr.bottom - dr.top), lateral ? Math.max(0, pr.right - dr.left) : 0, reenquadrar);
+  // em pé: o mapa inteiro fica na parte de cima; a parte de baixo (46%) é da barra e da gaveta
+  Cena3D.margens(Math.max(0, tr.bottom - pr.top), lateral ? 0 : Math.max(pr.height * 0.46, pr.bottom - dr.top), lateral ? Math.max(0, pr.right - dr.left) : 0, reenquadrar);
 }
 window.addEventListener('resize', () => { clearTimeout(ajustarMargens.t); ajustarMargens.t = setTimeout(() => { if (T && Cena3D.ativa()) ajustarMargens(true); }, 250); });
 
@@ -11709,10 +11737,10 @@ function iniciativaHtml() {
   if (T.fase === 'escolha' && !T.limpa) {
     const tipos = new Map();
     for (const e of combatentes(T)) { if (tipos.has(e.tipo)) tipos.get(e.tipo).n++; else tipos.set(e.tipo, { ref: e, n: 1 }); }
-    const ocultos = [...tipos.entries()].map(([tipo, g]) => `<button class="ini-chip oculta ${g.ref.chefe ? 'chefe' : ''}" data-a="tat-gaveta" style="--cor:${Cena3D.corDoTipo(tipo)}" title="Carta oculta até você escolher a sua">
+    const ocultos = [...tipos.entries()].map(([tipo, g]) => `<button class="ini-chip oculta ${g.ref.chefe ? 'chefe' : ''}" data-a="tat-aba" data-aba="monstros" style="--cor:${Cena3D.corDoTipo(tipo)}" title="Carta oculta até você escolher a sua">
       <i class="n">?</i>${miniIcone(g.ref.id, 22)}<span class="ef">🂠</span>${g.n > 1 ? `<em>×${g.n}</em>` : ''}</button>`);
     const estr = T.inim.filter(e => e.vivo && e.estrutura);
-    if (estr.length) ocultos.push(`<button class="ini-chip" data-a="tat-gaveta" style="--cor:#8a8a99">${miniIcone(estr[0].id, 22)}<span class="ef">×${estr.length}</span></button>`);
+    if (estr.length) ocultos.push(`<button class="ini-chip chip-estr" data-a="tat-aba" data-aba="monstros" style="--cor:#8a8a99">${miniIcone(estr[0].id, 22)}<span class="ef">×${estr.length}</span></button>`);
     return `<div class="ini-chip heroi pendente" title="Você"><i class="n">?</i>${miniIcone(P.classe, 22)}<span class="ef">Você</span></div>${ocultos.join('')}`;
   }
   const ordem = ordemDaRodada(T, null);
@@ -11732,13 +11760,13 @@ function iniciativaHtml() {
     }
     const restam = T.inim.some(e => e.vivo && e.tipo === g.tipo && emFila.has(e.uid));
     const feito = T.fase !== 'escolha' && !restam, ativo = OCUPADO && ATOR_TIPO === g.tipo;
-    return `<button class="ini-chip ${feito ? 'feito' : ''} ${ativo ? 'ativo' : ''} ${g.ref.chefe ? 'chefe' : ''}" data-a="tat-gaveta" data-tipo="${g.tipo}" style="--cor:${Cena3D.corDoTipo(g.tipo)}" title="${esc(T.cartas[g.tipo].nome)}">
+    return `<button class="ini-chip ${feito ? 'feito' : ''} ${ativo ? 'ativo' : ''} ${g.ref.chefe ? 'chefe' : ''}" data-a="tat-aba" data-aba="monstros" data-tipo="${g.tipo}" style="--cor:${Cena3D.corDoTipo(g.tipo)}" title="${esc(T.cartas[g.tipo].nome)}">
       <i class="n">${g.ini}</i>${miniIcone(g.ref.id, 22)}<span class="ef">${resumoCarta(T.cartas[g.tipo], g.ref)}</span>${g.n > 1 ? `<em>×${g.n}</em>` : ''}</button>`;
   });
   const arm = T.tipoArm && T.armadilhas.size ? ARMADILHAS[T.tipoArm] : null;
-  if (arm) chips.push(`<button class="ini-chip chip-arm" data-a="tat-gaveta" style="--cor:${arm.cor}" title="${esc(arm.nome)}"><span class="ef">${arm.icone} ×${T.armadilhas.size}</span></button>`);
+  if (arm) chips.push(`<button class="ini-chip chip-arm" data-a="tat-aba" data-aba="monstros" style="--cor:${arm.cor}" title="${esc(arm.nome)}"><span class="ef">${arm.icone} ×${T.armadilhas.size}</span></button>`);
   const estr = T.inim.filter(e => e.vivo && e.estrutura);
-  if (estr.length) chips.push(`<button class="ini-chip" data-a="tat-gaveta" style="--cor:#8a8a99">${miniIcone(estr[0].id, 22)}<span class="ef">×${estr.length}</span></button>`);
+  if (estr.length) chips.push(`<button class="ini-chip chip-estr" data-a="tat-aba" data-aba="monstros" style="--cor:#8a8a99">${miniIcone(estr[0].id, 22)}<span class="ef">×${estr.length}</span></button>`);
   return chips.join('');
 }
 
@@ -11797,21 +11825,32 @@ function cartasHtml() {
   return cartas + estrHtml;
 }
 
-/** Painel de detalhes (abre pelo botão 📋 ou tocando numa carta da faixa): cartas dos inimigos, armadilhas e histórico. */
 function gavetaHtml() {
   const defArm = T.tipoArm && T.armadilhas.size ? ARMADILHAS[T.tipoArm] : null;
-  const log = T.log.slice(-8).map(l => `<p class="l-${l.cls}">${esc(l.msg)}</p>`).join('');
+  const log = T.log.slice(-10).map(l => `<p class="l-${l.cls}">${esc(l.msg)}</p>`).join('');
   const naSaida = T.heroi.c === T.saida.c && T.heroi.r === T.saida.r;
-  return `<div class="gaveta-cab"><b>📋 Detalhes da batalha</b><button class="btn-x" data-a="tat-gaveta" aria-label="Fechar">✕</button></div>
-    ${T.limpa ? '' : `<div class="cartas-titulo">🃏 Cartas dos inimigos ${T.fase === 'escolha' ? '(ocultas até você escolher a sua)' : 'nesta rodada'}</div><div class="cartas">${cartasHtml()}</div>`}
-    ${defArm ? `<div class="dica-arm" style="--cor:${defArm.cor}">${defArm.icone} <b>${defArm.nome}</b> · ${defArm.desc} <small>(${T.armadilhas.size} no mapa)</small></div>` : ''}
-    <div class="cartas-titulo">🎴 Baralhos de ataque (a sorte)</div>
-    <div class="baralhos"><div><small>Seu baralho · ${T.exp.baralhos.heroi.compra.length} no monte</small>${baralhoChips(T.exp.baralhos.heroi)}</div>
-      ${T.limpa ? '' : `<div><small>Baralho dos monstros · ${T.exp.baralhos.inim.compra.length} no monte</small>${baralhoChips(T.exp.baralhos.inim)}</div>`}
-      <small class="dica-mod">Cada ataque vira uma carta sozinha. Só quando sai ×2 ou ✖ o baralho é embaralhado de novo.</small></div>
-    <div class="cartas-titulo">Histórico</div><div class="log">${log}</div>
-    ${T.instante && T.exp.rebobinar > 0 && !T.fim && !T.limpa ? `<button class="btn sec" data-a="tat-rebobinar" ${OCUPADO ? 'disabled' : ''}>⏪ Rebobinar a rodada <small>(${T.exp.rebobinar} chance neste cenário)</small></button>` : ''}
-    ${!T.limpa && !T.chefeId ? `<button class="btn sec" data-a="tat-fugir" ${naSaida && (T.fase === 'heroi' || T.fase === 'escolha') && !OCUPADO ? '' : 'disabled'}>🚪 Fugir do cenário <small>${naSaida ? '' : '(só na entrada)'}</small></button>` : ''}`;
+  const escolhendo = T.fase === 'escolha' && !OCUPADO && !T.fim;
+  const abas = [['cartas', '🃏 Cartas'], ['monstros', '👹 Monstros'], ['itens', '🎒 Itens'], ['registro', '📜 Registro']];
+  let corpo = '';
+  if (ABA === 'cartas') {
+    corpo = escolhendo ? maoHtml() : `<p class="dica-2">${T.fase === 'heroi' ? 'Você já jogou as cartas desta rodada. Use as metades no painel de baixo.' : 'Aguarde a sua vez de escolher as cartas.'}</p>
+      <p class="dica-2">🃏 ${T.mao.length} na mão · ${T.descarte.length} usadas · ${T.perdidas.length} perdidas</p>`;
+  } else if (ABA === 'monstros') {
+    corpo = `${T.limpa ? '<p class="vazio">Sala limpa: não há monstros.</p>' : `<div class="cartas-titulo">🃏 Cartas dos inimigos ${T.fase === 'escolha' ? '(ocultas até você escolher as suas)' : 'nesta rodada'}</div><div class="cartas">${cartasHtml()}</div>`}
+      ${defArm ? `<div class="dica-arm" style="--cor:${defArm.cor}">${defArm.icone} <b>${defArm.nome}</b> · ${defArm.desc} <small>(${T.armadilhas.size} no mapa)</small></div>` : ''}`;
+  } else if (ABA === 'itens') {
+    corpo = itensHtml();
+  } else {
+    corpo = `<div class="cartas-titulo">🎴 Baralhos de ataque (a sorte)</div>
+      <div class="baralhos"><div><small>Seu baralho · ${T.exp.baralhos.heroi.compra.length} no monte</small>${baralhoChips(T.exp.baralhos.heroi)}</div>
+        ${T.limpa ? '' : `<div><small>Baralho dos monstros · ${T.exp.baralhos.inim.compra.length} no monte</small>${baralhoChips(T.exp.baralhos.inim)}</div>`}
+        <small class="dica-mod">Cada ataque vira uma carta sozinha. Só quando sai ×2 ou ✖ o baralho é embaralhado de novo.</small></div>
+      <div class="cartas-titulo">Histórico</div><div class="log">${log}</div>
+      ${T.instante && T.exp.rebobinar > 0 && !T.fim && !T.limpa ? `<button class="btn sec" data-a="tat-rebobinar" ${OCUPADO ? 'disabled' : ''}>⏪ Rebobinar a rodada <small>(${T.exp.rebobinar} chance neste cenário)</small></button>` : ''}
+      ${!T.limpa && !T.chefeId ? `<button class="btn sec" data-a="tat-fugir" ${naSaida && (T.fase === 'heroi' || T.fase === 'escolha') && !OCUPADO ? '' : 'disabled'}>🚪 Fugir do cenário <small>${naSaida ? '' : '(só na entrada)'}</small></button>` : ''}`;
+  }
+  return `<div class="gaveta-cab"><div class="abas">${abas.map(([id, nome]) => `<button class="aba ${ABA === id ? 'on' : ''}" data-a="tat-aba" data-aba="${id}">${nome}</button>`).join('')}</div><button class="btn-x" data-a="tat-gaveta" aria-label="Fechar">✕</button></div>
+    <div class="gaveta-corpo">${corpo}</div>`;
 }
 
 /** Texto curtinho de uma metade, para os botões: "⚔️3 🎯4 💨1". */
@@ -11852,19 +11891,18 @@ function maoHtml() {
   const escolhidas = CARTAS_SEL.map(id => T.mao.find(c => c.id === id)).filter(Boolean);
   const precisa = T.limpa ? 1 : Math.min(2, T.mao.length);           // sala limpa (só andar) ou 1 carta na mão: vale a carta inteira
   const pronto = !sel && escolhidas.length === precisa && precisa > 0;
-  const naSaida = T.heroi.c === T.saida.c && T.heroi.r === T.saida.r;
   const podeDescansar = T.descarte.length >= 2;
   const longo = { ...CARTA_DESCANSO, id: 'descanso', nome: 'Descanso longo' };
   const botao = sel ? `<button class="btn jogar" data-a="tat-jogar">▶ Descansar (ini 99)</button>`
-    : pronto ? `${escolhidas.length === 2 ? '<button class="btn peq sec" data-a="tat-trocar" title="Trocar qual carta dá a iniciativa">⇄</button>' : ''}<button class="btn jogar" data-a="tat-jogar">▶ Jogar (ini ${escolhidas[0].ini})</button>`
-    : (naSaida && !T.chefeId && !T.limpa && !escolhidas.length ? '<button class="btn link peq" data-a="tat-fugir">🚪 Fugir</button>' : '');
+    : pronto ? `${escolhidas.length === 2 ? '<button class="btn peq sec" data-a="tat-trocar" title="Trocar qual carta dá a iniciativa">⇄</button>' : ''}<button class="btn jogar" data-a="tat-jogar">▶ Jogar ${escolhidas.length === 2 ? 'as 2 cartas' : 'a carta'} (ini ${escolhidas[0].ini})</button>`
+    : `<button class="btn jogar" disabled>${precisa === 2 ? `Escolha 2 cartas (${escolhidas.length}/2)` : 'Escolha 1 carta'}</button>`;
   const pv = !sel && escolhidas.length ? previaDasCartas() : null;
-  const previa = pv ? ` <span class="previa">👁️ Prévia no mapa: anda até ${pv.mov} · ataca a ${pv.alcance} de alcance (azul = onde chega, vermelho = quem alcança).</span>` : '';
-  const dica = sel ? '' : precisa === 2 ? `<span class="dica-2">Toque em <b>2 cartas</b>: ① dá a iniciativa; use a metade de cima de uma e a de baixo da outra (ou as duas de cima...).${escolhidas.length ? ` ${escolhidas.length}/2` : ''}${previa}</span>` : `<span class="dica-2">${T.limpa ? 'Sala limpa: jogue UMA carta só para andar.' : 'Última carta: vale ela inteira.'}${previa}</span>`;
-  return `<div class="mao-topo"><span>🃏 ${T.mao.length} na mão · ${T.descarte.length} usadas · ${T.perdidas.length} perdidas</span>
-      <span class="mao-bts"><button class="btn link peq" data-a="tat-itens">🎒 ${P.equip.mochila.length}</button><button class="btn peq sec" data-a="tat-rapido" ${podeDescansar && !T.rapidoUsado ? '' : 'disabled'} title="Perde 1 carta usada ao acaso; as outras voltam para a mão e você joga nesta rodada">⚡ Descanso rápido</button>${botao}</span></div>
+  const previa = pv ? ` <span class="previa">👁️ No mapa: azul = onde você chega (até ${pv.mov}), vermelho = quem você alcança.</span>` : '';
+  const dica = sel ? '' : precisa === 2 ? `<span class="dica-2">① dá a iniciativa. Em X: se usar a metade de cima de uma, use a de baixo da outra.${previa}</span>` : `<span class="dica-2">${T.limpa ? 'Sala limpa: jogue UMA carta só para andar.' : 'Última carta: vale ela inteira.'}${previa}</span>`;
+  return `<div class="mao-topo"><span>🃏 ${T.mao.length} na mão · ${T.descarte.length} usadas · ${T.perdidas.length} perdidas</span></div>
     ${dica}
-    <div class="mao">${ordenada.map(c => cartaMaoHtml(c, CARTAS_SEL.includes(c.id))).join('')}${cartaMaoHtml(longo, CARTA_SEL === 'descanso', !podeDescansar)}</div>`;
+    <div class="mao">${ordenada.map(c => cartaMaoHtml(c, CARTAS_SEL.includes(c.id))).join('')}${cartaMaoHtml(longo, CARTA_SEL === 'descanso', !podeDescansar)}</div>
+    <div class="mao-rodape"><button class="btn peq sec" data-a="tat-rapido" ${podeDescansar && !T.rapidoUsado ? '' : 'disabled'} title="Perde 1 carta usada ao acaso; as outras voltam para a sua mão e você joga nesta rodada">⚡ Descanso rápido</button>${botao}</div>`;
 }
 
 /** No turno do herói (duas cartas): as duas cartas jogadas, cada uma com a metade de cima e a de baixo para escolher. */
@@ -11873,7 +11911,7 @@ function turno2Html() {
   const cartas = T.cartasTurno || [];
   const bloco = c => {
     const m = metadesDaCarta(c), pend = T.pendentes.some(x => x.id === c.id);
-    const b = (q, h) => `<button class="m2 ${q} ${T.usadas && T.usadas[c.id] === q ? 'ativa' : ''}" data-a="tat-metade" data-id="${c.id}" data-q="${q}" ${pend && h ? '' : 'disabled'}>${q === 'topo' ? '⬆' : '⬇'} ${metadeCurta(h)}</button>`;
+    const b = (q, h) => `<button class="m2 ${q} ${T.usadas && T.usadas[c.id] === q ? 'ativa' : ''}" data-a="tat-metade" data-id="${c.id}" data-q="${q}" ${pend && h && metadePermitida(T, c, q) ? '' : 'disabled'}>${q === 'topo' ? '⬆' : '⬇'} ${metadeCurta(h)}</button>`;
     return `<div class="c2 ${pend ? '' : 'usada'}"><span class="c2-nome"><i>${c.ini}</i>${esc(c.nome)}${c.queima ? ' 🔥' : ''}</span>${b('topo', m.topo)}${b('base', m.base)}</div>`;
   };
   return `<div class="turno2">${cartas.map(bloco).join('')}</div>`;
@@ -11887,61 +11925,73 @@ function perdaHtml() {
     <button class="btn link" data-a="tat-perder-cancelar">← Cancelar</button></div>`;
 }
 
-/** Barra de baixo: vida e, conforme a fase, a mão de cartas ou os atalhos de ação. */
+/** O balão com a ficha do monstro tocado no mapa (vida, jeito e a carta da rodada). */
+function balaoHtml() {
+  const e = INSPECIONADO !== null && T.inim.find(x => x.uid === INSPECIONADO && x.vivo);
+  if (!e) return '';
+  const c = T.cartas[e.tipo];
+  const jeito = e.jeito ? `${JEITOS_IA[e.jeito].icone} ${JEITOS_IA[e.jeito].nome}: ${JEITOS_IA[e.jeito].desc}` : '';
+  const estado = [e.dorme ? '😴 dormindo' : '', ...e.efeitos.map(x => (CONDICAO_POR_TIPO[x.tipo] ? CONDICAO_POR_TIPO[x.tipo].icone + ' ' + CONDICAO_POR_TIPO[x.tipo].nome : ''))].filter(Boolean).join(' · ');
+  const carta = e.estrutura ? 'Estrutura: não anda nem ataca.' : c ? `Carta: <b>${esc(c.nome)}</b> · ${resumoCarta(c, e)}` : 'Carta oculta até você escolher a sua.';
+  return `<div class="balao ${e.chefe ? 'chefe' : ''}" style="--cor:${Cena3D.corDoTipo(e.tipo)}"><button class="btn-x" data-a="tat-fechar-balao" aria-label="Fechar">✕</button>
+    <b>${esc(e.nome.split(',')[0])}</b> <span class="bal-vida">❤️ ${e.hp}/${e.hpMax}</span>
+    <div>${carta}</div>${jeito ? `<small>${esc(jeito)}</small>` : ''}${estado ? `<small>${esc(estado)}</small>` : ''}</div>`;
+}
+
 function dockHtml() {
   const d = derivados(P), c = cartaAtual(T);
   const etiquetas = [
+    T.fase === 'heroi' ? `<span class="${T.movRest > 0 ? 'on' : ''}">👣 ${T.movRest}</span>` : '',
     T.bonusItem && T.bonusItem.atq ? `<span class="tag ouro">🪨 +${T.bonusItem.atq} dano</span>` : '',
     T.escudoHeroi ? `<span class="tag">🛡️ escudo ${T.escudoHeroi}</span>` : '',
     ...T.efeitos.map(ef => CONDICAO_POR_TIPO[ef.tipo] ? `<span class="tag efeito" title="${esc(CONDICAO_POR_TIPO[ef.tipo].desc)}">${CONDICAO_POR_TIPO[ef.tipo].icone} ${CONDICAO_POR_TIPO[ef.tipo].nome}</span>` : `<span class="tag efeito">${ef.tipo === 'gelo' ? '❄️ gelo' : '☠️ veneno'} (${ef.turnos})</span>`),
     ...Object.keys(ELEMENTOS).filter(k => (T.elementos[k] || 0) > 0).map(k => `<span class="tag elem ${T.elementos[k] === 1 ? 'fraco' : ''}" title="${ELEMENTOS[k].nome} disponível para cartas que o gastam">${ELEMENTOS[k].icone}</span>`),
-  ].join('');
+  ].filter(Boolean).join('');
   const ult = T.log[T.log.length - 1];
-  const barras = `<div class="hud-heroi">
-      <div class="hh-barras">${miniIcone(P.classe, 26)}<span class="vida-num ${P.hp <= d.hpMax * 0.34 ? 'baixa' : ''}">❤️ <b>${P.hp}</b><small>/${d.hpMax}</small></span><span class="ouro-mini">🪙 ${P.gold}</span></div>
-      <div class="pips">${(T.fase === 'heroi' ? `<span class="${T.movRest > 0 ? 'on' : ''}">👣 ${T.movRest}</span><span class="${T.acaoUsada || !c.atq ? '' : 'on'}">${!c.atq ? (T.modo2 && !T.acaoAtiva && T.pendentes.length ? '👆 escolha uma metade' : '⚔️ sem ataque') : T.acaoUsada ? '⚔️ ataque usado' : `⚔️ dano ${danoDoHeroi(T, P)}`}</span>` : '')}${T.cartaHeroi && !T.modo2 ? `<span class="on carta-atual">🃏 ${esc(T.cartaHeroi.nome)}</span>` : ''}${etiquetas}<button class="tag baralho-tag" data-a="tat-gaveta" title="Seu baralho de modificadores">🎴 ${T.exp.baralhos.heroi.compra.length}/${T.exp.baralhos.heroi.todas.length}</button>
-        <span class="cen-tag">${DIFICULDADES[T.exp.difId].icone} Nv ${T.exp.nivelCen}</span></div>
-    </div>`;
   const tick = ult ? `<div class="tick l-${ult.cls}">${esc(ult.msg)}</div>` : '';
-  if (T.fim === 'vitoria' || T.fim === 'porta') return tick + barras;
+  const vida = `<span class="vida-chip ${P.hp <= d.hpMax * 0.34 ? 'baixa' : ''}">❤️ <b>${P.hp}</b><small>/${d.hpMax}</small></span>`;
+  const itensN = P.equip.mochila.length + equipamentosUsaveis(P).filter(q => !T.exp.equipGasto[q.chave]).length;
+  const bt = (a, ic, txt, extra = '', cls = '') => `<button class="ac ${cls}" data-a="${a}" ${extra}><b>${ic}</b><span>${txt}</span></button>`;
+  const balao = balaoHtml();
+  if (T.fim === 'vitoria' || T.fim === 'porta') return tick + `<div class="barra-unica hud-heroi">${vida}</div>`;
   const pendF = pendenciaForca(T);
-  if (pendF && !OCUPADO) return tick + barras + `<div class="alvo-msg forca"><span>${pendF.modo === 'puxar' ? '🧲' : '💨'} <b>Escolha para onde ${pendF.modo === 'puxar' ? 'puxar' : 'empurrar'} ${esc(pendF.alvo.nome.split(',')[0])}</b> (até ${pendF.n}): toque num hexágono destacado</span><button class="btn peq" data-a="tat-forca-pular">Deixar onde está</button></div>`;
-  if (T.fim === 'derrota') return tick + barras;
-  if (OCUPADO || T.fase === 'inimigos') return tick + cartasLinhaHtml() + barras + '<div class="aguarde">⏳ Os inimigos estão agindo…</div>';
-  if (T.fase === 'escolha') return tick + barras + (SUB === 'itens' ? acoesHtml() : maoHtml());
-  return tick + cartasLinhaHtml() + barras + turno2Html() + acoesHtml();
+  if (pendF && !OCUPADO) return tick + `<div class="alvo-msg forca"><span>${pendF.modo === 'puxar' ? '🧲' : '💨'} <b>Escolha para onde ${pendF.modo === 'puxar' ? 'puxar' : 'empurrar'} ${esc(pendF.alvo.nome.split(',')[0])}</b> (até ${pendF.n}): toque num hexágono destacado</span><button class="btn peq" data-a="tat-forca-pular">Deixar onde está</button></div><div class="barra-unica hud-heroi">${vida}</div>`;
+  if (T.fim === 'derrota') return tick + `<div class="barra-unica hud-heroi">${vida}</div>`;
+  if (OCUPADO || T.fase === 'inimigos') return balao + `<div class="pips">${etiquetas}</div>` + `<div class="barra-unica hud-heroi">${vida}<span class="aguarde-i">⏳ Os inimigos estão agindo…</span></div>`;
+  if (T.fase === 'escolha') return balao + tick + (etiquetas ? `<div class="pips">${etiquetas}</div>` : '') + `<div class="barra-unica hud-heroi">${vida}${bt('tat-gaveta-cartas', '🃏', 'Cartas')}${bt('tat-itens', '🎒', `Itens ${itensN}`)}</div>`;
+  if (MODO) return tick + `<div class="alvo-msg"><span>🎯 Toque no inimigo destacado em vermelho</span><button class="btn peq" data-a="tat-cancelar">Cancelar</button></div>`;
+  const podeAtacar = !!c.atq && !T.acaoUsada && !temCond(T.efeitos, 'desarmado');
+  const atacar = T.limpa ? '' : bt('tat-atacar', '⚔️', c.atq ? `Atacar ${danoDoHeroi(T, P)}` : (T.modo2 && !T.acaoAtiva && T.pendentes.length ? 'Escolha ⬆⬇' : 'Sem ataque'), podeAtacar ? '' : 'disabled');
+  return balao + tick + `<div class="pips">${etiquetas}</div>` + turno2Html() + `<div class="barra-unica hud-heroi">${vida}${T.ultimoMov ? bt('tat-desfazer', '↩️', 'Desfazer') : ''}${atacar}${bt('tat-itens', '🎒', `Itens ${itensN}`)}${bt('tat-fim', '⏭️', 'Encerrar', '', 'fim-turno')}</div>`;
 }
 
-function acoesHtml() {
-  if (MODO) {
-    return `<div class="alvo-msg"><span>🎯 Toque no inimigo destacado em vermelho</span><button class="btn peq" data-a="tat-cancelar">Cancelar</button></div>`;
-  }
-  const bt = (a, ic, txt, extra = '', cls = '') => `<button class="ac ${cls}" data-a="${a}" ${extra}><b>${ic}</b><span>${txt}</span></button>`;
-  if (SUB === 'itens') {
-    const m = P.equip.mochila, heroi = T.fase === 'heroi' && !T.fim;
-    const equips = equipamentosUsaveis(P).map(q => {
-      const it = ITENS[q.id], gasto = !!T.exp.equipGasto[q.chave];
-      return `<button class="btn hab" data-a="tat-equip" data-k="${q.chave}" ${gasto || !heroi ? 'disabled' : ''}><span>${it.icone} ${it.nome} ${gasto ? '<small>✔ usado</small>' : ''}</span><small>${esc(descreverBonus(it))} · uso único por cenário${heroi ? '' : ' (só no seu turno)'}</small></button>`;
-    }).join('');
-    return `<div class="submenu"><p class="dica-sub">🛡️ Equipamento · cada peça pode ser usada <b>1 vez por cenário</b> (de graça, no seu turno)</p>${equips || '<p class="vazio">Nenhum equipamento vestido.</p>'}
-      <p class="dica-sub">🎒 Mochila (${m.length}/${tamanhoMochila(P.nivel)}) · usar um item <b>não gasta</b> a sua jogada</p>${m.length ? m.map((id, i) => {
-      const it = ITENS[id], vazio = !!(it.heal && !it.limpa && P.hp >= derivados(P).hpMax);
-      return `<button class="btn hab" data-a="tat-item" data-i="${i}" ${vazio ? 'disabled' : ''}><span>${it.icone} ${it.nome}</span><small>${it.desc}</small></button>`;
-    }).join('') : '<p class="vazio">Mochila vazia.</p>'}<button class="btn link peq" data-a="tat-voltar">← Voltar</button></div>`;
-  }
-  if (T.limpa) return `<div class="acoes-linha">${bt('tat-itens', '🎒', `Itens ${P.equip.mochila.length + equipamentosUsaveis(P).filter(q => !T.exp.equipGasto[q.chave]).length}`)}${bt('tat-fim', '⏭️', 'Encerrar', '', 'fim-turno')}</div>`;
-  const c = cartaAtual(T);
-  const podeAtacar = !!c.atq && !T.acaoUsada;
-  return `<div class="acoes-linha">${bt('tat-atacar', '⚔️', c.atq ? `Atacar ${danoDoHeroi(T, P)}` : 'Sem ataque', podeAtacar ? '' : 'disabled')}${T.ultimoMov ? bt('tat-desfazer', '↩️', 'Desfazer') : ''}${bt('tat-itens', '🎒', `Itens ${P.equip.mochila.length + equipamentosUsaveis(P).filter(q => !T.exp.equipGasto[q.chave]).length}`)}${bt('tat-fim', '⏭️', 'Encerrar', '', 'fim-turno')}</div>`;
+function itensHtml() {
+  const m = P.equip.mochila, heroi = (T.fase === 'heroi' || T.fase === 'escolha') && !T.fim, noTurno = T.fase === 'heroi' && !T.fim;
+  const equips = equipamentosUsaveis(P).map(q => {
+    const it = ITENS[q.id], gasto = !!T.exp.equipGasto[q.chave];
+    return `<button class="btn hab" data-a="tat-equip" data-k="${q.chave}" ${gasto || !noTurno ? 'disabled' : ''}><span>${it.icone} ${it.nome} ${gasto ? '<small>✔ usado</small>' : ''}</span><small>${esc(descreverBonus(it))} · uso único por cenário${noTurno ? '' : ' (só no seu turno)'}</small></button>`;
+  }).join('');
+  return `<p class="dica-sub">🛡️ Equipamento · cada peça pode ser usada <b>1 vez por cenário</b> (de graça, no seu turno)</p>${equips || '<p class="vazio">Nenhum equipamento vestido.</p>'}
+    <p class="dica-sub">🎒 Mochila (${m.length}/${tamanhoMochila(P.nivel)}) · usar um item <b>não gasta</b> a sua jogada</p>${m.length ? m.map((id, i) => {
+    const it = ITENS[id], vazio = !!(it.heal && !it.limpa && P.hp >= derivados(P).hpMax);
+    return `<button class="btn hab" data-a="tat-item" data-i="${i}" ${vazio || !heroi ? 'disabled' : ''}><span>${it.icone} ${it.nome}</span><small>${it.desc}</small></button>`;
+  }).join('') : '<p class="vazio">Mochila vazia.</p>'}`;
 }
 
 function atualizarHud() {
   const dock = document.getElementById('dock');
   if (!dock || !T) return;
+  const chaveRodada = T.etapa + ':' + T.rodada;
+  if (T.fase === 'escolha' && !OCUPADO && !T.fim && AUTO_RODADA !== chaveRodada) { AUTO_RODADA = chaveRodada; GAVETA = true; ABA = 'cartas'; }   // a cada rodada a gaveta de cartas abre sozinha
   dock.innerHTML = dockHtml();
   const ini = document.getElementById('iniciativa'); if (ini) ini.innerHTML = iniciativaHtml();
   const obj = document.getElementById('obj'); if (obj) obj.innerHTML = objetivoHtml();
-  const gv = document.getElementById('gaveta'); if (gv) { gv.innerHTML = GAVETA ? gavetaHtml() : ''; gv.classList.toggle('aberta', GAVETA); }
+  const gv = document.getElementById('gaveta');
+  if (gv) {
+    const rol = (gv.querySelector('.gaveta-corpo') || {}).scrollTop || 0;
+    gv.innerHTML = GAVETA ? gavetaHtml() : ''; gv.classList.toggle('aberta', GAVETA);
+    const novo = gv.querySelector('.gaveta-corpo'); if (novo) novo.scrollTop = rol;
+  }
   const centro = document.getElementById('centro');
   if (centro) {
     const painel = T.fim === 'vitoria' && RES ? painelVitoria() : (T.fim === 'derrota' ? derrotaHtml() : (ESCOLHENDO_PERDA ? perdaHtml() : (T.limpa && RES && !RES.visto && !T.fim ? painelVitoria() : '')));
@@ -12272,8 +12322,14 @@ const ACOES = {
 
   // batalha tática
   hex(el) {
-    if (!T || OCUPADO || T.fase !== 'heroi' || T.fim) return;
+    if (!T || OCUPADO) return;
     const c = +el.dataset.c, r = +el.dataset.r;
+    if (T.fase !== 'heroi' || T.fim) {                      // fora do seu turno, tocar num monstro mostra a ficha dele
+      const m = inimigoEm(T, c, r);
+      if (m) { INSPECIONADO = INSPECIONADO === m.uid ? null : m.uid; atualizarHud(); }
+      return;
+    }
+    if (GAVETA && !MODO) { GAVETA = false; ajustarMargens(true); atualizarHud(); }
     if (pendenciaForca(T)) {                               // escolhendo para onde o inimigo vai
       if (tResolverForca(T, P, c, r)) { Cena3D.investir('heroi', c, r); depoisDaAcao(true); }
       else toast('Toque num dos hexágonos destacados (ou em "Deixar onde está").');
@@ -12282,9 +12338,9 @@ const ACOES = {
     const e = inimigoEm(T, c, r);
     if (e) {
       if (MODO) { executar(MODO, e.uid); return; }
-      if (T.acaoUsada) { toast('Você já agiu neste turno.'); return; }
-      if (tAlvos(T, P).some(x => x.uid === e.uid)) executar({ tipo: 'atacar' }, e.uid);
-      else toast(`${e.nome.split(',')[0]} está fora de alcance. Aproxime-se!`);
+      if (!T.acaoUsada && tAlvos(T, P).some(x => x.uid === e.uid)) { INSPECIONADO = null; executar({ tipo: 'atacar' }, e.uid); return; }
+      INSPECIONADO = INSPECIONADO === e.uid ? null : e.uid;      // sem ataque possível: mostra a ficha do monstro
+      atualizarHud();
       return;
     }
     if (MODO) { MODO = null; atualizarTudo(); return; }
@@ -12365,10 +12421,12 @@ const ACOES = {
     CARTA_SEL = null; CARTAS_SEL = []; toast(`⚡ A carta "${perdida.nome}" se perdeu. As outras voltaram para a sua mão: escolha a carta da rodada!`);
     salvar(); atualizarTudo();
   },
-  'tat-gaveta'() { GAVETA = !GAVETA; atualizarHud(); },
+  'tat-gaveta'() { GAVETA = !GAVETA; atualizarHud(); ajustarMargens(true); },
+  'tat-gaveta-cartas'() { GAVETA = true; ABA = 'cartas'; atualizarHud(); },
+  'tat-aba'(el) { ABA = el.dataset.aba; GAVETA = true; atualizarHud(); },
+  'tat-fechar-balao'() { INSPECIONADO = null; atualizarHud(); },
   'tat-forca-pular'() { if (T && !OCUPADO && tResolverForca(T, P, null)) depoisDaAcao(true); },
-  'tat-itens'() { SUB = 'itens'; atualizarHud(); },
-  'tat-voltar'() { SUB = 'main'; atualizarHud(); },
+  'tat-itens'() { ABA = 'itens'; GAVETA = true; atualizarHud(); },
   'tat-cancelar'() { MODO = null; atualizarTudo(); },
   'tat-equip'(el) { if (T && !OCUPADO) { const ok = tUsarEquip(T, P, el.dataset.k); if (ok) { SUB = 'main'; Tutorial.evento('equip'); } depoisDaAcao(ok); } },
   'tat-item'(el) { if (T && !OCUPADO) executar({ tipo: 'item', i: +el.dataset.i }); },
