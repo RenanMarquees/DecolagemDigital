@@ -962,11 +962,6 @@ teste('terreno: a cada 3 rodadas o chão racha e surgem armadilhas novas', () =>
     for (let i = 0; i < 2; i++) fimRodada(T, p); out.push(T.armadilhas.size); fimRodada(T, p); out.push(T.armadilhas.size, T.rodada); return out; })()`);
   igual(r.join(), 'true,0,2,4');
 });
-teste('atravessar a porta devolve as cartas usadas à mão (as perdidas não voltam)', () => {
-  const r = R(`(() => { const { p, T, exp } = cen(1, { semTurno: true, etapa: 0 }); for (let i = 0; i < 3; i++) { tEscolherCarta(T, p, T.mao.find(c => !c.queima).id); T.fase = 'escolha'; T.cartaHeroi = null; }
-    tDescansoRapido(T, p); const N = tProximaEtapa(T, p); return [N.descarte.length, N.perdidas.length, N.mao.length + N.perdidas.length]; })()`);
-  igual(r.join(), '0,1,12');
-});
 
 console.log('\nHistória com escolhas: eventos, consequências, ordem livre e finais (ciclo 8)');
 teste('nos reinos depois de Valhala dá para escolher a ordem dos 3 primeiros cenários; o chefe só abre depois deles (Valhala segue em ordem)', () => {
@@ -1066,11 +1061,11 @@ teste('a regra do X: depois da metade de CIMA de uma carta só vale a de BAIXO d
   igual(r.join(), 'true,false,true,true,false,true,true,true');
 });
 
-teste('sala limpa: as cartas usadas voltam para a mão na hora (as perdidas continuam perdidas)', () => {
-  const r = R(`(() => { const { p, T } = cen(1, { semTurno: true, etapa: 0 }); tEscolherCarta(T, p, T.mao.find(c => !c.queima).id); T.fase = 'escolha'; T.cartaHeroi = null;
-    tEscolherCarta(T, p, T.mao.find(c => !c.queima).id); T.fase = 'escolha'; T.cartaHeroi = null; tDescansoRapido(T, p); tEscolherCarta(T, p, T.mao.find(c => !c.queima).id); const antes = [T.descarte.length, T.perdidas.length];
-    matarTodos(T); return [...antes, T.descarte.length, T.perdidas.length, T.mao.length + T.perdidas.length]; })()`);
-  igual(r.join(), '1,1,0,1,12');
+teste('as cartas NÃO voltam ao limpar a sala nem ao passar a porta (só os descansos recuperam cartas)', () => {
+  const r = R(`(() => { const { p, T } = cen(1, { semTurno: true, etapa: 0 }); for (let i = 0; i < 3; i++) { tEscolherCarta(T, p, T.mao.find(c => !c.queima).id); T.fase = 'escolha'; T.cartaHeroi = null; }
+    const antes = [T.mao.length, T.descarte.length]; matarTodos(T); const limpa = [T.mao.length, T.descarte.length]; const N = tProximaEtapa(T, p);
+    return [...antes, ...limpa, N.mao.length, N.descarte.length]; })()`);
+  igual(r.join(), '9,3,9,3,9,3');
 });
 
 console.log(`\n${ok} testes passaram${falhas.length ? `, ${falhas.length} FALHARAM: ${falhas.join('; ')}` : ''}.`);
