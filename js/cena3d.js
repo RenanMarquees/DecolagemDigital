@@ -273,8 +273,8 @@ const Cena3D = (() => {
 
     const cena = new THREE.Scene();
     cena.background = new THREE.Color(tema.fundo);
-    cena.fog = new THREE.Fog(tema.fundo, 20, 52);
-    cena.add(new THREE.HemisphereLight(tema.ceu, tema.solo, 0.95));
+    // sem névoa: a câmera fica longe (mapa inteiro na tela) e a névoa escurecia o campo
+    cena.add(new THREE.HemisphereLight(tema.ceu, tema.solo, 1.05));
     const sol = new THREE.DirectionalLight(0xffffff, 0.8); sol.position.set(-5, 11, 7); cena.add(sol);
     const rim = new THREE.DirectionalLight(tema.ceu, 0.45); rim.position.set(6, 5, -8); cena.add(rim);   // luz de contorno: separa o monstro do fundo
     Modelos3D.ambiente(renderer, cena);                                                                     // reflexos suaves nos metais e olhos

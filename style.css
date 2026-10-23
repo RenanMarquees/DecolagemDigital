@@ -514,3 +514,10 @@ b { font-weight: 700; }
   .sobre-topo .obj { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: .7rem; }
   .mao-rodape .btn { font-size: .72rem; padding: 6px 8px; }
 }
+
+/* gaveta: nada encolhe (o texto das fichas não pode sair do quadro) */
+.gaveta-corpo > * { flex-shrink: 0; }
+.cartas { flex-shrink: 0; }
+.carta-inim { flex-shrink: 0; min-height: min-content; }
+.carta-inim small { overflow-wrap: anywhere; }
+.gaveta { background: #130f20; }

@@ -1066,5 +1066,12 @@ teste('a regra do X: depois da metade de CIMA de uma carta só vale a de BAIXO d
   igual(r.join(), 'true,false,true,true,false,true,true,true');
 });
 
+teste('sala limpa: as cartas usadas voltam para a mão na hora (as perdidas continuam perdidas)', () => {
+  const r = R(`(() => { const { p, T } = cen(1, { semTurno: true, etapa: 0 }); tEscolherCarta(T, p, T.mao.find(c => !c.queima).id); T.fase = 'escolha'; T.cartaHeroi = null;
+    tEscolherCarta(T, p, T.mao.find(c => !c.queima).id); T.fase = 'escolha'; T.cartaHeroi = null; tDescansoRapido(T, p); tEscolherCarta(T, p, T.mao.find(c => !c.queima).id); const antes = [T.descarte.length, T.perdidas.length];
+    matarTodos(T); return [...antes, T.descarte.length, T.perdidas.length, T.mao.length + T.perdidas.length]; })()`);
+  igual(r.join(), '1,1,0,1,12');
+});
+
 console.log(`\n${ok} testes passaram${falhas.length ? `, ${falhas.length} FALHARAM: ${falhas.join('; ')}` : ''}.`);
 process.exit(falhas.length ? 1 : 0);

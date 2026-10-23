@@ -527,7 +527,8 @@ function checarFim(T) {
   if (!cumprido) return;
   for (const e of T.inim) if (e.vivo) { e.vivo = false; e.recuou = true; }
   T.objetivoCumprido = true;
-  T.limpa = true;                 // a sala está limpa, mas o jogo continua: você ainda usa as cartas para andar até a saída
+  T.limpa = true;
+  if (T.descarte && T.descarte.length) { T.mao.push(...T.descarte.splice(0)); logar(T, '🃏 Sala limpa: as cartas usadas voltaram para a sua mão (as perdidas, não).', 'cura'); }                 // a sala está limpa, mas o jogo continua: você ainda usa as cartas para andar até a saída
   if (!T.ultimaEtapa && T.porta) { T.porta.acessivel = true; T.g.cel[T.porta.r][T.porta.c] = '.'; }   // a porta só abre quando você chega nela
   if (T.ultimaEtapa) {            // última sala: cumpriu o objetivo, o cenário termina na hora (o que não foi pego se perde)
     T.fim = 'vitoria';

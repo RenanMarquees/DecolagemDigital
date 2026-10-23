@@ -517,6 +517,13 @@ b { font-weight: 700; }
   .mao-rodape .btn { font-size: .72rem; padding: 6px 8px; }
 }
 
+/* gaveta: nada encolhe (o texto das fichas não pode sair do quadro) */
+.gaveta-corpo > * { flex-shrink: 0; }
+.cartas { flex-shrink: 0; }
+.carta-inim { flex-shrink: 0; min-height: min-content; }
+.carta-inim small { overflow-wrap: anywhere; }
+.gaveta { background: #130f20; }
+
 </style>
 <div id="app"></div>
 <div id="modal"></div>
@@ -3371,7 +3378,8 @@ function checarFim(T) {
   if (!cumprido) return;
   for (const e of T.inim) if (e.vivo) { e.vivo = false; e.recuou = true; }
   T.objetivoCumprido = true;
-  T.limpa = true;                 // a sala está limpa, mas o jogo continua: você ainda usa as cartas para andar até a saída
+  T.limpa = true;
+  if (T.descarte && T.descarte.length) { T.mao.push(...T.descarte.splice(0)); logar(T, '🃏 Sala limpa: as cartas usadas voltaram para a sua mão (as perdidas, não).', 'cura'); }                 // a sala está limpa, mas o jogo continua: você ainda usa as cartas para andar até a saída
   if (!T.ultimaEtapa && T.porta) { T.porta.acessivel = true; T.g.cel[T.porta.r][T.porta.c] = '.'; }   // a porta só abre quando você chega nela
   if (T.ultimaEtapa) {            // última sala: cumpriu o objetivo, o cenário termina na hora (o que não foi pego se perde)
     T.fim = 'vitoria';
@@ -10436,8 +10444,8 @@ const Cena3D = (() => {
 
     const cena = new THREE.Scene();
     cena.background = new THREE.Color(tema.fundo);
-    cena.fog = new THREE.Fog(tema.fundo, 20, 52);
-    cena.add(new THREE.HemisphereLight(tema.ceu, tema.solo, 0.95));
+    // sem névoa: a câmera fica longe (mapa inteiro na tela) e a névoa escurecia o campo
+    cena.add(new THREE.HemisphereLight(tema.ceu, tema.solo, 1.05));
     const sol = new THREE.DirectionalLight(0xffffff, 0.8); sol.position.set(-5, 11, 7); cena.add(sol);
     const rim = new THREE.DirectionalLight(tema.ceu, 0.45); rim.position.set(6, 5, -8); cena.add(rim);   // luz de contorno: separa o monstro do fundo
     Modelos3D.ambiente(renderer, cena);                                                                     // reflexos suaves nos metais e olhos
